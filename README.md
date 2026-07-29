@@ -22,6 +22,8 @@ Markdown is the native format of AI assistants — they read it, write it, diff 
 
 endpaper installs without admin rights, stores nothing outside a directory you already have, and needs no server or account — just a folder.
 
+The tool disappears into the twenty seconds before a meeting starts. You type `/meeting.standup Q3 planning #platform`, a file exists with correct frontmatter and a date-stamped name, and you're typing notes before anyone has finished joining the call. You never decide where a file goes or what to call it.
+
 ## Usage
 
 > Screenshots coming soon — `docs/screenshots/tui-list.png` and `docs/screenshots/tui-preview.png` are referenced below and will render once added.
