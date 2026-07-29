@@ -150,7 +150,7 @@ Examples of foundational tasks (adjust based on your project):
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] TXXX [P] Documentation updates (README, AGENTS.md, changelog)
+- [ ] TXXX [P] Documentation updates (README, AGENTS.md)
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Verify TUI on target terminals (Windows Terminal, iTerm2, macOS Terminal, PuTTY, tmux)

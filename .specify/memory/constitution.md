@@ -1,39 +1,35 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (uninitialized template) → 1.0.0
-Bump rationale: Initial ratification. All placeholder tokens replaced with
-concrete governance for the endpaper project.
+Version change: 1.0.0 → 2.0.0
+Bump rationale: Principle VI redefined in a backward-incompatible way — the
+changelog-recording MUST is removed. The project will not maintain a
+CHANGELOG.md file; public API surface is tracked via specs, contracts, and
+tests instead. No replacement record-keeping obligation was substituted in.
 
 Modified principles:
-  - [PRINCIPLE_1_NAME] → I. Core Is the Product
-  - [PRINCIPLE_2_NAME] → II. Two Interfaces, One Contract
-  - [PRINCIPLE_3_NAME] → III. Simplicity Is the Default (NON-NEGOTIABLE)
-  - [PRINCIPLE_4_NAME] → IV. Never Lose the User's Words
-  - [PRINCIPLE_5_NAME] → V. The Interface Is Specified, Not Improvised
-  - (added)           → VI. Readable Python, Enforced Automatically
+  - VI. Readable Python, Enforced Automatically — dropped the bullet
+    "Public API changes ... MUST be recorded in the changelog with their
+    version." All other bullets in VI are unchanged.
 
-Added sections:
-  - Platform & Distribution Constraints (was [SECTION_2_NAME])
-  - Development Workflow & Quality Gates (was [SECTION_3_NAME])
-
+Added sections: none
 Removed sections: none
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md — Constitution Check gates populated
-  ✅ .specify/templates/spec-template.md — reviewed; no constitution-driven
-     mandatory sections added or removed (principles constrain HOW, spec
-     template governs WHAT)
-  ✅ .specify/templates/tasks-template.md — sample Foundational tasks rewritten
-     to core-first (they led with database/auth setup, contradicting III);
-     Polish phase now includes terminal- and platform-verification tasks
-  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated agent-specific
-     references requiring generic guidance
+  ✅ .specify/templates/tasks-template.md — "Documentation updates (README,
+     AGENTS.md, changelog)" sample task no longer lists changelog
+  ✅ .specify/templates/plan-template.md — Constitution Check row for
+     Principle VI no longer references the changelog
+  ✅ .specify/templates/spec-template.md — reviewed; no changelog reference
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated changelog
+     references requiring update
 
-Follow-up TODOs:
-  - README.md names the project "cairn" while REQUIREMENTS.md, the command
-    name, and this constitution use "endpaper". Not changed here (outside the
-    constitution workflow's scope); resolve before first public release.
+Deferred (out of scope for this amendment):
+  - specs/001-meeting-notes/plan.md and tasks.md reference CHANGELOG.md as a
+    historical record of a completed feature; left unchanged since they
+    document what was actually done at the time, not current policy.
+
+Follow-up TODOs: none
 -->
 
 # endpaper Constitution
@@ -143,8 +139,6 @@ by strangers.
   in a spec MUST map to at least one test.
 - Prefer a plain function to a class, a class to a framework, and an explicit branch to a
   clever abstraction. Names say what the thing is; comments explain only why.
-- Public API changes — `--json` schemas, exit codes, frontmatter fields, the task line
-  format, file layout — MUST be recorded in the changelog with their version.
 
 **Rationale**: Automated gates make quality the cheap path rather than a matter of
 reviewer stamina, and a contributor who can read the codebase in an afternoon is a
@@ -204,4 +198,4 @@ in writing is removed rather than merged.
 `REQUIREMENTS.md` holds the current version's scope and acceptance criteria; `AGENTS.md`
 in a workspace holds runtime guidance for AI assistants. Neither overrides this document.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28
+**Version**: 2.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28

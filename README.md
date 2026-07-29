@@ -85,7 +85,7 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter s
 - **No index, no database** — the markdown files are the only state. endpaper globs and parses the workspace in memory on launch; nothing to corrupt, nothing to reindex.
 - **`AGENTS.md`** — generated at `init`, under ~60 lines, so an assistant landing in the workspace is productive immediately.
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for the full v0.0.1 specification, including CLI syntax, frontmatter schema, and acceptance criteria. Not everything above has landed on `main` yet — check [CHANGELOG.md](CHANGELOG.md) for what's actually shipped so far.
+See [REQUIREMENTS.md](REQUIREMENTS.md) for the full v0.0.1 specification, including CLI syntax, frontmatter schema, and acceptance criteria. Not everything above has landed on `main` yet.
 
 ## Roadmap
 
