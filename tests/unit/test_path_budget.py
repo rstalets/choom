@@ -45,5 +45,5 @@ def test_daily_note_path_is_well_under_budget(tmp_workspace: Workspace) -> None:
     daily = open_daily_note(tmp_workspace, now=datetime(2026, 7, 28, 9, 0, 0))
 
     relative = daily.path.relative_to(tmp_workspace.root).as_posix()
-    assert relative == "notes/daily/2026-07-28.md"
+    assert relative == "notes/daily/2026/07/2026-07-28.md"
     assert len(relative) <= 120

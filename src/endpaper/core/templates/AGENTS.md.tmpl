@@ -1,22 +1,22 @@
 # endpaper workspace
 
-This directory is an endpaper workspace: plain Markdown files with YAML frontmatter, no
-database. Every command below runs non-interactively and produces stable, parseable output.
+Plain Markdown files with YAML frontmatter, no database. Every command below is
+non-interactive and produces stable, parseable output.
 
 ## Layout
 
 ```
-.endpaper/config.toml   workspace marker, do not edit
-meetings/               one markdown file per meeting
-notes/                  one markdown file per typed or untyped note
-notes/daily/            one markdown file per day, named YYYY-MM-DD.md
-tasks.md                reserved for a future feature, currently empty
-AGENTS.md               this file
+.endpaper/config.toml      workspace marker, do not edit
+meetings/YYYY/MM/          one markdown file per meeting
+notes/YYYY/MM/             one markdown file per typed or untyped note
+notes/daily/YYYY/MM/       one markdown file per day, named YYYY-MM-DD.md
+tasks.md                   one checkbox line per task, at the workspace root
+AGENTS.md                  this file
 ```
 
 ## Frontmatter
 
-Every file in `meetings/` and `notes/` (daily notes included) starts with exactly these six keys:
+Every file in `meetings/` and `notes/` starts with exactly these six keys:
 
 ```yaml
 ---
@@ -31,26 +31,30 @@ updated: 2026-07-28T09:14:00
 
 `id` is prefixed `m_` for meetings, `n_` for notes. `type` is `""` when untyped; `tags` is `[]`.
 
+## Tasks
+
+One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment (invisible in
+any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on the next scan:
+
+```
+- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->
+```
+
 ## Commands
 
 ```bash
 endpaper meeting new "Q3 planning" --type standup --tag platform
-endpaper meeting list                                    # tab-separated, newest first
-endpaper meeting list --json                             # array of objects, 7 keys each
-endpaper meeting list --type standup --tag platform --since 2026-07-01
-```
-
-`--tag` is repeatable and is the supported way to attach tags on the command line — an
-unquoted `#tag` is eaten by the shell before endpaper ever sees it. A `#tag` token inside a
-*quoted* description is also parsed out, as a convenience.
-
-Notes take the same `new`/`list` commands and flags, plus a no-argument daily note command:
-
-```bash
+endpaper meeting list --json --type standup --tag platform --since 2026-07-01
 endpaper note today                                      # open/create today's note
 endpaper note new "vendor landscape" --type research --tag procurement
 endpaper note list --json --type daily --since 2026-07-01
+endpaper task add "send the vendor comparison" --type followup --tag procurement
+endpaper task list --json --all --type followup --tag procurement
+endpaper task done t_a1b2                                 # endpaper task undone t_a1b2
 ```
+
+`--tag` is repeatable and the supported way to attach tags on the command line -- an unquoted
+`#tag` is eaten by the shell first; a `#tag` inside a *quoted* description is parsed out too.
 
 ## Exit codes
 

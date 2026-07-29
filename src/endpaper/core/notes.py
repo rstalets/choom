@@ -9,7 +9,7 @@ from endpaper.core.frontmatter import render_frontmatter
 from endpaper.core.models import Collection, DailyNote, Document, ScanWarning, Workspace
 from endpaper.core.text import new_document_id
 
-NOTES = Collection("n_", "notes", ("notes", "notes/daily"), frozenset({"daily"}))
+NOTES = Collection("n_", "notes", ("notes",), frozenset({"daily"}))
 
 
 def create_note(
@@ -29,7 +29,7 @@ def scan_notes(workspace: Workspace) -> tuple[list[Document], list[ScanWarning]]
 
 def open_daily_note(workspace: Workspace, *, now: datetime | None = None) -> DailyNote:
     when = now or datetime.now()
-    path = workspace.daily_dir / f"{when:%Y-%m-%d}.md"
+    path = workspace.daily_dir / f"{when:%Y/%m}" / f"{when:%Y-%m-%d}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
 
     timestamp = when.replace(microsecond=0).isoformat()

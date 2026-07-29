@@ -43,9 +43,12 @@ def test_non_markdown_files_under_notes_are_ignored(tmp_path: Path, monkeypatch,
     assert len(records) == 1
 
 
-def test_subdirectories_of_notes_other_than_daily_are_ignored(
+def test_notes_subtree_is_scanned_recursively_including_arbitrary_subdirectories(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
+    # Post-003 (YYYY/MM partitioning): scan_documents walks a collection's whole
+    # subtree, not just its top level, so any nested .md file with valid
+    # frontmatter is now discoverable -- including a user's own subdirectories.
     monkeypatch.chdir(tmp_path)
     main(["init"])
     capsys.readouterr()
@@ -63,5 +66,6 @@ def test_subdirectories_of_notes_other_than_daily_are_ignored(
     exit_code = main(["note", "list", "--json"])
     assert exit_code == 0
     records = json.loads(capsys.readouterr().out)
-    assert len(records) == 1
-    assert records[0]["title"] == "an idea"
+    assert len(records) == 2
+    titles = {r["title"] for r in records}
+    assert titles == {"an idea", "old"}

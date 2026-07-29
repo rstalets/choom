@@ -7,10 +7,11 @@ from textual.app import App
 from textual.binding import Binding
 
 from endpaper.core.documents import _read_document, match_document
-from endpaper.core.errors import UsageError
+from endpaper.core.errors import EndpaperError, UsageError
 from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.models import DailyNote, Document, ScanWarning, Workspace
+from endpaper.core.models import DailyNote, Document, ScanWarning, Task, TaskFilter, Workspace
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
+from endpaper.core.tasks import add_task, filter_tasks, load_tasks, match_task, set_task_state
 
 
 class EndpaperApp(App[None]):
@@ -23,16 +24,23 @@ class EndpaperApp(App[None]):
         super().__init__()
         self.workspace = workspace
         self.documents: dict[str, list[Document]] = {"meetings": [], "notes": []}
-        self.warnings: dict[str, list[ScanWarning]] = {"meetings": [], "notes": []}
+        self.warnings: dict[str, list[ScanWarning]] = {"meetings": [], "notes": [], "tasks": []}
         self.active: str = "meetings"
         self.visible_documents: list[Document] = []
         self.last_create_error: str | None = None
         self._filter_query: str = ""
+        self.tasks: list[Task] = []
+        self.visible_tasks: list[Task] = []
+        self.show_done: bool = False
+        self.last_task_error: str | None = None
+        self._task_filter_query: str = ""
 
     def on_mount(self) -> None:
         self.documents["meetings"], self.warnings["meetings"] = scan_meetings(self.workspace)
         self.documents["notes"], self.warnings["notes"] = scan_notes(self.workspace)
+        self.tasks, self.warnings["tasks"] = load_tasks(self.workspace)
         self.visible_documents = list(self.documents[self.active])
+        self._refresh_visible_tasks()
 
         from endpaper.tui.list_screen import ListScreen
 
@@ -50,6 +58,10 @@ class EndpaperApp(App[None]):
         return self.visible_documents
 
     def apply_filter(self, query: str) -> None:
+        if self.active == "tasks":
+            self._task_filter_query = query
+            self._refresh_visible_tasks()
+            return
         self._filter_query = query
         active_documents = self.documents[self.active]
         if query:
@@ -89,7 +101,17 @@ class EndpaperApp(App[None]):
 
     def switch_collection(self, name: str) -> None:
         self.active = name
-        self.visible_documents = list(self.documents[self.active])
+        if name == "tasks":
+            self._refresh_visible_tasks()
+        else:
+            self.visible_documents = list(self.documents[self.active])
+
+    def _refresh_visible_tasks(self) -> None:
+        task_filter = TaskFilter(include_done=self.show_done)
+        filtered = filter_tasks(self.tasks, task_filter)
+        if self._task_filter_query:
+            filtered = [t for t in filtered if match_task(t, self._task_filter_query)]
+        self.visible_tasks = filtered
 
     def create_meeting_and_track(self, description: str, type: str) -> Document | None:
         try:
@@ -124,3 +146,33 @@ class EndpaperApp(App[None]):
         self.active = "notes"
         self.visible_documents = list(self.documents["notes"])
         return daily
+
+    def add_task_and_track(self, description: str, type: str) -> Task | None:
+        try:
+            task = add_task(self.workspace, description, type=type)
+        except UsageError as exc:
+            self.last_create_error = str(exc)
+            return None
+        self.last_create_error = None
+        self.tasks.append(task)
+        self.active = "tasks"
+        self._task_filter_query = ""
+        self._refresh_visible_tasks()
+        return task
+
+    def toggle_task_and_track(self, task_id: str) -> None:
+        current = next((t for t in self.tasks if t.id == task_id), None)
+        try:
+            updated = set_task_state(
+                self.workspace, task_id, done=not (current.done if current else False)
+            )
+        except EndpaperError as exc:
+            self.last_task_error = str(exc)
+            return
+        self.last_task_error = None
+        self.tasks = [updated if t.id == task_id else t for t in self.tasks]
+        self._refresh_visible_tasks()
+
+    def toggle_show_done(self) -> None:
+        self.show_done = not self.show_done
+        self._refresh_visible_tasks()

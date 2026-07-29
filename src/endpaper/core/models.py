@@ -22,6 +22,10 @@ class Workspace:
     def daily_dir(self) -> Path:
         return self.root / "notes" / "daily"
 
+    @property
+    def tasks_file(self) -> Path:
+        return self.root / "tasks.md"
+
 
 @dataclass(frozen=True, slots=True)
 class Document:
@@ -61,6 +65,9 @@ ScanWarningReason = Literal[
     "missing_fields",
     "unexpected_fields",
     "invalid_value",
+    "task_unterminated_comment",
+    "task_malformed_comment",
+    "task_invalid_value",
 ]
 
 
@@ -102,3 +109,29 @@ class InitResult:
     workspace: Workspace
     written: tuple[str, ...]
     skipped: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Task:
+    id: str | None
+    text: str
+    done: bool
+    type: str
+    tags: tuple[str, ...]
+    created: date | None
+    line: int
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedTasks:
+    tasks: tuple[Task, ...]
+    warnings: tuple[ScanWarning, ...]
+    lines: tuple[str, ...]
+    needs_id: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TaskFilter:
+    type: str | None = None
+    tags: tuple[str, ...] = ()
+    include_done: bool = False
