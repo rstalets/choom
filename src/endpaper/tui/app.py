@@ -20,6 +20,7 @@ class EndpaperApp(App[None]):
         self.meetings: list[Meeting] = []
         self.warnings: list[ScanWarning] = []
         self.visible_meetings: list[Meeting] = []
+        self.last_create_error: str | None = None
 
     def on_mount(self) -> None:
         self.meetings, self.warnings = scan_meetings(self.workspace)
@@ -38,8 +39,10 @@ class EndpaperApp(App[None]):
     def create_meeting_and_track(self, description: str, type: str) -> Meeting | None:
         try:
             meeting = create_meeting(self.workspace, description, type=type)
-        except UsageError:
+        except UsageError as exc:
+            self.last_create_error = str(exc)
             return None
+        self.last_create_error = None
         self.meetings.insert(0, meeting)
         self.visible_meetings = list(self.meetings)
         return meeting

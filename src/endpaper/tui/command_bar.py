@@ -9,6 +9,17 @@ from textual.widgets import Input, Static
 VERBS = {"meeting", "meetings", "init"}
 
 
+def _normalize(text: str) -> str:
+    """Tolerate a literal leading '/' in the typed text.
+
+    The bar is opened by pressing '/', which is not inserted into the input --
+    but users naturally retype it anyway (the footer hint reads "/ filter or
+    command", and it's the universal command-prefix convention), so a leading
+    '/' must not be treated as part of the query/verb.
+    """
+    return text[1:] if text.startswith("/") else text
+
+
 def resolve_mode(text: str) -> tuple[str, str]:
     """Return (mode, first_token). mode is 'filter' or 'command'.
 
@@ -16,6 +27,7 @@ def resolve_mode(text: str) -> tuple[str, str]:
     """
     if text.startswith(" "):
         return "filter", ""
+    text = _normalize(text)
     stripped = text.lstrip()
     if not stripped:
         return "filter", ""
@@ -76,7 +88,10 @@ class CommandBar(Static):
         mode, verb = resolve_mode(event.value)
         self.post_message(self.ModeChanged(mode, verb))
         if mode == "filter":
-            query = event.value[1:] if event.value.startswith(" ") else event.value
+            # A leading space is the explicit escape hatch for a literal filter
+            # (e.g. the literal word "meetings"); anywhere else, a leading '/' is
+            # the retyped activation key, not part of the query.
+            query = event.value[1:] if event.value.startswith(" ") else _normalize(event.value)
             self.post_message(self.FilterChanged(query))
 
     @on(Input.Submitted, "#bar-input")
@@ -87,6 +102,7 @@ class CommandBar(Static):
         self.close()
 
     def _run_command(self, text: str, verb_token: str) -> None:
+        text = _normalize(text)
         rest = text[len(verb_token) :].lstrip()
         stem, _, type_part = verb_token.partition(".")
         stem = stem.lower()

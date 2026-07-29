@@ -40,6 +40,7 @@ class ListScreen(Screen[None]):
     def __init__(self) -> None:
         super().__init__()
         self._last_previewed_id: str | None = None
+        self._pending_error: str | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
@@ -99,9 +100,16 @@ class ListScreen(Screen[None]):
             preview.update("")
 
     def _render_status(
-        self, mode: str | None = None, verb: str = "", bar_open: bool = False
+        self,
+        mode: str | None = None,
+        verb: str = "",
+        bar_open: bool = False,
+        error: str | None = None,
     ) -> None:
         status = self.query_one(StatusBar)
+        if error:
+            status.update(f"⚠ {error}")
+            return
         if bar_open and mode:
             label = f"[command: {verb}]" if mode == "command" else "[filter]"
             status.update(f"{label}   enter run   esc cancel")
@@ -156,9 +164,13 @@ class ListScreen(Screen[None]):
             from endpaper.tui.preview_screen import PreviewScreen
 
             self._last_previewed_id = meeting.id
+            self._pending_error = None
             self.app.push_screen(PreviewScreen(meeting))
+        else:
+            self._pending_error = self.app.last_create_error  # type: ignore[attr-defined]
 
     @on(CommandBar.Closed)
     def _on_command_bar_closed(self, message: CommandBar.Closed) -> None:
-        self._render_status()
+        self._render_status(error=self._pending_error)
+        self._pending_error = None
         self.query_one("#meeting-list", ListView).focus()
