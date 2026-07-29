@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 import secrets
 import unicodedata
+from collections.abc import Container
 from datetime import date
 
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
@@ -32,5 +33,16 @@ def parse_tags(description: str) -> tuple[str, tuple[str, ...]]:
     return title, tuple(tags)
 
 
+def new_document_id(when: date, prefix: str) -> str:
+    return f"{prefix}{when:%Y%m%d}_{secrets.token_hex(4)}"
+
+
 def new_meeting_id(when: date) -> str:
-    return f"m_{when:%Y%m%d}_{secrets.token_hex(4)}"
+    return new_document_id(when, "m_")
+
+
+def new_task_id(taken: Container[str]) -> str:
+    while True:
+        candidate = f"t_{secrets.token_hex(2)}"
+        if candidate not in taken:
+            return candidate

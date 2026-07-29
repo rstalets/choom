@@ -61,8 +61,8 @@ frontmatter, and title.
 **Acceptance Scenarios**:
 
 1. **Given** an initialized workspace, **When** the user runs `/meeting.standup Q3 planning #platform`
-   in the interface, **Then** exactly one file is created under `meetings/`, named with today's
-   date, the type, and a slug of the description, containing frontmatter with `type: standup`,
+   in the interface, **Then** exactly one file is created under `meetings/YYYY/MM/` for today's
+   date, named with today's date, the type, and a slug of the description, containing frontmatter with `type: standup`,
    `tags: [platform]`, `title: Q3 planning`, today's `created`, and a matching `updated`.
 2. **Given** the same workspace, **When** the user runs
    `endpaper meeting new "Q3 planning" --type standup --tag platform`, **Then** the resulting file is
@@ -210,8 +210,13 @@ every result parses.
   `/meeting.<type> <description>` and from the command line with
   `endpaper meeting new <description> --type <type>`, both producing the same result.
 - **FR-014**: The type MUST be optional and free-form. Omitting it MUST create an untyped meeting.
-- **FR-015**: A created meeting MUST be a markdown file at `meetings/YYYY-MM-DD-<type>-<slug>.md`,
-  omitting the type segment when untyped.
+- **FR-015**: A created meeting MUST be a markdown file at
+  `meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md`, omitting the type segment when untyped. The
+  `YYYY/MM/` partition is derived from the meeting's own date and MUST be created on demand.
+  *(Amended 2026-07-28 — see [Amendments](#amendments).)*
+- **FR-015a**: Listing MUST walk `meetings/` recursively. A meeting filed under a partition that
+  does not match its `created` date MUST still list, and MUST NOT be moved — the date in
+  frontmatter is authoritative, never the path.
 - **FR-016**: Slugs MUST be derived from the description, lowercase, containing only alphanumeric
   characters and hyphens, and truncated to 40 characters.
 - **FR-017**: When the target filename already exists, the new file MUST be created with a numeric
@@ -284,9 +289,10 @@ every result parses.
 
 - **Workspace**: A directory containing a configuration marker, the fixed folder structure, and the
   guidance file. It is the boundary for all listing and creation in this feature.
-- **Meeting**: A single markdown file in `meetings/`. Identified by a stable id, described by a type,
-  title, tags, and creation and update timestamps, and located by a date-first filename so that
-  lexical order matches chronological order. Its body is free-form markdown owned by the user.
+- **Meeting**: A single markdown file under `meetings/YYYY/MM/`. Identified by a stable id, described
+  by a type, title, tags, and creation and update timestamps, and located by a date-first filename so
+  that lexical order matches chronological order within its partition. Its body is free-form markdown
+  owned by the user.
 - **Tag**: A short free-form label attached to a meeting. Supplied inline in the interface, and by an
   explicit option on the command line.
 - **Meeting list record**: The in-memory, machine-readable projection of a meeting used by both the
@@ -357,3 +363,30 @@ Deferred to their own features, and explicitly not delivered here:
 - Editing: the edit state, line numbers, save and discard keys, and the unsaved-changes prompt (§3.5)
 - `endpaper find`, `read`, `write`, and `append` (§4.2, §4.4)
 - Everything listed in REQUIREMENTS.md §5
+
+## Amendments
+
+### 2026-07-28 — meetings are partitioned by `YYYY/MM/`
+
+**What changed**: FR-015 now places a meeting at `meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md`
+rather than flat under `meetings/`. FR-015a is added: listing walks the collection recursively, and
+frontmatter — never the path — is authoritative for a meeting's date.
+
+**Why**: a flat collection grows without bound, and at a few years of daily use it is thousands of
+files in one directory. The amendment is made before v0.0.1 ships specifically so that partitioning
+never has to be a migration; changing it later would mean moving users' files. See REQUIREMENTS.md
+§4.6.
+
+**What it costs**: 8 characters of path budget (`/YYYY/MM`), taking the worst-case generated path
+from 107 to 115 characters below the workspace root — still inside the ≤120 budget set in
+[research.md R10](./research.md#r10-windows-path-length), so no cap changes.
+
+**What is unaffected**: the filename itself, which keeps its full ISO date so a file that leaves the
+vault still says what it is; collision suffixes, which still disambiguate within a day and never
+across partitions; frontmatter; ids; and every command's surface.
+
+**Implementation status**: this spec and REQUIREMENTS.md are amended; `create_meeting` and
+`scan_meetings` still write and read flat and must be updated to match before release. The
+supporting artifacts still describing the flat layout —
+[data-model.md](./data-model.md) filename derivation and
+[contracts/core-api.md](./contracts/core-api.md) — are updated alongside.

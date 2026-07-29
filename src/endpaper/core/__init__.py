@@ -1,28 +1,97 @@
+from endpaper.core.documents import (
+    create_document,
+    filter_documents,
+    match_document,
+    scan_documents,
+)
+from endpaper.core.editing import load_for_edit, save_buffer, stamp_updated
 from endpaper.core.errors import EndpaperError, NotFoundError, UsageError, WorkspaceError
 from endpaper.core.frontmatter import read_frontmatter, render_frontmatter
 from endpaper.core.meetings import create_meeting, filter_meetings, match_meeting, scan_meetings
-from endpaper.core.models import Meeting, MeetingFilter, ScanWarning, Workspace
-from endpaper.core.text import new_meeting_id, parse_tags, slugify
+from endpaper.core.models import (
+    Collection,
+    DailyNote,
+    Document,
+    DocumentFilter,
+    EditableFile,
+    InitResult,
+    Meeting,
+    MeetingFilter,
+    Note,
+    ParsedTasks,
+    SaveResult,
+    ScanWarning,
+    Task,
+    TaskFilter,
+    Workspace,
+)
+from endpaper.core.notes import create_note, open_daily_note, scan_notes
+from endpaper.core.tasks import (
+    add_task,
+    filter_tasks,
+    load_tasks,
+    match_task,
+    parse_tasks,
+    render_task_line,
+    set_task_state,
+)
+from endpaper.core.text import (
+    new_document_id,
+    new_meeting_id,
+    new_task_id,
+    parse_tags,
+    slugify,
+)
 from endpaper.core.workspace import find_workspace, init_workspace
 
 __all__ = [
+    "Collection",
+    "DailyNote",
+    "Document",
+    "DocumentFilter",
+    "EditableFile",
     "EndpaperError",
-    "NotFoundError",
-    "UsageError",
-    "WorkspaceError",
+    "InitResult",
     "Meeting",
     "MeetingFilter",
+    "Note",
+    "NotFoundError",
+    "ParsedTasks",
+    "SaveResult",
     "ScanWarning",
+    "Task",
+    "TaskFilter",
+    "UsageError",
     "Workspace",
+    "WorkspaceError",
+    "add_task",
+    "create_document",
     "create_meeting",
+    "create_note",
+    "filter_documents",
     "filter_meetings",
+    "filter_tasks",
     "find_workspace",
     "init_workspace",
+    "load_for_edit",
+    "load_tasks",
+    "match_document",
     "match_meeting",
+    "match_task",
+    "new_document_id",
     "new_meeting_id",
+    "new_task_id",
+    "open_daily_note",
     "parse_tags",
+    "parse_tasks",
     "read_frontmatter",
     "render_frontmatter",
+    "render_task_line",
+    "save_buffer",
+    "scan_documents",
     "scan_meetings",
+    "scan_notes",
+    "set_task_state",
     "slugify",
+    "stamp_updated",
 ]

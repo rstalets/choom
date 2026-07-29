@@ -14,9 +14,21 @@ class Workspace:
     def meetings_dir(self) -> Path:
         return self.root / "meetings"
 
+    @property
+    def notes_dir(self) -> Path:
+        return self.root / "notes"
+
+    @property
+    def daily_dir(self) -> Path:
+        return self.root / "notes" / "daily"
+
+    @property
+    def tasks_file(self) -> Path:
+        return self.root / "tasks.md"
+
 
 @dataclass(frozen=True, slots=True)
-class Meeting:
+class Document:
     id: str
     path: Path
     title: str
@@ -24,6 +36,25 @@ class Meeting:
     tags: tuple[str, ...]
     created: str
     updated: str
+
+
+Meeting = Document
+Note = Document
+
+
+@dataclass(frozen=True, slots=True)
+class Collection:
+    id_prefix: str
+    create_dir: str
+    scan_dirs: tuple[str, ...]
+    reserved_types: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class DailyNote:
+    path: Path
+    document: Document | None
+    created: bool
 
 
 ScanWarningReason = Literal[
@@ -34,6 +65,9 @@ ScanWarningReason = Literal[
     "missing_fields",
     "unexpected_fields",
     "invalid_value",
+    "task_unterminated_comment",
+    "task_malformed_comment",
+    "task_invalid_value",
 ]
 
 
@@ -45,7 +79,59 @@ class ScanWarning:
 
 
 @dataclass(frozen=True, slots=True)
-class MeetingFilter:
+class DocumentFilter:
     type: str | None = None
     tags: tuple[str, ...] = ()
     since: date | None = None
+
+
+MeetingFilter = DocumentFilter
+
+
+@dataclass(frozen=True, slots=True)
+class EditableFile:
+    path: Path
+    text: str
+    newline: str
+    trailing_newline: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SaveResult:
+    ok: bool
+    saved_text: str
+    stamped: bool
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class InitResult:
+    workspace: Workspace
+    written: tuple[str, ...]
+    skipped: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class Task:
+    id: str | None
+    text: str
+    done: bool
+    type: str
+    tags: tuple[str, ...]
+    created: date | None
+    line: int
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedTasks:
+    tasks: tuple[Task, ...]
+    warnings: tuple[ScanWarning, ...]
+    lines: tuple[str, ...]
+    needs_id: tuple[int, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TaskFilter:
+    type: str | None = None
+    tags: tuple[str, ...] = ()
+    include_done: bool = False

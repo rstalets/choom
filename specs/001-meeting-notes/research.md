@@ -255,7 +255,8 @@ describe a personal vault synced to a shared folder, not a coordinated event log
 
 **Rationale**: FR-044 requires staying well within the 260-character limit assuming a root like
 `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\` (~56 chars). Worst case generated path is
-`meetings/YYYY-MM-DD-<type>-<slug>-NN.md`: 9 + 10 + 1 + 40 (type cap) + 1 + 40 (slug cap) + 3 + 3 =
-107. That leaves ~150 characters of headroom for the root, which covers deeply nested corporate
+`meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>-NN.md`: 9 + 8 (the `YYYY/MM/` partition added by the
+2026-07-28 amendment) + 10 + 1 + 40 (type cap) + 1 + 40 (slug cap) + 3 + 3 =
+115. That leaves ~145 characters of headroom for the root, which covers deeply nested corporate
 OneDrive paths. Slug and type caps are therefore load-bearing, not cosmetic, and are asserted in
 tests.

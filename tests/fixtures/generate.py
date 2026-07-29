@@ -7,6 +7,7 @@ from pathlib import Path
 from endpaper.core.errors import WorkspaceError
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
+from endpaper.core.notes import create_note, open_daily_note
 from endpaper.core.workspace import find_workspace, init_workspace
 
 
@@ -14,7 +15,7 @@ def generate(workspace_root: Path, count: int) -> Workspace:
     try:
         workspace = find_workspace(workspace_root)
     except WorkspaceError:
-        workspace = init_workspace(workspace_root)
+        workspace = init_workspace(workspace_root).workspace
 
     base = datetime(2026, 1, 1, 9, 0, 0)
     for i in range(count):
@@ -29,13 +30,39 @@ def generate(workspace_root: Path, count: int) -> Workspace:
     return workspace
 
 
+def generate_notes(workspace_root: Path, count: int) -> Workspace:
+    try:
+        workspace = find_workspace(workspace_root)
+    except WorkspaceError:
+        workspace = init_workspace(workspace_root).workspace
+
+    base = datetime(2026, 1, 1, 9, 0, 0)
+    daily_count = min(count, 30)
+    for i in range(daily_count):
+        open_daily_note(workspace, now=base + timedelta(days=i))
+
+    for i in range(count - daily_count):
+        when = base + timedelta(minutes=i)
+        create_note(
+            workspace,
+            f"generated note {i}",
+            type="research" if i % 3 == 0 else "",
+            tags=("perf",) if i % 5 == 0 else (),
+            now=when,
+        )
+    return workspace
+
+
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Generate an N-meeting workspace for perf tests.")
+    parser = argparse.ArgumentParser(
+        description="Generate an N-meeting, N-note workspace for perf tests."
+    )
     parser.add_argument("--count", type=int, default=1000)
     parser.add_argument("--path", type=Path, default=Path.cwd())
     args = parser.parse_args()
     workspace = generate(args.path, args.count)
-    print(f"generated {args.count} meetings in {workspace.root}")
+    generate_notes(workspace.root, args.count)
+    print(f"generated {args.count} meetings and {args.count} notes in {workspace.root}")
     return 0
 
 

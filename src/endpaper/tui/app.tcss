@@ -7,6 +7,11 @@ Screen {
     layout: horizontal;
 }
 
+#menu-pane {
+    width: 14;
+    border-right: solid $accent;
+}
+
 #list-pane {
     width: 2fr;
     border-right: solid $accent;
@@ -15,6 +20,10 @@ Screen {
 #preview-pane {
     width: 3fr;
     padding: 0 1;
+}
+
+#collection-menu {
+    height: 1fr;
 }
 
 #meeting-list {
@@ -40,4 +49,32 @@ CommandBar Input {
 StatusBar {
     height: 1;
     background: $panel;
+}
+
+#editor {
+    height: 1fr;
+    width: 1fr;
+}
+
+#discard-dialog {
+    width: auto;
+    height: auto;
+    padding: 1 2;
+    background: $panel;
+    border: thick $accent;
+    align: center middle;
+}
+
+#discard-buttons {
+    height: auto;
+    align: center middle;
+    padding-top: 1;
+}
+
+#discard-buttons Button {
+    margin: 0 1;
+}
+
+DiscardDialog {
+    align: center middle;
 }
