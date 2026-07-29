@@ -31,6 +31,12 @@ CommandBar {
     display: none;
 }
 
+CommandBar Input {
+    height: 1;
+    border: none;
+    padding: 0;
+}
+
 StatusBar {
     height: 1;
     background: $panel;

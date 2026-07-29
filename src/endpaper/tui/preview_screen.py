@@ -7,6 +7,7 @@ from textual.screen import Screen
 from textual.widgets import Markdown
 
 from endpaper.core.models import Meeting
+from endpaper.tui.rendering import render_preview_markdown
 from endpaper.tui.status_bar import PREVIEW_HELP, StatusBar
 
 
@@ -23,8 +24,7 @@ class PreviewScreen(Screen[None]):
             yield StatusBar(PREVIEW_HELP, id="status-bar")
 
     def on_mount(self) -> None:
-        text = self.meeting.path.read_text(encoding="utf-8", errors="replace")
-        self.query_one("#full-preview", Markdown).update(text)
+        self.query_one("#full-preview", Markdown).update(render_preview_markdown(self.meeting))
 
     def action_close_preview(self) -> None:
         self.app.pop_screen()

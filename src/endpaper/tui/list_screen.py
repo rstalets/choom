@@ -8,6 +8,7 @@ from textual.widgets import Label, ListItem, ListView, Markdown
 
 from endpaper.core.models import Meeting
 from endpaper.tui.command_bar import CommandBar
+from endpaper.tui.rendering import render_preview_markdown
 from endpaper.tui.status_bar import LIST_HELP, StatusBar
 
 EMPTY_STATE_MESSAGE = "No meetings yet. Press / then 'meeting <description>' to create one."
@@ -68,8 +69,7 @@ class ListScreen(Screen[None]):
         preview = self.query_one("#preview", Markdown)
         highlighted = list_view.highlighted_child
         if isinstance(highlighted, MeetingRow):
-            text = highlighted.meeting.path.read_text(encoding="utf-8", errors="replace")
-            preview.update(text)
+            preview.update(render_preview_markdown(highlighted.meeting))
         else:
             preview.update("")
 
