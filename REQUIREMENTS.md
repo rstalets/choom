@@ -79,13 +79,14 @@ CLI:  endpaper meeting list [--json] [--tag <tag>] [--type <type>] [--since <dat
 
 - TUI shows a list sorted by date descending: date, type, title, tags.
 - Up/down or `j`/`k` to move.
-- `/` focuses a filter input that filters the list live.
+- `/` opens a single input that is both the filter and the command line. Its first token decides: if the part before any `.` is a registered command verb (`meeting`, `meetings`, `init`, and later `note`, `task`, `workspace`), the input is a command and runs on `enter`; otherwise every keystroke filters the list live. The footer shows the resolved mode — `[filter]` or `[command: meeting.standup]` — as the user types, and a leading space forces filter mode.
+- One key, not two. `/` is specified both as the filter key here and as the prefix of `/meeting.<type>` above, so it must do both. Filtering is live while commands require `enter`, which means a mis-read command never acts without a confirming keystroke.
 - `enter` opens the selected meeting — see §3.5 for view and edit behaviour.
 
 **Acceptance criteria**
 
 1. `/meeting.standup Q3 planning #platform` creates exactly one file with `type: standup`, `tags: [platform]`, today's date, and title "Q3 planning".
-2. `endpaper meeting new "Q3 planning" --type standup --tag platform` produces a byte-identical file to (1) and prints its path.
+2. `endpaper meeting new "Q3 planning" --type standup --tag platform` produces a file identical to (1) in every field except `id`, `created`, and `updated`, and prints its path. Those three are generated per invocation, so byte-equality across two separate runs is not achievable; what is required — and what the test asserts — is that both front doors call the same core function and neither has behaviour the other lacks.
 3. `endpaper meeting list --json` emits an array of objects with stable keys: `id`, `path`, `title`, `type`, `tags`, `created`, `updated`.
 4. Creating two meetings with the same description on the same day yields two distinct files, neither overwritten.
 
@@ -333,7 +334,7 @@ Frontmatter — exactly these fields, no more:
 
 ```yaml
 ---
-id: m_20260728_a1b2
+id: m_20260728_a1b2c3d4
 type: standup
 title: Q3 planning
 tags: [platform]
