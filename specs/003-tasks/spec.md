@@ -1,6 +1,6 @@
 # Feature Specification: Tasks
 
-**Feature Branch**: `002-tasks`
+**Feature Branch**: `003-tasks`
 
 **Created**: 2026-07-28
 
