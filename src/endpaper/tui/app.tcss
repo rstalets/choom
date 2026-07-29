@@ -1,0 +1,37 @@
+Screen {
+    layout: vertical;
+}
+
+#body {
+    height: 1fr;
+    layout: horizontal;
+}
+
+#list-pane {
+    width: 2fr;
+    border-right: solid $accent;
+}
+
+#preview-pane {
+    width: 3fr;
+    padding: 0 1;
+}
+
+#meeting-list {
+    height: 1fr;
+}
+
+#bottom-bar {
+    dock: bottom;
+    height: auto;
+}
+
+CommandBar {
+    height: 1;
+    display: none;
+}
+
+StatusBar {
+    height: 1;
+    background: $panel;
+}

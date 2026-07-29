@@ -1,0 +1,57 @@
+# endpaper workspace
+
+This directory is an endpaper workspace: plain Markdown files with YAML frontmatter, no
+database. Every command below is safe to run non-interactively — no prompts, no editor, no
+pager — and produces stable output for a script or an assistant to parse.
+
+## Layout
+
+```
+.endpaper/config.toml   workspace marker, do not edit
+meetings/               one markdown file per meeting
+notes/daily/            reserved for a future feature, currently unused
+tasks.md                reserved for a future feature, currently empty
+AGENTS.md               this file
+```
+
+## Meeting frontmatter
+
+Every file in `meetings/` starts with exactly these six keys, in this order:
+
+```yaml
+---
+id: m_20260728_a1b2c3d4
+type: "standup"
+title: "Q3 planning"
+tags: ["platform"]
+created: 2026-07-28T09:14:00
+updated: 2026-07-28T09:14:00
+---
+```
+
+`type` is `""` when the meeting is untyped. `tags` is `[]` when there are none.
+
+## Commands
+
+Create a meeting:
+
+```bash
+endpaper meeting new "Q3 planning" --type standup --tag platform
+```
+
+`--tag` is repeatable and is the supported way to attach tags on the command line — an
+unquoted `#tag` is eaten by the shell before endpaper ever sees it. A `#tag` token inside a
+*quoted* description is also parsed out, as a convenience.
+
+List meetings:
+
+```bash
+endpaper meeting list                                    # tab-separated, newest first
+endpaper meeting list --json                             # array of objects, 7 keys each
+endpaper meeting list --type standup --tag platform --since 2026-07-01
+```
+
+## Exit codes
+
+`0` success · `1` not found · `2` usage error · `3` workspace error. Diagnostics go to
+stderr; data goes to stdout; the two are never interleaved.

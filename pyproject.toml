@@ -1,0 +1,53 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "endpaper"
+version = "0.0.1"
+description = "A corporate-friendly Markdown notes engine that makes your AI happy."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = [
+    "textual>=8.2",
+    "PyYAML>=6.0",
+]
+
+[project.scripts]
+endpaper = "endpaper.cli.main:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+    "mypy",
+    "types-PyYAML",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/endpaper"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/endpaper/core/templates" = "endpaper/core/templates"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["specs", ".specify"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+files = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
