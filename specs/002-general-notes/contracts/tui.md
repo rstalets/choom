@@ -52,6 +52,11 @@ on the next keystroke. No modal, no dialog — nothing here is destructive.
 
 ## Collection switching
 
+*Updated by the [2026-07-28 amendment](../spec.md#amendment-2026-07-28-collection-navigation-pane)
+(FR-036–FR-039): a persistent collection menu pane joins the command-bar verbs as a second way to
+switch, and creating a document now switches to it automatically. The command-bar path below is
+unchanged; the menu path is new.*
+
 ```
 /notes     → active collection becomes notes,    filter cleared, selection reset to the top
 /meetings  → active collection becomes meetings, filter cleared, selection reset to the top
@@ -62,22 +67,40 @@ collections once at mount and holds `documents: dict[str, list[Document]]` keyed
 plus an `active` name. Switching re-derives the visible list from the already-scanned data — no disk
 access, so it is instant and FR-026's no-disk-per-keystroke rule extends to switching.
 
-**The active collection must be identifiable on screen** (FR-025). It appears in two places:
+**The active collection must be identifiable on screen** (FR-025). It appears in three places:
 
-- The status bar names it: `notes` / `meetings` alongside the existing key hints.
+- **The collection menu pane** (FR-036), leftmost on the screen: `Meetings` and `Notes`, with the
+  active one highlighted, always visible regardless of what else is on screen.
+- The status bar names it: `[notes]` / `[meetings]` alongside the existing key hints.
 - The empty-state message names it: `No notes yet. Press / then 'note' for today's note, or 'note <description>'.`
 
-Two indicators rather than one because the status bar is where a user looks for state and the empty
-state is the only thing on screen when the list is empty — the case where "which list am I even
-looking at?" is hardest to answer.
+Three indicators rather than one because the status bar is where a user looks for state, the empty
+state is the only thing on screen when the list is empty, and the menu is the only one that also
+shows *what else there is to switch to* — the case the original two indicators didn't cover: a user
+who doesn't already know `/notes` exists has no way to discover it.
 
-**Filter is cleared on switch.** A filter typed against meetings almost never means the same thing
-against notes, and carrying it over would show an unexplained empty list. Clearing is the behaviour
-a user can predict.
+**The collection menu** (FR-036–FR-038): a `ListView` in a third pane to the left of the list and
+preview panes, populated once at mount from `list_screen.COLLECTIONS = ("meetings", "notes")`.
+Moving the highlight within it (up/down or `j`/`k`, when it has focus) calls the same
+`switch_collection` used by `/notes`/`/meetings` — live, no disk access, same as every other
+highlight-driven update in this screen. `h`/`left` moves focus into the menu; `l`/`right` (and
+`enter` on a menu row) moves focus back to the list. List-pane keyboard focus is still the default
+at mount, so `j`/`k`/`↑`/`↓` behave exactly as feature 001 shipped them until the user explicitly
+moves into the menu.
+
+**Filter is cleared on switch**, whether triggered by a command or by the menu. A filter typed
+against meetings almost never means the same thing against notes, and carrying it over would show
+an unexplained empty list. Clearing is the behaviour a user can predict.
 
 **Both lists stay current** (FR-030). Creating a note updates the in-memory notes list immediately,
 so switching away and back shows it without a rescan. This is the same mechanism feature 001 uses
 for `on_screen_resume` after a create lands in preview.
+
+**Creating switches to what you created** (FR-039). `create_meeting_and_track`,
+`create_note_and_track`, and `open_daily_note_and_track` all set `active` to their own collection
+unconditionally, not only when it was already active. Escaping the full-screen preview after a
+create therefore always lands on the list containing the thing just created — closing the gap where
+a note created while viewing meetings was invisible until the user remembered to switch by hand.
 
 ---
 
@@ -98,6 +121,10 @@ Three cases, from the `DailyNote` result:
 The third row is the case FR-005 exists for. The user gets their note open, which is what they
 asked for, and is told why it is absent from the list — rather than the tool silently creating a
 second file for the day or refusing to open anything.
+
+**All three rows switch the active collection to notes** (FR-039, added by the 2026-07-28
+amendment), including the third: even when nothing was inserted, the user asked for their note and
+is looking at it, so escaping should show the notes list, not whatever was active before.
 
 **Nothing in any of these paths writes to an existing file.**
 
@@ -130,13 +157,18 @@ different from every other document for no gain.
 
 ## Bindings
 
-Unchanged. No key is added, rebound, or removed.
+*Updated by the [2026-07-28 amendment](../spec.md#amendment-2026-07-28-collection-navigation-pane):
+`h`/`left` and `l`/`right` are new (FR-038), added to move focus between the collection menu and the
+list. Everything else is unchanged from the original plan.*
 
 | Key | State | Action |
 |---|---|---|
 | `/` | list | Open the filter/command bar |
-| `↑` `↓` `j` `k` | list | Move selection |
+| `↑` `↓` `j` `k` | list or menu (whichever has focus) | Move selection |
+| `h` `left` | list | Move focus to the collection menu |
+| `l` `right` | menu | Move focus to the list |
 | `enter` | list | Open the selected document in preview |
+| `enter` | menu | Move focus to the list (the highlight already switched the active collection live) |
 | `esc` | preview | Back to the list |
 | `ctrl+q` | any | Quit |
 

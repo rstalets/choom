@@ -66,8 +66,10 @@ class EndpaperApp(App[None]):
             return None
         self.last_create_error = None
         self.documents["meetings"].insert(0, meeting)
-        if self.active == "meetings":
-            self.visible_documents = list(self.documents["meetings"])
+        # Land back on the collection just created into, so escaping the preview
+        # shows it -- a create is always followed by "let me see that".
+        self.active = "meetings"
+        self.visible_documents = list(self.documents["meetings"])
         return meeting
 
     def create_note_and_track(self, description: str, type: str) -> Document | None:
@@ -78,14 +80,14 @@ class EndpaperApp(App[None]):
             return None
         self.last_create_error = None
         self.documents["notes"].insert(0, note)
-        if self.active == "notes":
-            self.visible_documents = list(self.documents["notes"])
+        self.active = "notes"
+        self.visible_documents = list(self.documents["notes"])
         return note
 
     def open_daily_note_and_track(self, *, now: datetime | None = None) -> DailyNote:
         daily = open_daily_note(self.workspace, now=now)
         if daily.created and daily.document is not None:
             self.documents["notes"].insert(0, daily.document)
-            if self.active == "notes":
-                self.visible_documents = list(self.documents["notes"])
+        self.active = "notes"
+        self.visible_documents = list(self.documents["notes"])
         return daily

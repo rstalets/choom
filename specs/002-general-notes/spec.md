@@ -303,6 +303,21 @@ describes the commands used.
 - **FR-035**: No operation in this feature may require network access, and no state may be introduced
   outside the markdown files themselves.
 
+**Collection navigation** *(added post-implementation — see [Amendment](#amendment-2026-07-28-collection-navigation-pane) below)*
+
+- **FR-036**: The interface MUST show a persistent, always-visible collection menu listing every
+  available collection (`Meetings`, `Notes`), with the active collection highlighted, alongside the
+  list and preview panes already required by FR-025.
+- **FR-037**: The user MUST be able to move keyboard focus into the collection menu and navigate it
+  with up/down (and `j`/`k`), and moving the highlight MUST switch the active collection live, with
+  no disk access, consistent with FR-026.
+- **FR-038**: The user MUST be able to move keyboard focus between the collection menu and the list
+  pane with a dedicated key distinct from up/down/`j`/`k` (this feature uses `h`/`left` and `l`/
+  `right`), and this key MUST be shown in the footer per FR-029.
+- **FR-039**: Creating a document, or opening the daily note, from the interface MUST switch the
+  active collection to the one just written to, so that returning from preview shows that document
+  in its list without a separate manual switch.
+
 ### Key Entities
 
 - **Note**: A markdown file representing something the user wrote that is not a meeting. Carries the
@@ -403,3 +418,31 @@ Deferred to their own features, and explicitly not delivered here:
 - Templates, boilerplate, or per-type scaffolding for note bodies
 - Backdating a daily note, or opening a daily note for a day other than today
 - Everything listed in REQUIREMENTS.md §5
+
+## Amendment (2026-07-28): collection navigation pane
+
+**Gap found during implementation review.** The original spec required the active collection to be
+"identifiable on screen" (FR-025) and switchable via `/notes`/`/meetings` (FR-016), but said nothing
+about how a user discovers that a second collection exists, or reaches it, without already knowing
+the `/notes` verb. In practice this meant: the interface always launched straight into the meetings
+list with no visible indication that a notes collection existed, and a document created while
+viewing one collection was invisible until the user separately remembered to switch — collection
+switching and document discovery were disconnected. FR-036–FR-039 above close this gap.
+
+**Resolution**: a persistent collection menu in a third pane, to the left of the existing list and
+preview panes, always listing `Meetings` and `Notes` with the active one highlighted. It is
+navigable (up/down or `j`/`k` when focused) and switches the active collection live as you move,
+matching the live-update convention the list pane already uses for its own row highlight. `h`/`left`
+and `l`/`right` move keyboard focus between the menu and the list — a new keybinding, added to the
+footer, distinct from up/down so it does not collide with row navigation. This does not add a
+screen (Principle V holds): it is a third column on the one screen that already exists.
+
+Creating a document, or opening the daily note, now switches the active collection to match what
+was just written — closing the "created it but can't see it" gap directly.
+
+**Tasks is not a third menu entry.** REQUIREMENTS.md §3.3 (tasks) has no plan or implementation yet
+in this codebase — only a spec draft exists. Adding a non-functional or stubbed entry was considered
+and rejected: a menu item that does nothing when selected is worse than no menu item, and building
+real task support is explicitly out of scope for this feature (see Out of Scope, above, and
+Dependencies). The menu is written to add a collection by adding a name to a tuple
+(`list_screen.COLLECTIONS`), so Tasks is a small addition once its own feature lands.

@@ -207,6 +207,26 @@ describes the commands used.
 
 ---
 
+## Phase 8: Amendment — collection navigation pane (2026-07-28, post-review)
+
+**Purpose**: Close the spec gap found in manual review: the interface launched straight into the
+meetings list with no visible way to discover or reach the notes collection, and creating a document
+did not switch to it. See [spec.md's 2026-07-28 amendment](./spec.md#amendment-2026-07-28-collection-navigation-pane)
+(FR-036–FR-039) and [contracts/tui.md](./contracts/tui.md#collection-switching).
+
+- [X] T065 Add a persistent collection menu pane (`Meetings`/`Notes`) to `src/endpaper/tui/list_screen.py` and `app.tcss`, populated from a new `COLLECTIONS` tuple; highlight moves switch the active collection live, matching the existing row-highlight-live-update convention
+- [X] T066 Add `h`/`left` (focus the menu) and `l`/`right` (focus the list) bindings to `ListScreen`, routing `j`/`k` to whichever pane currently has focus; update the footer hint in `status_bar.py`
+- [X] T067 Change `create_meeting_and_track`, `create_note_and_track`, and `open_daily_note_and_track` in `src/endpaper/tui/app.py` to switch `active` to their own collection unconditionally, so escaping a just-created document's preview always lands on its list
+- [X] T068 Add `tests/integration/test_collection_menu_tui.py` covering: both collections shown with meetings active at launch, menu navigation switching the visible list live, focus moving between menu and list, and the three creation paths (meeting, note, daily) each landing on the correct collection after escape
+- [X] T069 Verify live via a real (non-headless) run — `tmux` driving the actual `endpaper` binary — since this gap was found by manual use, not by the automated suite
+
+**Checkpoint**: `uv run pytest` — 154 passed. `ruff check`/`format --check`/`mypy src` clean. Verified
+interactively in tmux: menu visible at launch, `/notes` and menu navigation both switch the list
+live, creating a note while viewing meetings and escaping lands on the notes view with the new note
+visible.
+
+---
+
 ## Dependencies & Execution Order
 
 ### Phase Dependencies

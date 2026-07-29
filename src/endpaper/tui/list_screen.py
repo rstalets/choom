@@ -16,6 +16,9 @@ _NOTES_EMPTY_STATE_MESSAGE = (
     "No notes yet. Press / then 'note' for today's note, or 'note <description>'."
 )
 
+COLLECTIONS = ("meetings", "notes")
+_COLLECTION_LABELS = {"meetings": "Meetings", "notes": "Notes"}
+
 
 def _empty_state_message(active: str) -> str:
     return _NOTES_EMPTY_STATE_MESSAGE if active == "notes" else EMPTY_STATE_MESSAGE
@@ -45,10 +48,20 @@ class DocumentRow(ListItem):
 MeetingRow = DocumentRow  # alias, feature 001 compatibility
 
 
+class CollectionRow(ListItem):
+    def __init__(self, name: str) -> None:
+        super().__init__(Label(_COLLECTION_LABELS[name]))
+        self.collection_name = name
+
+
 class ListScreen(Screen[None]):
     BINDINGS = [
         ("j", "cursor_down", "Down"),
         ("k", "cursor_up", "Up"),
+        ("h", "focus_menu", "Menu"),
+        ("left", "focus_menu", "Menu"),
+        ("l", "focus_list", "List"),
+        ("right", "focus_list", "List"),
         ("/", "open_command_bar", "Filter/command"),
     ]
 
@@ -59,6 +72,8 @@ class ListScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
+            with Vertical(id="menu-pane"):
+                yield ListView(id="collection-menu")
             with Vertical(id="list-pane"):
                 yield ListView(id="meeting-list")
             with Vertical(id="preview-pane"):
@@ -68,6 +83,9 @@ class ListScreen(Screen[None]):
             yield StatusBar(LIST_HELP, id="status-bar")
 
     def on_mount(self) -> None:
+        menu = self.query_one("#collection-menu", ListView)
+        for name in COLLECTIONS:
+            menu.append(CollectionRow(name))
         self.query_one("#meeting-list", ListView).focus()
         self.refresh_rows()
 
@@ -78,6 +96,13 @@ class ListScreen(Screen[None]):
         # stale. Rebuild, preferring the document that was actually being previewed
         # over whatever the list happened to have highlighted before it was opened.
         self.refresh_rows(select_id=self._last_previewed_id)
+
+    def _sync_menu_highlight(self) -> None:
+        menu = self.query_one("#collection-menu", ListView)
+        active = self.app.active  # type: ignore[attr-defined]
+        index = COLLECTIONS.index(active)
+        if menu.index != index:
+            menu.index = index
 
     def refresh_rows(self, *, select_id: str | None = None, reset_selection: bool = False) -> None:
         app = self.app
@@ -102,6 +127,7 @@ class ListScreen(Screen[None]):
                         index = i
                         break
             list_view.index = index
+        self._sync_menu_highlight()
         self._update_preview()
         self._render_status()
 
@@ -149,11 +175,34 @@ class ListScreen(Screen[None]):
             self._last_previewed_id = document.id
             self.app.push_screen(PreviewScreen(document.path, document))
 
+    @on(ListView.Highlighted, "#collection-menu")
+    def _on_menu_highlighted(self, event: ListView.Highlighted) -> None:
+        item = event.item
+        if isinstance(item, CollectionRow) and item.collection_name != self.app.active:  # type: ignore[attr-defined]
+            self.app.switch_collection(item.collection_name)  # type: ignore[attr-defined]
+            self.refresh_rows(reset_selection=True)
+
+    @on(ListView.Selected, "#collection-menu")
+    def _on_menu_selected(self, event: ListView.Selected) -> None:
+        self.query_one("#meeting-list", ListView).focus()
+
+    def _focused_list(self) -> ListView:
+        focused = self.focused
+        if isinstance(focused, ListView) and focused.id == "collection-menu":
+            return focused
+        return self.query_one("#meeting-list", ListView)
+
     def action_cursor_down(self) -> None:
-        self.query_one("#meeting-list", ListView).action_cursor_down()
+        self._focused_list().action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        self.query_one("#meeting-list", ListView).action_cursor_up()
+        self._focused_list().action_cursor_up()
+
+    def action_focus_menu(self) -> None:
+        self.query_one("#collection-menu", ListView).focus()
+
+    def action_focus_list(self) -> None:
+        self.query_one("#meeting-list", ListView).focus()
 
     def action_open_command_bar(self) -> None:
         self.query_one(CommandBar).open()
