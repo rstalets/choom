@@ -16,7 +16,7 @@ A directory containing the fixed endpaper layout.
 | Field | Type | Source | Notes |
 |---|---|---|---|
 | `root` | `Path` | discovered | Absolute path to the directory holding `.endpaper/` |
-| `meetings_dir` | `Path` | derived | `root / "meetings"` |
+| `meetings_dir` | `Path` | derived | `root / "meetings"` — the collection root; dated files live in `YYYY/MM/` beneath it |
 
 **Created by** `endpaper init`, which writes:
 
@@ -79,15 +79,21 @@ re-reads the file (Principle III: no cache to invalidate).
 | `created` | Local naive time at creation. Never changes after. | FR-018 |
 | `updated` | Equals `created` at creation. This feature never changes it (no edit path). | FR-018 |
 
-### Filename derivation
+### Path derivation
 
 ```
-meetings/YYYY-MM-DD[-<type>]-<slug>[-N].md
+meetings/YYYY/MM/YYYY-MM-DD[-<type>]-<slug>[-N].md
 ```
 
 - Date is the local date at creation. ISO-first so lexical sort equals chronological sort.
+- The `YYYY/MM/` partition repeats the file's own date and is created on demand
+  (spec [Amendments](./spec.md#amendments)). It is derived, never stored — nothing reads a meeting's
+  date from its path.
 - Type segment is omitted entirely when untyped (FR-015).
-- `N` starts at `2` and only appears on collision (FR-017).
+- `N` starts at `2` and only appears on collision (FR-017), and only within one partition — a
+  collision suffix never crosses a directory boundary.
+- Reading walks `meetings/` recursively, so a file the user has moved to the wrong month, or left
+  directly under `meetings/`, still lists (FR-015a).
 
 **Slug algorithm** (FR-016):
 
