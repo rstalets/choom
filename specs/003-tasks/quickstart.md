@@ -153,17 +153,24 @@ Every command must return without reading stdin — run each with stdin closed a
 ## Scenario 5 — the terminal interface (spec US2 scenarios 3–4)
 
 ```bash
-endpaper          # opens on the meetings list
+endpaper          # opens on the meetings collection
 ```
 
-- `/` then `tasks` → the task list.
-- `↑`/`↓`/`j`/`k` move; the footer lists every active binding.
+- The menu pane lists three collections: Meetings, Notes, **Tasks**. Reach tasks either way —
+  `h` to the menu then `j`/`k` to Tasks, or `/` then `tasks`.
+- `↑`/`↓`/`j`/`k` move in the list; `h`/`l` cross panes; the footer lists every active binding and
+  shows `[tasks]`.
+- **The preview pane is empty and still there.** Confirm it does not collapse and the list pane does
+  not change width as you move between Meetings and Tasks (FR-044b).
 - `space` on a row flips its checkbox; check `tasks.md` in another shell within a second (SC-002) and
   confirm the metadata comment is untouched.
-- `a` reveals completed tasks, struck through; `a` again hides them.
-- `/` then `task.followup call the vendor #procurement` → lands back on the task list with the new
-  task selected, not in a preview.
-- `/` then `meetings` returns to the meetings list.
+- `a` reveals completed tasks, struck through; `a` again hides them. Cross to Notes and back — the
+  `a` state survives.
+- On the Meetings and Notes collections, `space` and `a` do nothing, raise nothing, and are absent
+  from the footer.
+- `/` then `task.followup call the vendor #procurement` → switches to Tasks with the new task
+  selected, not in a preview.
+- `/` then `meetings` returns to the meetings collection, and the preview repopulates.
 
 ---
 

@@ -23,7 +23,8 @@ def tasks_file(self) -> Path:      # self.root / "tasks.md"
 
 ## Entity: Task
 
-The in-memory record. Frozen, slotted, no methods — the same shape as `Meeting`.
+The in-memory record. Frozen, slotted, no methods — the same shape of thing as `Document`, but not
+one of them: a task has no path, no frontmatter, and no file of its own.
 
 ```python
 @dataclass(frozen=True, slots=True)

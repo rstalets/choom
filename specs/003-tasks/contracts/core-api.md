@@ -1,8 +1,21 @@
 # Contract: `endpaper.core.tasks` public API
 
-Extends [001's core-api contract](../../001-meeting-notes/contracts/core-api.md), which stays in
-force: nothing in `core` imports `argparse`, `textual`, `rich`, or `sys.stdout`; `core` returns data
-and raises `EndpaperError` subclasses; formatting and exit codes belong to the adapters.
+Extends the core-api contracts of [001](../../001-meeting-notes/contracts/core-api.md) and
+[002](../../002-general-notes/contracts/core-api.md), which stay in force: nothing in `core` imports
+`argparse`, `textual`, `rich`, or `sys.stdout`; `core` returns data and raises `EndpaperError`
+subclasses; formatting and exit codes belong to the adapters.
+
+**Why tasks are not a `Collection`.** 002 generalised meetings and notes into a
+collection-parameterised document layer — `Collection(id_prefix, create_dir, scan_dirs,
+reserved_types)` over `create_document` / `scan_documents`. Tasks deliberately do not join it. That
+layer's unit of work is *a file per record, with YAML frontmatter, discovered by globbing a
+directory*; a task is *a line in one shared file, with metadata in an HTML comment, discovered by
+parsing that file*. They share the words "id", "type", "tags", and "created" and nothing else —
+no path, no frontmatter, no per-record file, no collision suffixes, no partitioning. Forcing tasks
+through `documents.py` would mean parameterising it by storage strategy, which is a bigger and less
+honest abstraction than two modules that each do one thing.
+
+`core/tasks.py` therefore sits beside `documents.py`, not beneath it.
 
 **The split that matters here**: everything above the line is pure — no `Path`, no `open()`, no
 clock. Everything below it touches the filesystem and does nothing else interesting.
@@ -84,7 +97,7 @@ def new_task_id(taken: Container[str]) -> str:
 ```
 
 `parse_tasks` is where every acceptance criterion about hand-editing is testable as a string
-comparison. `filter_tasks` and `match_task` mirror `filter_meetings` / `match_meeting`:
+comparison. `filter_tasks` and `match_task` mirror `filter_documents` / `match_document`:
 
 ```python
 def filter_tasks(tasks: Iterable[Task], f: TaskFilter) -> list[Task]:
@@ -122,7 +135,7 @@ def add_task(
     """Append one task to tasks.md and return it.
 
     Parses inline #tags out of `description` and merges them after `tags`, exactly as
-    create_meeting does. Creates tasks.md if absent. Every pre-existing byte is
+    create_document does. Creates tasks.md if absent. Every pre-existing byte is
     preserved; if the file did not end with a newline, the terminator is added.
 
     Raises UsageError if the description is empty after tag removal, or if a type or
