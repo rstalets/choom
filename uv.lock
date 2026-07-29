@@ -58,7 +58,6 @@ wheels = [
 
 [[package]]
 name = "endpaper"
-version = "0.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "pyyaml" },
