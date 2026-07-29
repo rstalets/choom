@@ -13,6 +13,12 @@
 feature needs to be shippable. §3.5 is a terminal-interface feature end to end, and this spec adds no
 command-line surface — see Assumptions for why that does not breach the two-front-doors rule.
 
+**Also carries a fix to §4.3** (User Story 4): `endpaper init` must drop a `CLAUDE.md` pointing at
+`AGENTS.md`, because `AGENTS.md` alone is not reliably read. It rides here rather than in its own
+feature because this spec's division of labour — assistants create through the command line and
+modify markdown directly — only holds if the assistant reads the guidance at all. `REQUIREMENTS.md`
+§4.3 currently specifies `AGENTS.md` only and should be updated to match.
+
 **Builds on**: Features `001-meeting-notes` and `002-general-notes`, which delivered the workspace,
 the frontmatter schema, the list-and-preview screen, the collection menu, and the command-line
 conventions. Both deliberately deferred the edit half of §3.5 and forbade the preview footer from
@@ -118,6 +124,41 @@ absence of horizontal scrolling, and the footer contents.
 
 ---
 
+### User Story 4 - An assistant finds the conventions without being told (Priority: P4)
+
+Someone points an AI assistant at their workspace and asks it to write up a call. The assistant
+learns, before it touches anything, that this directory has rules — where documents go, what the
+frontmatter looks like, and that it should create documents through the commands rather than by
+inventing filenames. It learns this without the user having to say it in every conversation.
+
+**Why this priority**: It is a small, self-contained fix that protects the assumption the rest of
+this spec now rests on — that an assistant creates through the command line and modifies markdown
+directly. That division only holds if the assistant actually reads the guidance, and `AGENTS.md`
+alone is not reliably read. It is last because the three editing stories deliver value without it.
+
+**Independent Test**: Initialize a workspace in an empty directory, then in a directory that already
+contains a `CLAUDE.md`, and confirm the guidance file is written in the first case, left untouched in
+the second, and that init reports what it did in both.
+
+**Acceptance Scenarios**:
+
+1. **Given** an empty directory, **When** `endpaper init` runs, **Then** a `CLAUDE.md` is created at
+   the workspace root alongside `AGENTS.md`, and it points the reader to `AGENTS.md` rather than
+   repeating it.
+2. **Given** a directory that already contains a `CLAUDE.md`, **When** `endpaper init` runs, **Then**
+   that file is byte-identical afterwards, init exits 0, and it states on standard error what the
+   user should add to it.
+3. **Given** a directory that already contains an `AGENTS.md`, **When** `endpaper init` runs, **Then**
+   that file is byte-identical afterwards and init exits 0 — closing a gap in the current behaviour,
+   which overwrites it.
+4. **Given** an initialized workspace, **When** the guidance files are compared, **Then** no folder
+   layout, schema, format, or command appears in `CLAUDE.md` that is not already in `AGENTS.md`.
+5. **Given** an assistant given only the workspace root and a request to record a meeting, **When** it
+   works, **Then** it creates the document through the documented command rather than hand-writing a
+   file into a collection directory.
+
+---
+
 ### Edge Cases
 
 - **The file is read-only, or the disk is full.** The save fails, the user is told plainly, and they
@@ -151,6 +192,14 @@ absence of horizontal scrolling, and the footer contents.
 - **A document last written by something other than endpaper** — hand-edited in another editor, or
   rewritten in place by an AI assistant. It opens, edits, and saves like any other, and its stale
   `updated` value is left as found until the next save through endpaper stamps it.
+- **The workspace is initialized inside an existing repository**, which already has a `CLAUDE.md` and
+  possibly an `AGENTS.md` serving that codebase. Neither is touched; init says what to add and
+  carries on. This is the common case, not the exception, and losing a repository's own assistant
+  guidance would be exactly the kind of data loss the tool exists to avoid.
+- **A guidance file is deleted after init.** It is not recreated, because init runs once. Nothing
+  breaks; the assistant simply loses the pointer until the user restores it.
+- **A `CLAUDE.md` exists in a parent directory** rather than at the workspace root. The root file is
+  still written, because it is the one that describes this vault.
 
 ## Requirements *(mandatory)*
 
@@ -267,6 +316,24 @@ absence of horizontal scrolling, and the footer contents.
   operation in this feature.
 - **FR-044**: No operation in this feature may require network access.
 
+**Assistant guidance at init**
+
+- **FR-045**: `endpaper init` MUST write a `CLAUDE.md` at the workspace root, alongside `AGENTS.md`.
+- **FR-046**: `CLAUDE.md` MUST direct the assistant to read `AGENTS.md` before creating or modifying
+  anything in the workspace, and MUST NOT restate what `AGENTS.md` says.
+- **FR-047**: `CLAUDE.md` MUST stay short — on the order of ten lines — so that it costs nothing to
+  load and holds nothing that can drift.
+- **FR-048**: `AGENTS.md` MUST remain the single source of truth for the folder layout, the
+  frontmatter schema, the task line format, and the commands. No convention may be documented only in
+  `CLAUDE.md`.
+- **FR-049**: When a `CLAUDE.md` already exists at the target, init MUST leave it byte-identical, MUST
+  NOT overwrite, truncate, or append to it, and MUST tell the user what line to add themselves.
+- **FR-050**: The same protection MUST apply to `AGENTS.md`. An existing file at the target MUST NOT
+  be overwritten by init, which today it is.
+- **FR-051**: Init MUST report which guidance files it wrote and which it left alone, and MUST still
+  exit 0 when it skipped one — a directory that already carries assistant guidance is a normal case,
+  not an error.
+
 ### Key Entities
 
 - **Document**: A meeting or a note — the thing being viewed and edited. Already defined by features
@@ -309,6 +376,14 @@ absence of horizontal scrolling, and the footer contents.
 - **SC-010**: A document rewritten in place outside endpaper — by hand or by an AI assistant — opens,
   edits, and saves indistinguishably from one endpaper wrote itself, verified for a document whose
   body, frontmatter field order, and line endings were all changed externally.
+- **SC-011**: An assistant given only a freshly initialized workspace and a request to record a
+  meeting follows the vault's conventions on its first attempt, creating the document through the
+  documented command rather than hand-writing a file into a collection directory.
+- **SC-012**: Init never destroys assistant guidance that was already there: in 100% of inits into a
+  directory already holding a `CLAUDE.md` or an `AGENTS.md`, those files are byte-identical
+  afterwards and the command exits 0.
+- **SC-013**: `CLAUDE.md` contains no convention that is not also in `AGENTS.md`, so there is exactly
+  one place to change when a convention changes.
 
 ## Assumptions
 
@@ -343,6 +418,20 @@ absence of horizontal scrolling, and the footer contents.
   for neither. The file's own modification time remains the record of when it last changed.
 - **The save operation is specified as core behaviour, not interface behaviour**, so that the §4.2
   writer can later reuse it and produce byte-identical results without the edit state being involved.
+- **`CLAUDE.md` is a pointer, not a copy.** `REQUIREMENTS.md` §4.3 keeps `AGENTS.md` short and
+  curated precisely because bloated context files raise exploration cost. Duplicating its content
+  into a second file would double the maintenance and guarantee the two drift apart, at which point
+  an assistant reads whichever it found first and gets the stale answer. So `CLAUDE.md` says where
+  the conventions live and nothing more.
+- **Only `CLAUDE.md` is written.** Other assistants have their own convention files; this addresses
+  the one observed failure — that `AGENTS.md` alone is not reliably read — rather than speculatively
+  covering every tool. Adding more later costs one template each.
+- **Existing guidance files are skipped, not merged.** Appending a pointer line into a repository's
+  own `CLAUDE.md` would mean parsing and rewriting a file endpaper does not own. Leaving it alone and
+  telling the user what to add is the safer half of that trade, and matches the rule that endpaper
+  never rewrites what it did not write.
+- **Init remains one-shot.** It does not repair or regenerate guidance files on later runs, and there
+  is no doctor command; a workspace that already has `.endpaper` is still refused.
 - **Line numbers count real lines, not display rows**, so a wrapped paragraph occupies one number.
 - **No undo history is specified beyond what the editing area provides natively**; the discard
   confirmation, not an undo stack, is the guarantee against losing work.
@@ -352,6 +441,9 @@ absence of horizontal scrolling, and the footer contents.
 
 - Feature `001-meeting-notes` for the workspace, the frontmatter schema, the list-and-preview screen,
   the footer, and the warning surface.
+- Feature `001-meeting-notes` again for `endpaper init` and the `AGENTS.md` template that User Story 4
+  extends. That story changes init's output and its overwrite behaviour, and touches no other part of
+  this feature — it can be built and reviewed independently of Stories 1 through 3.
 - Feature `002-general-notes` for notes and daily notes as a second collection, the collection menu,
   and the per-collection state that the edit state must leave undisturbed.
 - The document scan and single-file re-parse already used to keep the list current.
@@ -378,4 +470,11 @@ Deferred, and explicitly not delivered here:
 - Search (`endpaper find`, §4.4) and named workspaces (§3.4)
 - A find-and-replace, a spell checker, or any editing affordance beyond typing, wrapping, and line
   numbers
+- Convention files for assistants other than Claude. One observed failure, one file; more are one
+  template each when a second failure is observed.
+- Changing what `AGENTS.md` contains, or its roughly-60-line budget (§4.3). User Story 4 adds a
+  pointer to it and stops there.
+- Regenerating, repairing, or migrating guidance files after init — there is no doctor command, and
+  init stays one-shot.
+- Merging a pointer into a `CLAUDE.md` that already exists; init reports and leaves it alone.
 - Everything else listed in `REQUIREMENTS.md` §5

@@ -42,8 +42,19 @@
   than improvised. The spec deliberately does not name the interface toolkit, the editing widget, or
   the widget options that §4.5 discusses, leaving those to `/speckit-plan`.
 
-- **Success criteria**: All ten are stated as user-observable outcomes with counts, percentages, or
-  wall-clock bounds. SC-002 uses a one-second bound rather than a component-level latency figure.
+- **Success criteria**: All thirteen are stated as user-observable outcomes with counts, percentages,
+  or wall-clock bounds. SC-002 uses a one-second bound rather than a component-level latency figure.
+  SC-011 is behavioural rather than numeric — it asks whether an assistant follows the conventions on
+  a first attempt — which is verifiable by trial without prescribing how.
+
+- **Scope addition (User Story 4)**: A fix to §4.3 rides in this spec by request — `endpaper init`
+  must also write a `CLAUDE.md` pointing at `AGENTS.md`, because `AGENTS.md` alone is not reliably
+  read. It is init surface rather than §3.5 surface, and is placed here because this spec's division
+  of labour between creating and modifying depends on the assistant reading the guidance at all. It
+  is isolated in a P4 story with its own requirements block (FR-045 through FR-051) and touches
+  nothing in Stories 1 through 3. Two notes for review: `REQUIREMENTS.md` §4.3 specifies `AGENTS.md`
+  only and should be updated to match, and FR-050 fixes existing behaviour — `init_workspace()` in
+  `src/endpaper/core/workspace.py` currently overwrites an `AGENTS.md` that is already present.
 
 - **Scope boundary**: REQUIREMENTS.md §3.5 is a terminal-interface feature end to end, and the spec
   adds no command-line surface. An earlier draft claimed `read` / `write` / `append` from §4.2 on the
