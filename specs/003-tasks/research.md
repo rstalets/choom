@@ -225,28 +225,58 @@ list, where the user just typed it.
 
 ## R9. The task surface in the TUI
 
-**Decision**: A dedicated `TaskListScreen`, reached by `/tasks`, reusing the existing `CommandBar`
-and `StatusBar`. `space` toggles, `a` shows completed as well, `j`/`k` and the arrows move, `/`
-opens the shared bar. New verbs `task` and `tasks` join `VERBS` in `command_bar.py`. No preview
-pane: a task is one line, and there is nothing to preview.
+**Revised 2026-07-28**, after feature 002 merged. The original decision — a dedicated
+`TaskListScreen` — was made when the TUI had exactly one screen and one content type, and tasks had
+nowhere to live. 002 shipped a persistent collection menu pane (`#collection-menu`, `COLLECTIONS =
+("meetings", "notes")`, `h`/`l` between panes, `switch_collection()`), which is a first-class answer
+to "a second content type" that did not exist when this was written. The superseded decision is kept
+below.
 
-Verified against Textual's documentation: `ListView` binds only `enter`, `up`, and `down`, so
-`space` and `a` are unclaimed, and Textual resolves an unmatched key by walking from the focused
-widget up the DOM to the app — the same mechanism the existing screen already relies on for `j`/`k`
-and `/`. No `priority=True` is needed, and nothing is rebound.
+**Decision**: **Tasks are a third collection** in the existing menu — `COLLECTIONS = ("meetings",
+"notes", "tasks")` — inside the one `ListScreen`. No new screen. `space` toggles, `a` shows completed
+as well, `j`/`k` and the arrows move, `h`/`l` cross panes, `/` opens the shared bar. New verbs `task`
+and `tasks` join `VERBS`; `tasks` posts `CollectionRequested("tasks")` exactly as `notes` does, and
+`task` posts `CreateRequested("task", …)`.
 
-**Rationale on Principle V** ("the TUI is one screen: a filterable list and a preview pane"): the
-task screen is the same list surface with the preview pane omitted because its content type has no
-preview state. Transitions stay one keystroke, every binding stays in the footer, and `/meetings`
-and `/tasks` move between the two surfaces through the bar that already exists. This is the
-principle's list-with-one-keystroke-transitions shape applied to a second content type, not a second
-interaction model — recorded in the Constitution Check with that justification rather than passed
-over silently.
+**The preview pane stays visible and empty on the tasks collection** (requirements owner's decision).
+A task is one line and has nothing to preview today, but the pane is reserved for a future feature
+rather than collapsed. Keeping it also means the three-pane layout does not reflow when the user
+crosses collections, which is worth more than the reclaimed width.
+
+Verified against Textual's documentation and the merged code: `ListView` binds only `enter`, `up`,
+and `down`, so `space` and `a` are unclaimed, and Textual resolves an unmatched key by walking from
+the focused widget up the DOM — the same mechanism `ListScreen` already relies on for `j`/`k`, `h`,
+`l`, and `/`. No `priority=True`, nothing rebound.
+
+**Two guards the branching needs**:
+
+1. `space` and `a` are screen-level actions that **no-op unless `app.active == "tasks"`**. They are
+   bound once, not conditionally registered, because a binding that exists but does nothing is
+   simpler than a binding set that changes shape under the user.
+2. The status bar text is per-collection, so the footer advertises `space toggle` and `a all` only
+   where they do something. Principle V requires every *active* binding to be visible; it equally
+   requires the footer not to promise a key that will not fire.
+
+**Rationale on Principle V**: this now satisfies the principle literally rather than by argument.
+The TUI stays one screen with a filterable list and a preview pane; tasks are a third thing that
+list can show; every transition is still one keystroke. The Complexity Tracking entry the original
+decision required is deleted, not re-justified — the better design made the deviation unnecessary.
+
+**Cost of the revision**: `app` state stops being uniform. `documents` and `warnings` are dicts keyed
+by collection, but a `Task` is not a `Document` — different fields, different store, no path. So the
+app carries `tasks: list[Task]`, `visible_tasks: list[Task]`, `show_done: bool`, and
+`warnings["tasks"]`, and `ListScreen.refresh_rows` branches once on `app.active` to choose its row
+type. That is one conditional in one method, against a whole screen class avoided.
 
 **Alternatives considered**:
-- **A mode toggle inside `ListScreen`** — one screen class branching on whether its rows are
-  meetings or tasks, with a preview pane that appears and disappears. Rejected: every method grows a
-  conditional, and the two row types share no fields.
+- **A dedicated `TaskListScreen`** *(the superseded decision)* — a second screen reusing `CommandBar`
+  and `StatusBar`, with no preview pane. It was the right call against a single-collection TUI and
+  the wrong one against a multi-collection TUI: it would have introduced a second navigation model
+  (`/tasks` switching *screens*) alongside the menu that switches *collections*, for the same user
+  intent.
+- **Hiding the preview pane on tasks** — rejected by the requirements owner; the pane is reserved
+  for a future feature, and a layout that reflows on every collection change is worse than an empty
+  pane.
 - **Tasks in the preview pane of the meetings list** — rejected; it makes tasks a detail of meetings,
   which REQUIREMENTS.md §3.3 explicitly says they are not in v0.0.1.
 

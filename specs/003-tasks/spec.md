@@ -272,13 +272,19 @@ exit codes distinguish success, not-found, usage error, and workspace error.
 
 - **FR-040**: The terminal interface MUST support moving the task selection with the up and down
   arrows and with `j`/`k`.
-- **FR-041**: Every key binding active in the task list MUST be visible in the footer.
+- **FR-041**: Every key binding active in the task list MUST be visible in the footer, and the footer
+  MUST NOT advertise a task binding while the user is looking at a collection where it does nothing.
 - **FR-042**: The interface MUST NOT bind the terminal's reserved interrupt or quit keys to any task
   action.
 - **FR-043**: A toggle made in the interface MUST be reflected in the list without a manual refresh,
   and MUST re-read only the file that changed.
 - **FR-044**: Task creation from the interface MUST leave the user on the task list with the new task
   visible, not in a preview or an editor.
+- **FR-044a**: Tasks MUST be reachable as a collection alongside meetings and notes, selectable both
+  from the interface's collection menu and by command.
+- **FR-044b**: While tasks are shown, the preview area MUST remain present and empty. It MUST NOT be
+  collapsed, and the layout MUST NOT change size when the user moves between collections. Nothing in
+  this feature renders into it.
 
 **Command-line discipline**
 
@@ -369,6 +375,8 @@ exit codes distinguish success, not-found, usage error, and workspace error.
 - Feature `001-meeting-notes` for workspace creation and resolution, the guidance file generated at
   init, the tag-parsing rules shared by all create commands, the command-line conventions (exit
   codes, stream discipline, `--json`), and the terminal interface's command bar and list navigation.
+- Feature `002-general-notes` for the collection menu that tasks join as a third entry, and for the
+  per-collection state and warning routing the interface already carries.
 - The `tasks.md` file created empty by `endpaper init` in that feature.
 - No new external dependency: task scanning is plain markdown scanning, with no external search
   binary and no database.

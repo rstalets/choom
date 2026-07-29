@@ -27,8 +27,10 @@ endpaper shares with the user's own editor:
 3. **Writers locate by identifier, never by cached line number**, because the user may have
    rearranged the file since the list was drawn.
 
-The TUI gains a `TaskListScreen` reached by `/tasks`, with `space` to toggle and `a` to show
-completed. **No new dependency**, no new state, no configuration.
+In the TUI, tasks become a **third collection** in the menu pane feature 002 introduced —
+`COLLECTIONS = ("meetings", "notes", "tasks")` — inside the one existing `ListScreen`. `space`
+toggles, `a` shows completed as well. The preview pane stays visible and empty on tasks, reserved for
+a future feature. **No new dependency**, no new screen, no new state, no configuration.
 
 ## Technical Context
 
@@ -69,15 +71,20 @@ Complexity Tracking below with a rejected simpler alternative, or the plan does 
 | II | Behaviour is reachable from both CLI and TUI (or is inherently interactive/non-interactive). CLI never opens an editor, never blocks on input, never decorates non-TTY stdout. `--json` schema and exit codes are stable. | **PASS** — `add_task` and `set_task_state` are the single write paths for both front doors; `space` in the TUI and `task done` on the CLI call the same function, and a test diffs their output (FR-026). `task list --json` fixes seven keys; exit codes reuse the existing `EndpaperError` mapping. |
 | III | No new source of truth (index, database, cache). No new external binary dependency. Every new third-party dependency is justified. No new configuration knob that could be a default. | **PASS** — `tasks.md` is the only state; every read is a fresh parse, and no parse is cached across a write ([R7](./research.md#r7-locate-by-identifier-at-write-time-never-by-cached-line-number)). Zero new dependencies. No new flags beyond those the spec names. |
 | IV | Parsers skip malformed input without raising and never lose or truncate a line. Writes preserve `created`, update `updated`, and leave files valid CommonMark. | **PASS** — this is the feature's centre of gravity. Classification table in [R2](./research.md#r2-the-metadata-comment-and-what-malformed-means); atomic write strategy in [R6](./research.md#r6-writing-without-losing-anything). A round-trip test asserts that parsing and re-rendering an untouched file is byte-identical, including mixed line endings. `created` is never rewritten and never invented ([R8](./research.md#r8-a-hand-written-task-has-no-creation-date-and-endpaper-does-not-invent-one)). Task lines carry no `updated` field, by design — the checkbox is the state. |
-| V | TUI stays one screen with one-keystroke transitions; every binding is in the footer; confirmations fire only when data would be lost; bindings avoid `ctrl+c`, `ctrl+q`, and rely on no non-`ctrl` modifier. | **PASS, with the deviation stated** — tasks get a second list screen rather than sharing the meetings screen. Justified in [R9](./research.md#r9-the-task-surface-in-the-tui): same list surface, preview pane omitted because a one-line task has no preview state; transitions stay one keystroke through the existing command bar. `space` and `a` are unbound by `ListView`, so nothing is rebound and no priority binding is needed. No confirmations — a toggle is reversible with the same key. See Complexity Tracking. |
+| V | TUI stays one screen with one-keystroke transitions; every binding is in the footer; confirmations fire only when data would be lost; bindings avoid `ctrl+c`, `ctrl+q`, and rely on no non-`ctrl` modifier. | **PASS** — tasks are a third collection inside the single existing `ListScreen`, not a second screen ([R9](./research.md#r9-the-task-surface-in-the-tui), revised after 002 merged). The preview pane stays visible and empty on tasks, so the layout never reflows. `space` and `a` are unbound by `ListView`, so nothing is rebound and no priority binding is needed; both no-op outside the tasks collection, and the status bar advertises them only where they fire. No confirmations — a toggle is reversible with the same key. |
 | VI | Type hints and docstrings on new public `core` functions; every acceptance criterion maps to a test; public API changes recorded in the changelog. | **PASS** — `mypy --strict` already covers `src`; [contracts/core-api.md](./contracts/core-api.md) is the signature source of truth; the task line format, the four new commands, and the JSON schema go into CHANGELOG.md as part of 0.0.1, which has not shipped. |
 | — | Platform constraints hold: no admin rights, no network, Windows path length, spaces and non-ASCII in paths, per-user state outside the workspace. | **PASS** — no install, network, or path-length change; `tasks.md` sits at the workspace root, one segment long. CRLF and non-ASCII round-trip tests are part of the acceptance set. No per-user state is introduced. |
 
 **Post-Phase-1 re-check**: still PASS on all seven. Phase 1 added no dependency, no persistent state,
-and no binding beyond the two named at gate time. Gate V's deviation was identified before research
-and is unchanged after design. One spec refinement surfaced during design — appending to a file with
-no final newline must add the terminator — and is recorded under Follow-ups rather than left
-implicit.
+and no binding beyond the two named at gate time. One spec refinement surfaced during design —
+appending to a file with no final newline must add the terminator — and is recorded under Follow-ups
+rather than left implicit.
+
+**Re-checked again after merging feature 002** (2026-07-28): all seven still PASS, and gate V
+improved from "PASS, with the deviation stated" to a plain PASS. 002's collection menu gave tasks a
+home inside the existing screen, so the second-screen deviation and its Complexity Tracking entry are
+deleted rather than re-justified. No other gate moved: the core split, the write strategy, and the
+dependency count are unchanged by the merge.
 
 ## Project Structure
 
@@ -118,11 +125,15 @@ src/endpaper/
 │   ├── main.py              ~ + `task` subparser: add, list, done, undone
 │   └── output.py            ~ + print_tasks_table, print_tasks_json
 └── tui/
-    ├── app.py               ~ + task state, load_tasks on mount, toggle_task_and_track
-    ├── task_list_screen.py  + list of tasks, space toggle, `a` show-completed
-    ├── command_bar.py       ~ VERBS += {task, tasks}; + task create / navigate messages
-    ├── list_screen.py       ~ route `/tasks` to the task screen
-    └── status_bar.py        ~ + TASK_LIST_HELP
+    ├── app.py               ~ + tasks / visible_tasks / show_done, warnings["tasks"],
+    │                          ~ load_tasks on mount, toggle_task_and_track,
+    │                          ~ switch_collection accepts "tasks"
+    ├── list_screen.py       ~ COLLECTIONS += "tasks"; + TaskRow; refresh_rows branches on
+    │                          ~ app.active; preview cleared (pane kept) on tasks;
+    │                          ~ + action_toggle_task, action_toggle_show_done
+    ├── command_bar.py       ~ VERBS += {task, tasks}; `task` -> CreateRequested("task", …),
+    │                          ~ `tasks` -> CollectionRequested("tasks")
+    └── status_bar.py        ~ + TASK_LIST_HELP (footer text per collection)
 
 tests/
 ├── unit/
@@ -131,7 +142,8 @@ tests/
 │   └── test_task_id.py           + t_ format, in-file collision retry
 ├── integration/
 │   ├── test_task_cli.py          + add/list/done/undone, exit codes, empty and missing file
-│   ├── test_task_tui.py          + Pilot: space toggles, `a` shows completed, list refreshes
+│   ├── test_task_tui.py          + Pilot: menu shows Tasks, space toggles, `a` shows completed,
+│   │                               preview stays empty on tasks, space no-ops on meetings/notes
 │   ├── test_task_parity.py       + CLI toggle and TUI toggle produce identical files (FR-026)
 │   └── test_task_handedit.py     + bare-line backfill, broken comment, CRLF, no trailing newline
 ├── contract/
@@ -160,7 +172,7 @@ Ordered so each stage is independently verifiable, matching the spec's user stor
 | 2. File layer | `load_tasks`, `add_task`, atomic write helper, `Workspace.tasks_file` | Append to a missing, empty, and prose-bearing file; CRLF and no-final-newline preservation |
 | 3. Create (US1) | `endpaper task add`, `/task.<type>` in the command bar | US1 scenarios 1–4; empty-description usage error |
 | 4. Read + toggle (US2, CLI) | `set_task_state`, `task list` + `--json` + filters, `task done` / `undone` | US2 scenarios 1, 2, 5, 6; contract test on the seven keys |
-| 5. TUI (US2) | `TaskListScreen`, `space`, `a`, `/tasks` routing, footer text | US2 scenarios 3, 4; headless `Pilot` tests; FR-026 parity diff |
+| 5. TUI (US2) | Tasks as a third collection, `space`, `a`, `/task` and `/tasks` verbs, per-collection footer, empty preview | US2 scenarios 3, 4; headless `Pilot` tests; FR-026 parity diff |
 | 6. Hand-editing (US3) | Backfill write-back, read-only degradation, warning routing | US3 scenarios 1–5; SC-003 operation-sequence property test |
 | 7. AI contract + hardening (US4) | `AGENTS.md` task section, changelog entry, performance fixture | US4 scenarios 1–4; SC-005, SC-007; AGENTS.md line-count test |
 
@@ -171,12 +183,13 @@ them from the command line, which is the whole of REQUIREMENTS.md §3.3 minus th
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
 
-No gate failed. One deviation is recorded here because it departs from the literal text of a
-principle and should not be discovered later in review.
+**Nothing to record — no gate fails and no principle is deviated from.**
 
-| Violation | Why Needed | Simpler Alternative Rejected Because |
-|-----------|------------|-------------------------------------|
-| A second list screen (`TaskListScreen`), where Principle V says "the TUI is one screen: a filterable list and a preview pane" | Tasks are a second content type with no preview state — a task is one line, and REQUIREMENTS.md §3.3 gives it its own verbs (`/tasks`), its own default filter (open only), and its own binding (`space`). The screen keeps the principle's substance: one list, one-keystroke transitions, every binding in the footer, navigation through the command bar that already exists. | Branching inside `ListScreen` on row type was worked through on paper first: every method grows a conditional, the preview pane has to appear and disappear, and the two row types share no fields. It preserves the letter of "one screen" while making the code harder to read, which inverts Principle VI. |
+This table previously carried one entry: a second list screen for tasks, justified against Principle
+V's "the TUI is one screen". Feature 002 then merged, bringing a collection menu pane, and tasks
+became a third collection inside the existing screen — so the deviation was deleted rather than
+re-argued ([R9](./research.md#r9-the-task-surface-in-the-tui)). It is noted here only because a
+reviewer who read this plan before 002 landed will remember the entry and wonder where it went.
 
 ## Follow-ups outside this plan
 
@@ -191,10 +204,13 @@ principle and should not be discovered later in review.
   cross-workspace feature will need a different flag on this command, or a scope option that is not
   `--all`.
 - **AGENTS.md currently says `tasks.md` is "reserved for a future feature, currently empty".** This
-  feature makes that line wrong; stage 7 replaces it. The layout block in the same template must also
-  gain the `YYYY/MM/` partitions (see below), so stage 7 rewrites two sections against a ~60-line
-  budget that has 3 lines of slack today. If it does not fit, the meetings frontmatter example is
-  the block to shorten — an assistant can infer the schema from any file it opens.
+  feature makes that line wrong; stage 7 replaces it, and the layout block in the same template must
+  also gain the `YYYY/MM/` partitions (see below). **The budget is now the binding constraint**: after
+  002, `AGENTS.md.tmpl` is 58 lines and `tests/contract/test_agents_md.py` asserts `<= 58` in one
+  test and `<= 62` in another. Adding a task section plus partitions cannot fit under 58. Stage 7
+  therefore has to trim as well as add, and move the stricter assertion to the constitution's
+  "roughly 60 lines" (the `<= 62` bound already there). The meetings frontmatter example is the block
+  to shorten first — an assistant can infer the schema from any file it opens.
 - **REQUIREMENTS.md §3.3 lists `--all` on `task list` alongside `--tag` and `--type`** without saying
   whether completed tasks are filterable by tag. This plan applies the filters conjunctively to
   whatever set `--all` selected, which is the reading with no surprises.
@@ -219,11 +235,32 @@ and nothing to partition. Every requirement, contract, and test in this feature 
 **Two places the two changes touch each other**, both in stage 7:
 
 1. `AGENTS.md.tmpl` documents the folder layout to assistants. It must gain the partitions *and* the
-   task section in the same rewrite — see the follow-up above.
-2. The layout amendment is spec-only: `create_meeting` and `scan_meetings` still write and read flat.
-   If both ship as one feature, that code change belongs in this feature's task list, ahead of the
-   AGENTS.md rewrite that describes it. `/speckit-tasks` should pick it up as its own stage rather
-   than folding it into the task work, because it touches no task code and carries its own tests
-   (recursive scan, on-demand partition creation, a meeting left directly under `meetings/` still
-   listing).
+   task section in the same rewrite, against a budget that no longer has slack — see the follow-up
+   above.
+2. The layout amendment is spec-only: nothing on disk is partitioned yet. That code change belongs in
+   this feature's task list as **its own stage, before** the AGENTS.md rewrite that describes it. It
+   touches no task code and carries its own tests.
+
+### Where the partition work lands after feature 002
+
+002 generalised meetings and notes into a collection-parameterised layer, which makes this
+substantially smaller than it was when the amendment was written — one shared implementation instead
+of one per collection. `Collection(id_prefix, create_dir, scan_dirs, reserved_types)` is the seam.
+There are **three call sites**, not two:
+
+| Site | Change |
+|---|---|
+| `core/documents.py` → `create_document` | Write into `create_dir / f"{when:%Y/%m}"` instead of `create_dir`; `mkdir(parents=True)` already runs, so on-demand creation is free |
+| `core/documents.py` → `scan_documents` | `directory.glob("*.md")` → `rglob("*.md")` |
+| `core/notes.py` → `open_daily_note` | Builds its path directly (`workspace.daily_dir / f"{when:%Y-%m-%d}.md"`) rather than going through `create_document`, so it needs the same partition applied by hand — easy to miss, and the daily note is the highest-volume collection |
+
+**One hazard the recursion introduces.** `NOTES.scan_dirs` is `("notes", "notes/daily")`. Those are
+non-overlapping under a flat `glob`, but `notes/daily` is *inside* `notes`, so under `rglob` the
+first entry already sweeps the second and every daily note lists twice. The fix is to drop the
+redundant entry — recursive `("notes",)` covers both, and daily notes stay distinguishable by
+`type: daily` in frontmatter, which is how the code already tells them apart. A test asserting that
+a workspace with one daily note lists exactly one daily note will catch it if this is missed.
+
+Also worth carrying into that stage: `tests/unit/test_path_budget.py` asserts the generated-path
+bound, and the amendment moves the worst case from 107 to 115 characters.
 
