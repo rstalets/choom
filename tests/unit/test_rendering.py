@@ -18,7 +18,7 @@ def test_preview_markdown_strips_frontmatter_and_headings_the_title(
         now=datetime(2026, 7, 28, 9, 14, 0),
     )
 
-    rendered = render_preview_markdown(meeting)
+    rendered = render_preview_markdown(meeting.path, meeting)
 
     assert rendered.startswith("# Q3 planning\n")
     assert "id:" not in rendered
@@ -35,5 +35,5 @@ def test_preview_markdown_includes_body_content(tmp_workspace: Workspace) -> Non
         encoding="utf-8",
     )
 
-    rendered = render_preview_markdown(meeting)
+    rendered = render_preview_markdown(meeting.path, meeting)
     assert "Some notes go here." in rendered

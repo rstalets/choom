@@ -13,7 +13,7 @@ from endpaper.core.models import (
     ScanWarning,
     Workspace,
 )
-from endpaper.core.notes import create_note, scan_notes
+from endpaper.core.notes import create_note, open_daily_note, scan_notes
 from endpaper.core.text import new_document_id, new_meeting_id, parse_tags, slugify
 from endpaper.core.workspace import find_workspace, init_workspace
 
@@ -42,6 +42,7 @@ __all__ = [
     "match_meeting",
     "new_document_id",
     "new_meeting_id",
+    "open_daily_note",
     "parse_tags",
     "read_frontmatter",
     "render_frontmatter",
