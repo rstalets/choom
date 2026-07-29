@@ -37,6 +37,10 @@ class ListScreen(Screen[None]):
         ("/", "open_command_bar", "Filter/command"),
     ]
 
+    def __init__(self) -> None:
+        super().__init__()
+        self._last_previewed_id: str | None = None
+
     def compose(self) -> ComposeResult:
         with Horizontal(id="body"):
             with Vertical(id="list-pane"):
@@ -51,9 +55,23 @@ class ListScreen(Screen[None]):
         self.query_one("#meeting-list", ListView).focus()
         self.refresh_rows()
 
-    def refresh_rows(self) -> None:
+    def on_screen_resume(self) -> None:
+        # Coming back from PreviewScreen: a meeting may have been created while we
+        # were away (command bar create lands straight in preview, without ever
+        # selecting a row), so the rows built at initial mount are potentially
+        # stale. Rebuild, preferring the meeting that was actually being previewed
+        # over whatever the list happened to have highlighted before it was opened.
+        self.refresh_rows(select_id=self._last_previewed_id)
+
+    def refresh_rows(self, *, select_id: str | None = None) -> None:
         app = self.app
         list_view = self.query_one("#meeting-list", ListView)
+
+        if select_id is None:
+            highlighted = list_view.highlighted_child
+            if isinstance(highlighted, MeetingRow):
+                select_id = highlighted.meeting.id
+
         list_view.clear()
         meetings = app.visible_meetings  # type: ignore[attr-defined]
         if not meetings:
@@ -61,6 +79,13 @@ class ListScreen(Screen[None]):
         else:
             for meeting in meetings:
                 list_view.append(MeetingRow(meeting))
+            index = 0
+            if select_id is not None:
+                for i, meeting in enumerate(meetings):
+                    if meeting.id == select_id:
+                        index = i
+                        break
+            list_view.index = index
         self._update_preview()
         self._render_status()
 
@@ -96,6 +121,7 @@ class ListScreen(Screen[None]):
         if isinstance(event.item, MeetingRow):
             from endpaper.tui.preview_screen import PreviewScreen
 
+            self._last_previewed_id = event.item.meeting.id
             self.app.push_screen(PreviewScreen(event.item.meeting))
 
     def action_cursor_down(self) -> None:
@@ -129,6 +155,7 @@ class ListScreen(Screen[None]):
         if meeting is not None:
             from endpaper.tui.preview_screen import PreviewScreen
 
+            self._last_previewed_id = meeting.id
             self.app.push_screen(PreviewScreen(meeting))
 
     @on(CommandBar.Closed)
