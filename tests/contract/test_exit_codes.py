@@ -35,6 +35,26 @@ def test_workspace_error_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["meeting", "list"]) == 3
 
 
+def test_reserved_note_type_exits_2(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    assert main(["note", "new", "x", "--type", "daily"]) == 2
+
+
+def test_note_bad_since_exits_2(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    assert main(["note", "list", "--since", "yesterday"]) == 2
+
+
+def test_note_no_workspace_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert main(["note", "list"]) == 3
+    assert main(["note", "today"]) == 3
+
+
 def test_not_found_error_maps_to_exit_code_1(monkeypatch, capsys) -> None:
     # No command in this feature raises NotFoundError yet -- there is no "not found"
     # surface until `endpaper find`/`read` (out of scope here). This verifies main()'s

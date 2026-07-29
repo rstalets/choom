@@ -176,16 +176,16 @@ describes the commands used.
 
 ### Tests for User Story 4 ⚠️
 
-- [ ] T049 [P] [US4] Extend `tests/contract/test_agents_md.py` for US4 scenario 1: the template documents `note today`, `note new`, and `note list`, states that `notes/daily/` holds one file per day and `notes/` holds typed notes, still states the `--tag` form explicitly, and stays within the line budget (≤58 lines)
-- [ ] T050 [P] [US4] Extend `tests/contract/test_non_blocking.py` and `tests/contract/test_no_ansi.py` for US4 scenario 2: each of the three note commands run with redirected output terminates without waiting for input and writes zero `\x1b` bytes
-- [ ] T051 [P] [US4] Extend `tests/contract/test_exit_codes.py` and `tests/contract/test_streams.py` for US4 scenario 3: reserved type and bad `--since` exit 2, no workspace exits 3, and warnings never reach stdout while data never reaches stderr
-- [ ] T052 [P] [US4] Extend `tests/contract/test_json_schema.py` and `tests/contract/test_json_parses.py` for FR-020: `note list --json` emits objects with exactly the same seven keys as `meeting list --json`, and its stdout parses with no preamble or trailing text
-- [ ] T053 [P] [US4] Create `tests/integration/test_no_migration.py` for US4 scenario 4: a workspace created by feature 001 with no notes in it returns an empty result from every note command rather than failing, with no migration step (SC-010)
+- [X] T049 [P] [US4] Extend `tests/contract/test_agents_md.py` for US4 scenario 1: the template documents `note today`, `note new`, and `note list`, states that `notes/daily/` holds one file per day and `notes/` holds typed notes, still states the `--tag` form explicitly, and stays within the line budget (≤58 lines)
+- [X] T050 [P] [US4] Extend `tests/contract/test_non_blocking.py` and `tests/contract/test_no_ansi.py` for US4 scenario 2: each of the three note commands run with redirected output terminates without waiting for input and writes zero `\x1b` bytes
+- [X] T051 [P] [US4] Extend `tests/contract/test_exit_codes.py` and `tests/contract/test_streams.py` for US4 scenario 3: reserved type and bad `--since` exit 2, no workspace exits 3, and warnings never reach stdout while data never reaches stderr
+- [X] T052 [P] [US4] Extend `tests/contract/test_json_schema.py` and `tests/contract/test_json_parses.py` for FR-020: `note list --json` emits objects with exactly the same seven keys as `meeting list --json`, and its stdout parses with no preamble or trailing text
+- [X] T053 [P] [US4] Create `tests/integration/test_no_migration.py` for US4 scenario 4: a workspace created by feature 001 with no notes in it returns an empty result from every note command rather than failing, with no migration step (SC-010)
 
 ### Implementation for User Story 4
 
-- [ ] T054 [US4] Restructure `src/endpaper/core/templates/AGENTS.md.tmpl` per [R7](./research.md#r7-keeping-agentsmd-under-60-lines-while-documenting-twice-the-commands): give `notes/` and `notes/daily/` real descriptions in the layout block, retitle the frontmatter section to cover both kinds since the schema is identical, and document notes by their difference from meetings rather than repeating the tag rules — target ≤58 lines
-- [ ] T055 [US4] Audit the three new commands in `src/endpaper/cli/main.py` against [contracts/cli.md](./contracts/cli.md): confirm every error path writes to stderr with the `endpaper: ` prefix and returns the right exit code, and that no handler writes to stdout on failure
+- [X] T054 [US4] Restructure `src/endpaper/core/templates/AGENTS.md.tmpl` per [R7](./research.md#r7-keeping-agentsmd-under-60-lines-while-documenting-twice-the-commands): give `notes/` and `notes/daily/` real descriptions in the layout block, retitle the frontmatter section to cover both kinds since the schema is identical, and document notes by their difference from meetings rather than repeating the tag rules — target ≤58 lines
+- [X] T055 [US4] Audit the three new commands in `src/endpaper/cli/main.py` against [contracts/cli.md](./contracts/cli.md): confirm every error path writes to stderr with the `endpaper: ` prefix and returns the right exit code, and that no handler writes to stdout on failure
 
 **Checkpoint**: The command surface is safe for an assistant to drive unattended.
 
