@@ -191,8 +191,39 @@ principle and should not be discovered later in review.
   cross-workspace feature will need a different flag on this command, or a scope option that is not
   `--all`.
 - **AGENTS.md currently says `tasks.md` is "reserved for a future feature, currently empty".** This
-  feature makes that line wrong; stage 7 replaces it. The template's ~60-line budget has room (57
-  lines today) only if the meetings section is not expanded at the same time.
+  feature makes that line wrong; stage 7 replaces it. The layout block in the same template must also
+  gain the `YYYY/MM/` partitions (see below), so stage 7 rewrites two sections against a ~60-line
+  budget that has 3 lines of slack today. If it does not fit, the meetings frontmatter example is
+  the block to shorten — an assistant can infer the schema from any file it opens.
 - **REQUIREMENTS.md §3.3 lists `--all` on `task list` alongside `--tag` and `--type`** without saying
   whether completed tasks are filterable by tag. This plan applies the filters conjunctively to
   whatever set `--all` selected, which is the reading with no surprises.
+
+## Also on this branch: the `YYYY/MM/` layout amendment
+
+This branch carries a second, independent change that ships with the same feature: dated files are
+partitioned by `YYYY/MM/` under their collection root (REQUIREMENTS.md §4.6, and feature 001's
+[Amendments](../001-meeting-notes/spec.md#amendments)).
+
+```
+meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
+notes/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
+notes/daily/YYYY/MM/YYYY-MM-DD.md
+tasks.md                                      <- unchanged
+```
+
+**Tasks are unaffected.** `tasks.md` is a single file at the workspace root, with no date in its path
+and nothing to partition. Every requirement, contract, and test in this feature stands unchanged, and
+`Workspace.tasks_file` stays `root / "tasks.md"`.
+
+**Two places the two changes touch each other**, both in stage 7:
+
+1. `AGENTS.md.tmpl` documents the folder layout to assistants. It must gain the partitions *and* the
+   task section in the same rewrite — see the follow-up above.
+2. The layout amendment is spec-only: `create_meeting` and `scan_meetings` still write and read flat.
+   If both ship as one feature, that code change belongs in this feature's task list, ahead of the
+   AGENTS.md rewrite that describes it. `/speckit-tasks` should pick it up as its own stage rather
+   than folding it into the task work, because it touches no task code and carries its own tests
+   (recursive scan, on-demand partition creation, a meeting left directly under `meetings/` still
+   listing).
+
