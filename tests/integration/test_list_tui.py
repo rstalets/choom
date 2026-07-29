@@ -106,3 +106,42 @@ async def test_selection_preserved_across_preview_when_nothing_created(
         list_view = app.screen.query_one("#meeting-list", ListView)
         selected_after = list_view.highlighted_child.meeting.title  # type: ignore[union-attr]
         assert selected_after == selected_before
+
+
+async def test_single_meeting_row_is_visually_highlighted(tmp_workspace: Workspace) -> None:
+    # Regression: refresh_rows used to clear() and append() without awaiting
+    # either, so ListView.index was set against stale/incomplete `_nodes` and
+    # the reactive's highlight watcher marked the wrong (or a since-removed)
+    # widget. With exactly one row, there was no down/up workaround available.
+    create_meeting(tmp_workspace, "only one", now=datetime(2026, 7, 20, 9, 0, 0))
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        assert list_view.highlighted_child is not None
+        assert list_view.highlighted_child.highlighted is True
+
+
+async def test_top_row_highlighted_after_refocusing_list_without_moving_cursor(
+    tmp_workspace: Workspace,
+) -> None:
+    # Regression: after refresh_rows() ran (e.g. from switching collections),
+    # the top row's `-highlight` styling was never actually applied even
+    # though `list_view.index` correctly reported 0 -- only pressing an
+    # explicit down-then-up forced a real re-highlight. Moving focus alone
+    # (h then l) must not require that workaround.
+    create_meeting(tmp_workspace, "one", now=datetime(2026, 7, 20, 9, 0, 0))
+    create_meeting(tmp_workspace, "two", now=datetime(2026, 7, 21, 9, 0, 0))
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await pilot.press("left")
+        await pilot.pause()
+        await pilot.press("right")
+        await pilot.pause()
+
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        assert list_view.highlighted_child is not None
+        assert list_view.highlighted_child.highlighted is True
