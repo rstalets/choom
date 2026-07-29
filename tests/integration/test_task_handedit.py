@@ -11,7 +11,7 @@ from endpaper.core.workspace import init_workspace
 
 
 def test_bare_checkbox_gains_id_in_place_rest_of_file_unchanged(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = "# My tasks\n\n- [ ] buy milk\n\nSome trailing prose.\n"
     workspace.tasks_file.write_text(original, encoding="utf-8", newline="\n")
 
@@ -28,7 +28,7 @@ def test_bare_checkbox_gains_id_in_place_rest_of_file_unchanged(tmp_path: Path) 
 
 
 def test_truncated_comment_is_skipped_warned_and_left_byte_identical(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = "- [ ] thing <!-- id:\n"
     workspace.tasks_file.write_text(original, encoding="utf-8", newline="\n")
 
@@ -41,7 +41,7 @@ def test_truncated_comment_is_skipped_warned_and_left_byte_identical(tmp_path: P
 
 
 def test_headings_prose_and_non_task_list_items_survive_verbatim(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = (
         "# Tasks\n\n## Today\n\nSome prose about the day.\n\n- not a checkbox\n"
         "  - [ ] indented sub-task\n"
@@ -58,7 +58,7 @@ def test_headings_prose_and_non_task_list_items_survive_verbatim(tmp_path: Path)
 
 
 def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = "- [ ] one\r\n- [ ] bare"
     with open(workspace.tasks_file, "w", encoding="utf-8", newline="") as fh:
         fh.write(original)
@@ -85,7 +85,7 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(tmp_path: Pa
 def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
     tmp_path: Path,
 ) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = "- [ ] existing <!-- id:t_aaaa -->"
     with open(workspace.tasks_file, "w", encoding="utf-8", newline="") as fh:
         fh.write(original)
@@ -98,7 +98,7 @@ def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
 
 
 def test_users_own_comment_is_bare_and_gains_metadata_comment_after_it(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     original = "- [ ] fix the <!-- hack --> path\n"
     workspace.tasks_file.write_text(original, encoding="utf-8", newline="\n")
 

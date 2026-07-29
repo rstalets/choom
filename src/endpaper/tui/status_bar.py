@@ -4,7 +4,8 @@ from textual.widgets import Static
 
 LIST_HELP = "/ filter or command   ↑↓/jk move   h/l pane   enter open   ctrl+q quit"
 TASK_LIST_HELP = "/ filter or command   ↑↓/jk move   h/l pane   space toggle   a all   ctrl+q quit"
-PREVIEW_HELP = "esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+PREVIEW_HELP = "e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
 
 
 def collection_indicator(active: str) -> str:

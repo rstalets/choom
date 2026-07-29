@@ -6,7 +6,8 @@ All notable changes to this project are documented in this file.
 
 ### 0.0.3
 
-Standalone tasks, and the `YYYY/MM/` layout amendment.
+Standalone tasks, the `YYYY/MM/` layout amendment, viewing and editing, and `endpaper init`
+now drops a `CLAUDE.md` pointing at `AGENTS.md`.
 
 **Command surface added**
 
@@ -55,6 +56,22 @@ is unaffected — it remains a single file at the workspace root.
 **Guarantees**: unchanged from 0.0.1 and 0.0.2, extended to tasks — a write to `tasks.md` never
 truncates or reorders the user's file, and a scan never raises on malformed content. Exit codes
 are unchanged: `0` success, `1` not found, `2` usage error, `3` workspace error.
+
+**Viewing and editing**: `e` in preview opens an edit state on the raw file, including
+frontmatter. `ctrl+o` saves and stays; `ctrl+s` is a silent alias (some terminals eat it as
+XOFF); `ctrl+x` saves and returns to preview. `esc` discards — but only asks for confirmation
+when there is something to lose. A save changes only the `updated:` frontmatter line; every
+other byte, including `created`, hand-added fields, field order, and quoting style, is left
+exactly as typed. Line endings (CRLF/LF) and a missing/present trailing newline both survive a
+save unchanged.
+
+**`endpaper init`**: now also writes `CLAUDE.md`, a pointer telling an assistant to read
+`AGENTS.md`. Neither `AGENTS.md` nor `CLAUDE.md` is ever overwritten if it already exists; init
+reports any skipped guidance file on stderr and still exits 0.
+
+**`core` API — BREAKING**: `init_workspace(target: Path) -> Workspace` now returns
+`InitResult(workspace, written, skipped)`. Migration is one line per call site:
+`init_workspace(target)` becomes `init_workspace(target).workspace`.
 
 ### 0.0.2
 

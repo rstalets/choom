@@ -44,7 +44,7 @@ def test_cli_and_tui_create_note_identical_except_id_and_timestamps(
 
     tui_dir = tmp_path / "tui"
     tui_dir.mkdir()
-    workspace = init_workspace(tui_dir)
+    workspace = init_workspace(tui_dir).workspace
     tui_path = asyncio.run(_create_via_tui(workspace))
     tui_text = tui_path.read_text(encoding="utf-8")
 

@@ -42,7 +42,7 @@ def test_cli_and_tui_toggle_produce_byte_identical_files(
     cli_text = (cli_dir / "tasks.md").read_text(encoding="utf-8")
 
     tui_dir = tmp_path / "tui"
-    workspace = init_workspace(tui_dir)
+    workspace = init_workspace(tui_dir).workspace
     workspace.tasks_file.write_text(_SEED, encoding="utf-8", newline="\n")
 
     asyncio.run(_toggle_via_tui(workspace))

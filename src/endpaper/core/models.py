@@ -89,6 +89,29 @@ MeetingFilter = DocumentFilter
 
 
 @dataclass(frozen=True, slots=True)
+class EditableFile:
+    path: Path
+    text: str
+    newline: str
+    trailing_newline: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SaveResult:
+    ok: bool
+    saved_text: str
+    stamped: bool
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class InitResult:
+    workspace: Workspace
+    written: tuple[str, ...]
+    skipped: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class Task:
     id: str | None
     text: str

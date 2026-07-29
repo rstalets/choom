@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import os
 import tomllib
 from datetime import datetime
 from pathlib import Path
 
 from endpaper.core.errors import WorkspaceError
-from endpaper.core.models import Workspace
+from endpaper.core.models import InitResult, Workspace
 
 SUPPORTED_SCHEMA = 1
-_TEMPLATE_PATH = Path(__file__).parent / "templates" / "AGENTS.md.tmpl"
+_TEMPLATES_DIR = Path(__file__).parent / "templates"
+_GUIDANCE_TEMPLATES = {
+    "AGENTS.md": _TEMPLATES_DIR / "AGENTS.md.tmpl",
+    "CLAUDE.md": _TEMPLATES_DIR / "CLAUDE.md.tmpl",
+}
 
 
 def find_workspace(start: Path) -> Workspace:
@@ -38,7 +43,21 @@ def _check_schema(marker: Path) -> None:
         )
 
 
-def init_workspace(target: Path) -> Workspace:
+def _write_guidance_file(target: Path, name: str) -> bool:
+    """Write one guidance file if absent. Returns True when written, False when an
+    existing file was left untouched. Uses O_EXCL so the guarantee is enforced by the
+    OS rather than a check-then-write race."""
+    template = _GUIDANCE_TEMPLATES[name].read_text(encoding="utf-8")
+    try:
+        fd = os.open(target / name, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o644)
+    except FileExistsError:
+        return False
+    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(template)
+    return True
+
+
+def init_workspace(target: Path) -> InitResult:
     target = target.resolve()
     endpaper_dir = target / ".endpaper"
     if endpaper_dir.exists():
@@ -48,8 +67,13 @@ def init_workspace(target: Path) -> Workspace:
     (target / "notes" / "daily").mkdir(parents=True, exist_ok=True)
     (target / "tasks.md").touch(exist_ok=True)
 
-    template = _TEMPLATE_PATH.read_text(encoding="utf-8")
-    (target / "AGENTS.md").write_text(template, encoding="utf-8")
+    written: list[str] = []
+    skipped: list[str] = []
+    for name in ("AGENTS.md", "CLAUDE.md"):
+        if _write_guidance_file(target, name):
+            written.append(name)
+        else:
+            skipped.append(name)
 
     endpaper_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now().replace(microsecond=0).isoformat()
@@ -58,4 +82,6 @@ def init_workspace(target: Path) -> Workspace:
         encoding="utf-8",
     )
 
-    return Workspace(root=target)
+    return InitResult(
+        workspace=Workspace(root=target), written=tuple(written), skipped=tuple(skipped)
+    )

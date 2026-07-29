@@ -63,7 +63,7 @@ def test_malformed_note_is_skipped_warned_and_left_byte_identical_and_others_sti
 
 
 def test_one_in_ten_malformed_task_lines_still_lists_all_well_formed(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     lines = []
     well_formed_count = 0
     for i in range(100):
