@@ -15,7 +15,7 @@
 ⠀⠀⠈⠻⣿⣷⣄⡀⠀⠀⠀⢸⣿⣿⠀⠀⠀⠀⢀⣴⣿⡿⠃⠀⠀⠀
 ⠀⠀⠀⠀⠈⠙⠿⣿⣷⣶⣤⣼⣛⣻⣤⣤⣶⣾⡿⠟⠋⠀⠀⠀⠀⠀
 ⠀⠀⠀⠀⠀⠀⠀⠀⠉⠉⠛⠛⠛⠛⠛⠛⠉⠁⠀⠀⠀⠀⠀⠀⠀⠀
-KEEP YOUR CORPO OVERLORDS HAPPY
+KEEP YOUR CORPO OVERLORDS HAPPY, FEED YOUR AI
 ```
 
 **A corporate-friendly Markdown notes engine that makes your AI happy.**
