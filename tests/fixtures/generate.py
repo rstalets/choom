@@ -15,7 +15,7 @@ def generate(workspace_root: Path, count: int) -> Workspace:
     try:
         workspace = find_workspace(workspace_root)
     except WorkspaceError:
-        workspace = init_workspace(workspace_root)
+        workspace = init_workspace(workspace_root).workspace
 
     base = datetime(2026, 1, 1, 9, 0, 0)
     for i in range(count):
@@ -34,7 +34,7 @@ def generate_notes(workspace_root: Path, count: int) -> Workspace:
     try:
         workspace = find_workspace(workspace_root)
     except WorkspaceError:
-        workspace = init_workspace(workspace_root)
+        workspace = init_workspace(workspace_root).workspace
 
     base = datetime(2026, 1, 1, 9, 0, 0)
     daily_count = min(count, 30)

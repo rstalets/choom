@@ -4,6 +4,7 @@ from endpaper.core.documents import (
     match_document,
     scan_documents,
 )
+from endpaper.core.editing import load_for_edit, save_buffer, stamp_updated
 from endpaper.core.errors import EndpaperError, NotFoundError, UsageError, WorkspaceError
 from endpaper.core.frontmatter import read_frontmatter, render_frontmatter
 from endpaper.core.meetings import create_meeting, filter_meetings, match_meeting, scan_meetings
@@ -12,9 +13,12 @@ from endpaper.core.models import (
     DailyNote,
     Document,
     DocumentFilter,
+    EditableFile,
+    InitResult,
     Meeting,
     MeetingFilter,
     Note,
+    SaveResult,
     ScanWarning,
     Workspace,
 )
@@ -27,11 +31,14 @@ __all__ = [
     "DailyNote",
     "Document",
     "DocumentFilter",
+    "EditableFile",
     "EndpaperError",
+    "InitResult",
     "Meeting",
     "MeetingFilter",
     "Note",
     "NotFoundError",
+    "SaveResult",
     "ScanWarning",
     "UsageError",
     "Workspace",
@@ -43,6 +50,7 @@ __all__ = [
     "filter_meetings",
     "find_workspace",
     "init_workspace",
+    "load_for_edit",
     "match_document",
     "match_meeting",
     "new_document_id",
@@ -51,8 +59,10 @@ __all__ = [
     "parse_tags",
     "read_frontmatter",
     "render_frontmatter",
+    "save_buffer",
     "scan_documents",
     "scan_meetings",
     "scan_notes",
     "slugify",
+    "stamp_updated",
 ]

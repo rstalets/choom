@@ -106,9 +106,20 @@ def _run_tui() -> int:
     return 0
 
 
+_GUIDANCE_ADVICE = {
+    "AGENTS.md": "Add the commands and file format an assistant needs.",
+    "CLAUDE.md": "Add a line telling your assistant to read AGENTS.md.",
+}
+
+
 def _cmd_init() -> int:
-    workspace = init_workspace(Path.cwd())
-    print(str(workspace.root))
+    result = init_workspace(Path.cwd())
+    print(str(result.workspace.root))
+    for name in result.skipped:
+        print(
+            f"note: {name} already exists and was left unchanged.\n      {_GUIDANCE_ADVICE[name]}",
+            file=sys.stderr,
+        )
     return 0
 
 

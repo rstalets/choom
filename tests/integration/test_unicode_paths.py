@@ -10,7 +10,7 @@ from endpaper.core.workspace import init_workspace
 def test_workspace_path_with_spaces_and_non_ascii_works(tmp_path: Path) -> None:
     workspace_root = tmp_path / "Équipe Notes 笔记"
     workspace_root.mkdir()
-    workspace = init_workspace(workspace_root)
+    workspace = init_workspace(workspace_root).workspace
 
     meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
     assert meeting.path.is_file()
@@ -24,7 +24,7 @@ def test_workspace_path_with_spaces_and_non_ascii_works(tmp_path: Path) -> None:
 def test_note_workspace_path_with_spaces_and_non_ascii_works(tmp_path: Path) -> None:
     workspace_root = tmp_path / "Équipe Notes 笔记"
     workspace_root.mkdir()
-    workspace = init_workspace(workspace_root)
+    workspace = init_workspace(workspace_root).workspace
 
     note = create_note(workspace, "café résumé — naïve", type="idea")
     assert note.path.is_file()
