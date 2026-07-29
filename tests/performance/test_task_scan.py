@@ -8,7 +8,7 @@ from endpaper.core.workspace import init_workspace
 
 
 def test_load_tasks_on_1000_tasks_completes_under_1_second(tmp_path: Path) -> None:
-    workspace = init_workspace(tmp_path)
+    workspace = init_workspace(tmp_path).workspace
     lines = [
         f"- [{'x' if i % 3 == 0 else ' '}] generated task {i} "
         f"<!-- id:t_{i:04x} type:followup tags:perf created:2026-01-01 -->\n"

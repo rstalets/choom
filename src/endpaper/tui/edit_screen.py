@@ -54,6 +54,16 @@ class EditScreen(Screen[None]):
             self._render_status(result.message)
             return False
 
+        if result.saved_text != editor.text:
+            # The stamp changed the `updated:` line -- sync the buffer to match
+            # what actually landed on disk, or the widget would read as dirty
+            # the instant it saved (whenever the new timestamp differs from
+            # what's still displayed). `load_text` resets cursor/selection, so
+            # capture and restore it around the reload (FR-014).
+            cursor = editor.cursor_location
+            editor.text = result.saved_text
+            editor.cursor_location = cursor
+
         self.original_text = result.saved_text
         self.file = replace(self.file, text=result.saved_text)
         self.app.refresh_document(self.file.path)  # type: ignore[attr-defined]

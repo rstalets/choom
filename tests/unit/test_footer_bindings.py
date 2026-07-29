@@ -5,7 +5,7 @@ from textual.binding import Binding
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import ListScreen
 from endpaper.tui.preview_screen import PreviewScreen
-from endpaper.tui.status_bar import EDIT_HELP, LIST_HELP, PREVIEW_HELP
+from endpaper.tui.status_bar import EDIT_HELP, LIST_HELP, PREVIEW_HELP, TASK_LIST_HELP
 
 # Keys bound outside a screen's own BINDINGS but legitimately advertised in its
 # footer: "enter" is handled via a ListView.Selected message, not a Screen action;
@@ -45,7 +45,12 @@ def _assert_footer_advertises_every_shown_binding(screen_cls: type, help_text: s
 
 
 def test_list_screen_footer_advertises_every_shown_binding() -> None:
-    _assert_footer_advertises_every_shown_binding(ListScreen, LIST_HELP)
+    # ListScreen is one screen shared by three collections; "space"/"a" (task
+    # toggles) only make sense when the tasks collection is active, so they're
+    # advertised in TASK_LIST_HELP rather than LIST_HELP. Check against the
+    # union of both footers this single screen can show.
+    combined_help = f"{LIST_HELP}   {TASK_LIST_HELP}"
+    _assert_footer_advertises_every_shown_binding(ListScreen, combined_help)
 
 
 def test_preview_screen_footer_advertises_every_shown_binding() -> None:
