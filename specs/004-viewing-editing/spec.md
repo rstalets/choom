@@ -8,9 +8,10 @@
 
 **Input**: User description: "requirements.md feature 3.5"
 
-**Source**: `REQUIREMENTS.md` §3.5, plus the parts of §4.2 (`read`, `write`, `append`), §4.4 (re-parse
-only the changed file), §4.5 (edit-state presentation and key-binding hazards), §4.6 (frontmatter
-timestamps), and §4.7 that this feature needs to be shippable.
+**Source**: `REQUIREMENTS.md` §3.5, plus the parts of §4.4 (re-parse only the changed file), §4.5
+(edit-state presentation and key-binding hazards), §4.6 (frontmatter timestamps), and §4.7 that this
+feature needs to be shippable. §3.5 is a terminal-interface feature end to end, and this spec adds no
+command-line surface — see Assumptions for why that does not breach the two-front-doors rule.
 
 **Builds on**: Features `001-meeting-notes` and `002-general-notes`, which delivered the workspace,
 the frontmatter schema, the list-and-preview screen, the collection menu, and the command-line
@@ -117,44 +118,6 @@ absence of horizontal scrolling, and the footer contents.
 
 ---
 
-### User Story 4 - An assistant reads and rewrites the same files, with no terminal (Priority: P4)
-
-An AI assistant working in the user's workspace pulls a note's raw markdown, rewrites it, and writes
-it back — the same read-refine-write loop it already runs against a codebase. It never gets an
-editor, never gets a prompt, and never has to guess whether the write landed.
-
-**Why this priority**: The constitution requires that any behaviour in one front door exist in the
-other. Interactive text entry is inherently interactive and has no command-line form, but reading and
-replacing a document's content is exactly the peer, and no other feature delivers it. It is
-independently valuable to an assistant even if the terminal interface's edit state is never used.
-
-**Independent Test**: With no terminal attached and all output redirected, read a document, pipe
-modified content back through the write command, and compare the resulting file against the file the
-terminal interface produces from the same buffer.
-
-**Acceptance Scenarios**:
-
-1. **Given** an existing meeting, **When** `endpaper read <id>` runs with output piped, **Then**
-   standard output is the file's exact bytes with nothing added, removed, or re-encoded, and the
-   command exits 0.
-2. **Given** the same document, **When** `endpaper write <id>` is given replacement content on
-   standard input, **Then** the file becomes that content with `updated` stamped and `created`
-   untouched — the same file the terminal interface produces when the same text is saved from its
-   edit state.
-3. **Given** the same document, **When** `endpaper append <id>` is given content on standard input,
-   **Then** that content is added at the end of the file, every preceding byte is unchanged, and
-   `updated` is stamped.
-4. **Given** an identifier or path that matches no document, **When** any of the three commands runs,
-   **Then** it exits with the not-found code, writes the reason to standard error, and changes no
-   file.
-5. **Given** any of the three commands, **When** it runs, **Then** it never opens an editor, never
-   prompts, never waits for a keypress, never pages, and emits no colour or cursor control characters
-   when its output is not a terminal.
-6. **Given** `endpaper read <id> --json`, **When** it runs, **Then** standard output parses as a
-   single object carrying the document's identifier, path, and full content under documented keys.
-
----
-
 ### Edge Cases
 
 - **The file is read-only, or the disk is full.** The save fails, the user is told plainly, and they
@@ -170,9 +133,9 @@ terminal interface produces from the same buffer.
   is skipped rather than guessed at, a warning is surfaced, and the file is not repaired or reverted.
   On the next scan the document is skipped with a warning, exactly as a hand-broken file already is,
   and is never rewritten or deleted.
-- **The user saves an empty buffer.** The file becomes empty. From the command line the same outcome
-  requires an explicit flag, because empty standard input is far more often an upstream failure than
-  an intent.
+- **The user saves an empty buffer.** The file becomes empty. Emptying a buffer in an interactive
+  editor takes deliberate keystrokes and is undone by discarding rather than saving, so no extra
+  confirmation is warranted here.
 - **A file with Windows line endings, or with no trailing newline.** Both conventions survive a save
   unchanged.
 - **A document that the active filter or collection no longer matches after the edit** — a tag
@@ -185,10 +148,9 @@ terminal interface produces from the same buffer.
   buffer, cursor position, and unsaved-changes state all survive.
 - **A terminal with legacy flow control**, where `ctrl+s` freezes output instead of reaching the
   application. The canonical save key still works, because the footer advertises `ctrl+o`.
-- **A path outside the workspace given to a command-line read or write.** Refused with the workspace
-  error code; endpaper does not read or write arbitrary files on the machine.
-- **An argument that is both a valid identifier and an existing relative path.** Refused as a usage
-  error naming both candidates, rather than silently preferring one.
+- **A document last written by something other than endpaper** — hand-edited in another editor, or
+  rewritten in place by an AI assistant. It opens, edits, and saves like any other, and its stale
+  `updated` value is left as found until the next save through endpaper stamps it.
 
 ## Requirements *(mandatory)*
 
@@ -274,53 +236,36 @@ terminal interface produces from the same buffer.
 - **FR-035**: The fallback for a terminal whose flow control swallows `ctrl+s` MUST be documented for
   the user.
 
-**Command-line peer**
+**Command-line surface**
 
-- **FR-036**: `endpaper read <id|path>` MUST write the target file's exact bytes to standard output,
-  unmodified, and exit 0.
-- **FR-037**: `endpaper read` MUST support `--json`, emitting a single object with the documented keys
-  `id`, `path`, and `content`.
-- **FR-038**: `endpaper write <id|path>` MUST replace the target file's content with what it reads
-  from standard input.
-- **FR-039**: `endpaper append <id|path>` MUST add what it reads from standard input to the end of the
-  target file, leaving every preceding byte unchanged.
-- **FR-040**: `endpaper write` and the interface's save MUST produce the same file from the same
-  content, through the same underlying operation, including the `updated` stamp and the FR-018 and
-  FR-019 behaviours.
-- **FR-041**: `endpaper write` MUST refuse empty standard input as a usage error unless an explicit
-  flag is given, and MUST NOT modify the file when it refuses.
-- **FR-042**: All three commands MUST accept either a document identifier or a workspace-relative
-  path, MUST refuse a path resolving outside the workspace with the workspace error code, and MUST
-  refuse an argument that matches both an identifier and a path as a usage error naming both.
-- **FR-043**: All three commands MUST target an existing file; creating a document remains the job of
-  the create commands, and an unmatched target MUST exit with the not-found code.
-- **FR-044**: No command in this feature may open an editor, prompt for input, wait for a keypress, or
-  page its output.
-- **FR-045**: No command in this feature may emit colour or cursor control characters when its output
-  is not a terminal.
-- **FR-046**: Data MUST go to standard output and diagnostics to standard error, never interleaved.
-- **FR-047**: Exit codes MUST be 0 for success, 1 for a target that was not found, 2 for a usage
-  error, and 3 for a workspace error.
-- **FR-048**: The workspace guidance file generated at init MUST state the read, write, and append
-  commands, while remaining roughly 60 lines or fewer.
+- **FR-036**: This feature MUST add no command-line surface. Interactive text entry is inherently
+  interactive and has no command-line form, and the file-content commands in `REQUIREMENTS.md` §4.2
+  are independent of the edit state — see Assumptions.
+- **FR-037**: The edit state MUST NOT become a prerequisite for any command-line capability, so that
+  the §4.2 commands can be specified and delivered separately, before or after this feature, without
+  either depending on the other.
 
 **Never lose the user's words**
 
-- **FR-049**: No operation in this feature may drop, reorder, or truncate a line the user did not
+- **FR-038**: No operation in this feature may drop, reorder, or truncate a line the user did not
   change.
-- **FR-050**: A document whose frontmatter the user has broken MUST be left exactly as written, MUST
+- **FR-039**: A document whose frontmatter the user has broken MUST be left exactly as written, MUST
   be skipped with a warning on the next scan rather than raising, and MUST NOT prevent any other
   document from listing.
-- **FR-051**: Warnings MUST go to standard error on the command line, and to the interface's existing
-  warning surface in the terminal interface — never into standard output and never into a document.
+- **FR-040**: Warnings MUST go to the interface's existing warning surface — never into a document,
+  and never silently swallowed.
+- **FR-041**: A document modified outside endpaper — by hand, by another program, or by an AI
+  assistant editing the file directly — MUST open, preview, edit, and save exactly as one endpaper
+  itself last wrote. Nothing in this feature may require that a document have been last written by
+  endpaper.
 
 **Platform**
 
-- **FR-052**: Windows, macOS, and Linux MUST be supported, with Windows treated as a primary target,
+- **FR-042**: Windows, macOS, and Linux MUST be supported, with Windows treated as a primary target,
   and the bindings MUST be verified on the target terminals before release.
-- **FR-053**: Workspace paths containing spaces and non-ASCII characters MUST work for every
+- **FR-043**: Workspace paths containing spaces and non-ASCII characters MUST work for every
   operation in this feature.
-- **FR-054**: No operation in this feature may require network access.
+- **FR-044**: No operation in this feature may require network access.
 
 ### Key Entities
 
@@ -335,7 +280,9 @@ terminal interface produces from the same buffer.
   typing, cleared by a save, and the sole trigger for the discard confirmation.
 - **Save operation**: The single shared action that writes a buffer's content to a document, stamps
   `updated`, preserves `created` and the file's line-ending convention, and re-parses that one file.
-  Invoked by the interface's save keys and by the command-line write.
+  Invoked by the interface's save keys. It is defined as a core operation taking content and a
+  target, rather than as interface behaviour, so that a later command-line writer can reuse it
+  unchanged.
 
 ## Success Criteria *(mandatory)*
 
@@ -357,13 +304,11 @@ terminal interface produces from the same buffer.
   convention, verified for both conventions in both directions.
 - **SC-008**: Every key that does anything in a given state appears in that state's footer, verified
   by comparing the footer against the state's bindings for all three states.
-- **SC-009**: An assistant can complete a read → modify → write cycle with no terminal attached, no
-  human keystroke, and a non-zero exit code only when the operation genuinely failed.
-- **SC-010**: The file produced by saving a given text in the interface and the file produced by
-  piping the same text to the write command are identical apart from their timestamps, verified by a
-  test that exercises both.
-- **SC-011**: A save that fails because the file cannot be written loses nothing: the buffer is still
+- **SC-009**: A save that fails because the file cannot be written loses nothing: the buffer is still
   present and the file on disk is unchanged, in 100% of induced failure cases.
+- **SC-010**: A document rewritten in place outside endpaper — by hand or by an AI assistant — opens,
+  edits, and saves indistinguishably from one endpaper wrote itself, verified for a document whose
+  body, frontmatter field order, and line endings were all changed externally.
 
 ## Assumptions
 
@@ -371,11 +316,19 @@ terminal interface produces from the same buffer.
   `enter` to open it, and `esc` to return to the list. This feature restates those transitions
   because §3.5 defines the state machine as a whole, but implements only the edit half and the
   footer change that unblocks it.
-- **The command-line half is in scope.** `REQUIREMENTS.md` §3.5 is written in terminal-interface
-  terms only, but the constitution requires that any behaviour in one front door exist in the other,
-  and no other feature claims `read`, `write`, or `append` from §4.2. Shipping the edit state without
-  them would leave an assistant unable to change a document at all. Interactive text entry itself has
-  no command-line form and is exempt as inherently interactive.
+- **This feature adds no command-line surface, and that does not breach the two-front-doors rule.**
+  The constitution requires parity *unless* a behaviour is inherently interactive or inherently
+  non-interactive. Interactive text entry is the first kind and has no command-line form. The
+  file-content commands in §4.2 — `read`, `write`, `append` — are the second kind: they exist for
+  stdin piping, and they are not the peer of the edit state.
+
+  An AI assistant does not need them in order to change a document. It reaches for the command line
+  to **create** documents, because creation owns identifier generation, slug and collision rules,
+  date partitioning, and frontmatter — none of which an assistant should reinvent. To **modify** an
+  existing document it opens the markdown file and edits it directly, the same way it edits any file
+  in a repository. It cannot edit interactively at all, so there is nothing about the edit state to
+  mirror. §4.2's commands remain real, unclaimed requirements; they are independent surface and
+  belong in their own spec rather than riding along with §3.5.
 - **The buffer wins on frontmatter.** The edit state shows raw markdown including frontmatter, so the
   user can change any field. Whatever they type is what gets written; endpaper stamps `updated` and
   otherwise does not police the fields. This is consistent with the tool's premise that the files are
@@ -384,14 +337,12 @@ terminal interface produces from the same buffer.
 - **Simultaneous edits are not detected.** `REQUIREMENTS.md` §5 makes the sync tool's own
   conflict-copy behaviour the answer for two copies edited at once, so a save does not check whether
   the file changed underneath it.
-- **`write` does not create files.** Creation belongs to the create commands, which own naming,
-  partitioning, and frontmatter generation. A write to an unknown target is a not-found error, not an
-  invitation to invent a file.
-- **Empty input to `write` is refused by default**, requiring an explicit flag, because an empty
-  standard input is far more often a failed upstream command than a deliberate truncation, and the
-  command line takes an explicit flag rather than asking.
-- **`read` on a document with broken frontmatter still succeeds**, because it dumps bytes and does
-  not parse.
+- **endpaper does not police `updated` for changes made outside it.** A document edited by hand or
+  rewritten by an assistant carries a stale `updated` until the next save through endpaper stamps it.
+  Correcting it would mean watching the filesystem or keeping a second copy of state, and §3.5 asks
+  for neither. The file's own modification time remains the record of when it last changed.
+- **The save operation is specified as core behaviour, not interface behaviour**, so that the §4.2
+  writer can later reuse it and produce byte-identical results without the edit state being involved.
 - **Line numbers count real lines, not display rows**, so a wrapped paragraph occupies one number.
 - **No undo history is specified beyond what the editing area provides natively**; the discard
   confirmation, not an undo stack, is the guarantee against losing work.
@@ -400,8 +351,7 @@ terminal interface produces from the same buffer.
 ## Dependencies
 
 - Feature `001-meeting-notes` for the workspace, the frontmatter schema, the list-and-preview screen,
-  the footer, the warning surface, and the command-line conventions (exit codes, stream discipline,
-  `--json`, the guidance file generated at init).
+  the footer, and the warning surface.
 - Feature `002-general-notes` for notes and daily notes as a second collection, the collection menu,
   and the per-collection state that the edit state must leave undisturbed.
 - The document scan and single-file re-parse already used to keep the list current.
@@ -412,6 +362,11 @@ terminal interface produces from the same buffer.
 
 Deferred, and explicitly not delivered here:
 
+- The file-content commands `endpaper read`, `endpaper write`, and `endpaper append`
+  (`REQUIREMENTS.md` §4.2). They remain unclaimed by any feature and still need a spec, but they are
+  stdin-piping surface rather than the peer of the edit state, and an assistant modifies documents by
+  editing the markdown directly — so nothing here depends on them and they gain nothing from shipping
+  together. See Assumptions.
 - Editing `tasks.md` through the edit state. §3.5 applies to what is opened from the meetings and
   notes collections; tasks are toggled, not edited, in v0.0.1, and feature `003-tasks` deferred this
   on the same boundary.

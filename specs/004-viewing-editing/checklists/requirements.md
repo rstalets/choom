@@ -42,15 +42,20 @@
   than improvised. The spec deliberately does not name the interface toolkit, the editing widget, or
   the widget options that §4.5 discusses, leaving those to `/speckit-plan`.
 
-- **Success criteria**: All eleven are stated as user-observable outcomes with counts, percentages,
-  or wall-clock bounds. SC-002 uses a one-second bound rather than a component-level latency figure;
-  SC-009 and SC-010 describe what an assistant can accomplish rather than how the commands are built.
+- **Success criteria**: All ten are stated as user-observable outcomes with counts, percentages, or
+  wall-clock bounds. SC-002 uses a one-second bound rather than a component-level latency figure.
 
-- **Scope boundary**: REQUIREMENTS.md §3.5 is written purely in terminal-interface terms. The spec
-  additionally claims the `read` / `write` / `append` commands from §4.2, because constitution
-  principle II ("Two Interfaces, One Contract") requires a command-line peer for any behaviour the
-  interface gains, and no other feature claims them. This is recorded in Assumptions and isolated in
-  User Story 4 (P4) so it can be descoped without touching stories 1-3.
+- **Scope boundary**: REQUIREMENTS.md §3.5 is a terminal-interface feature end to end, and the spec
+  adds no command-line surface. An earlier draft claimed `read` / `write` / `append` from §4.2 on the
+  grounds that constitution principle II demands a command-line peer for anything the interface
+  gains. That reasoning was wrong on the facts: an AI assistant uses the CLI to *create* documents,
+  where identifier generation, slug and collision rules, partitioning, and frontmatter live, but
+  *modifies* an existing document by editing the markdown file directly, and cannot edit
+  interactively at all. Principle II also exempts both ends of this — interactive text entry is
+  inherently interactive, stdin piping is inherently non-interactive — so the two surfaces are
+  independent. §4.2's commands remain real, unclaimed requirements needing their own spec; FR-036 and
+  FR-037 keep this feature from becoming a prerequisite for them, and the save operation is specified
+  as core behaviour so a later writer can reuse it byte-for-byte.
 
 - **Prior-feature overlap**: FR-001 through FR-008 restate transitions that features 001 and 002
   already deliver, because §3.5 defines the three-state machine as a whole and the acceptance
