@@ -101,7 +101,6 @@ Considered and explicitly out of scope for v0.0.1 (see [REQUIREMENTS.md §5](REQ
 - Tasks created inline from inside a note or meeting
 - Backlinks, wikilinks, graph views
 - Syntax highlighting in the editor
-- An MCP server
 
 ## Status
 
