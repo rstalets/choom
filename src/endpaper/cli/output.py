@@ -4,43 +4,43 @@ import json
 import sys
 from collections.abc import Iterable
 
-from endpaper.core.models import Meeting, Workspace
+from endpaper.core.models import Document, Workspace
 
 
-def relative_path(workspace: Workspace, meeting: Meeting) -> str:
-    return meeting.path.relative_to(workspace.root).as_posix()
+def relative_path(workspace: Workspace, document: Document) -> str:
+    return document.path.relative_to(workspace.root).as_posix()
 
 
-def print_meeting_line(workspace: Workspace, meeting: Meeting) -> None:
+def print_document_line(workspace: Workspace, document: Document) -> None:
     print(
         "\t".join(
             [
-                meeting.created[:10],
-                meeting.type,
-                meeting.title,
-                ",".join(meeting.tags),
+                document.created[:10],
+                document.type,
+                document.title,
+                ",".join(document.tags),
             ]
         )
     )
 
 
-def print_meetings_table(workspace: Workspace, meetings: Iterable[Meeting]) -> None:
-    for meeting in meetings:
-        print_meeting_line(workspace, meeting)
+def print_documents_table(workspace: Workspace, documents: Iterable[Document]) -> None:
+    for document in documents:
+        print_document_line(workspace, document)
 
 
-def print_meetings_json(workspace: Workspace, meetings: Iterable[Meeting]) -> None:
+def print_documents_json(workspace: Workspace, documents: Iterable[Document]) -> None:
     records = [
         {
-            "id": meeting.id,
-            "path": relative_path(workspace, meeting),
-            "title": meeting.title,
-            "type": meeting.type,
-            "tags": list(meeting.tags),
-            "created": meeting.created,
-            "updated": meeting.updated,
+            "id": document.id,
+            "path": relative_path(workspace, document),
+            "title": document.title,
+            "type": document.type,
+            "tags": list(document.tags),
+            "created": document.created,
+            "updated": document.updated,
         }
-        for meeting in meetings
+        for document in documents
     ]
     print(json.dumps(records, ensure_ascii=False))
 

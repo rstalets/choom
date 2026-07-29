@@ -7,6 +7,11 @@ Screen {
     layout: horizontal;
 }
 
+#menu-pane {
+    width: 14;
+    border-right: solid $accent;
+}
+
 #list-pane {
     width: 2fr;
     border-right: solid $accent;
@@ -15,6 +20,10 @@ Screen {
 #preview-pane {
     width: 3fr;
     padding: 0 1;
+}
+
+#collection-menu {
+    height: 1fr;
 }
 
 #meeting-list {

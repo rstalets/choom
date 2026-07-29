@@ -14,9 +14,17 @@ class Workspace:
     def meetings_dir(self) -> Path:
         return self.root / "meetings"
 
+    @property
+    def notes_dir(self) -> Path:
+        return self.root / "notes"
+
+    @property
+    def daily_dir(self) -> Path:
+        return self.root / "notes" / "daily"
+
 
 @dataclass(frozen=True, slots=True)
-class Meeting:
+class Document:
     id: str
     path: Path
     title: str
@@ -24,6 +32,25 @@ class Meeting:
     tags: tuple[str, ...]
     created: str
     updated: str
+
+
+Meeting = Document
+Note = Document
+
+
+@dataclass(frozen=True, slots=True)
+class Collection:
+    id_prefix: str
+    create_dir: str
+    scan_dirs: tuple[str, ...]
+    reserved_types: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class DailyNote:
+    path: Path
+    document: Document | None
+    created: bool
 
 
 ScanWarningReason = Literal[
@@ -45,7 +72,10 @@ class ScanWarning:
 
 
 @dataclass(frozen=True, slots=True)
-class MeetingFilter:
+class DocumentFilter:
     type: str | None = None
     tags: tuple[str, ...] = ()
     since: date | None = None
+
+
+MeetingFilter = DocumentFilter

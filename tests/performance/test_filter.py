@@ -3,9 +3,11 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+from endpaper.core.documents import filter_documents, match_document
 from endpaper.core.meetings import filter_meetings, match_meeting, scan_meetings
 from endpaper.core.models import MeetingFilter
-from tests.fixtures.generate import generate
+from endpaper.core.notes import scan_notes
+from tests.fixtures.generate import generate, generate_notes
 
 
 def test_filter_meetings_1000_completes_under_100ms(tmp_path: Path) -> None:
@@ -29,4 +31,28 @@ def test_live_filter_predicate_1000_completes_under_100ms(tmp_path: Path) -> Non
     elapsed = time.perf_counter() - start
 
     assert len(visible) == 1000
+    assert elapsed < 0.1
+
+
+def test_filter_notes_1000_completes_under_100ms(tmp_path: Path) -> None:
+    workspace = generate_notes(tmp_path, 1000)
+    notes, _ = scan_notes(workspace)
+
+    start = time.perf_counter()
+    filtered = filter_documents(notes, MeetingFilter(type="research"))
+    elapsed = time.perf_counter() - start
+
+    assert filtered
+    assert elapsed < 0.1
+
+
+def test_live_filter_predicate_notes_1000_completes_under_100ms(tmp_path: Path) -> None:
+    workspace = generate_notes(tmp_path, 1000)
+    notes, _ = scan_notes(workspace)
+
+    start = time.perf_counter()
+    visible = [n for n in notes if match_document(n, "generated")]
+    elapsed = time.perf_counter() - start
+
+    assert len(visible) == 970  # 1000 - 30 daily notes, which don't match "generated"
     assert elapsed < 0.1
