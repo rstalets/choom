@@ -32,8 +32,6 @@ The tool disappears into the twenty seconds before a meeting starts. You type `/
 
 ## Usage
 
-> Screenshots coming soon — `docs/screenshots/tui-list.png` and `docs/screenshots/tui-preview.png` are referenced below and will render once added.
-
 ### Install
 
 ```bash
@@ -70,15 +68,23 @@ Or launch the TUI with no arguments:
 endpaper
 ```
 
-![TUI list view](docs/screenshots/tui-list.png)
+![Meetings list and rendered preview](docs/screenshots/meetings.png)
 
 `/` opens a combined filter/command bar — type to filter the list live, or type `meeting.standup <description>` and hit `enter` to create one without leaving the screen. Arrow keys move, `enter` opens the selected meeting in a rendered markdown preview, `e` drops into a raw editor, `ctrl+o`/`ctrl+x` save, `esc` backs out.
 
-![TUI preview and edit](docs/screenshots/tui-preview.png)
+![Raw markdown editor with line numbers and frontmatter](docs/screenshots/edit-meeting.png)
 
 ### For AI assistants
 
 An assistant working in an endpaper workspace reads `AGENTS.md` at the root and takes it from there — non-interactive, `--json`-capable, and scriptable by design. Nothing opens an editor or blocks on a prompt.
+
+Below, an assistant is asked to pull up a vendor sync meeting, research the competitor options it calls for, and write up its findings — reading and writing the vault the same way it reads and writes a codebase:
+
+![AI assistant reading meeting notes, researching, and writing a new note via the CLI](docs/screenshots/execute-task.png)
+
+The note it produced shows up like any other — because it is:
+
+![The assistant's research note, rendered back in the TUI](docs/screenshots/research-note.png)
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter schema, and exit codes.
 
