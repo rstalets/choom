@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Iterator
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
 import pytest
@@ -26,3 +26,7 @@ def seeded_id(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
     fixed = "a1b2c3d4"
     monkeypatch.setattr(secrets, "token_hex", lambda n: fixed)
     yield fixed
+
+
+def daily_note_path(workspace: Workspace, day: date) -> Path:
+    return workspace.daily_dir / f"{day:%Y-%m-%d}.md"

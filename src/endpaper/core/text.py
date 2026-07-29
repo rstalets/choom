@@ -32,5 +32,9 @@ def parse_tags(description: str) -> tuple[str, tuple[str, ...]]:
     return title, tuple(tags)
 
 
+def new_document_id(when: date, prefix: str) -> str:
+    return f"{prefix}{when:%Y%m%d}_{secrets.token_hex(4)}"
+
+
 def new_meeting_id(when: date) -> str:
-    return f"m_{when:%Y%m%d}_{secrets.token_hex(4)}"
+    return new_document_id(when, "m_")

@@ -4,7 +4,7 @@ import json
 
 import yaml
 
-from endpaper.core.models import Meeting, ScanWarningReason
+from endpaper.core.models import Document, ScanWarningReason
 
 REQUIRED_KEYS = frozenset({"id", "type", "title", "tags", "created", "updated"})
 
@@ -72,17 +72,17 @@ def _quoted(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def render_frontmatter(meeting: Meeting) -> str:
-    type_field = _quoted(meeting.type) if meeting.type else '""'
-    tags_field = "[" + ", ".join(_quoted(tag) for tag in meeting.tags) + "]"
+def render_frontmatter(document: Document) -> str:
+    type_field = _quoted(document.type) if document.type else '""'
+    tags_field = "[" + ", ".join(_quoted(tag) for tag in document.tags) + "]"
     lines = [
         "---",
-        f"id: {meeting.id}",
+        f"id: {document.id}",
         f"type: {type_field}",
-        f"title: {_quoted(meeting.title)}",
+        f"title: {_quoted(document.title)}",
         f"tags: {tags_field}",
-        f"created: {meeting.created}",
-        f"updated: {meeting.updated}",
+        f"created: {document.created}",
+        f"updated: {document.updated}",
         "---",
         "",
     ]
