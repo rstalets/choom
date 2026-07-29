@@ -66,7 +66,8 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(tmp_path: Pa
     tasks, warnings = load_tasks(workspace)
     assert warnings == []
 
-    text = workspace.tasks_file.read_text(encoding="utf-8", newline="")
+    with open(workspace.tasks_file, encoding="utf-8", newline="") as fh:
+        text = fh.read()
     assert text.endswith("bare <!-- id:") is False
     assert "\r\n" in text
     assert not text.endswith("\n")
@@ -77,7 +78,8 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(tmp_path: Pa
     assert bare_task.id is not None
     set_task_state(workspace, bare_task.id, done=True)
 
-    text_after = workspace.tasks_file.read_text(encoding="utf-8", newline="")
+    with open(workspace.tasks_file, encoding="utf-8", newline="") as fh:
+        text_after = fh.read()
     assert not text_after.endswith("\n")
     assert "- [x] bare" in text_after
 
@@ -92,7 +94,8 @@ def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
 
     add_task(workspace, "new task")
 
-    text = workspace.tasks_file.read_text(encoding="utf-8", newline="")
+    with open(workspace.tasks_file, encoding="utf-8", newline="") as fh:
+        text = fh.read()
     assert text.startswith(original + "\n")
     assert text.endswith("\n")
 
