@@ -36,10 +36,10 @@ Single project, `src/` layout. Package code under `src/endpaper/`, tests under `
 
 **Purpose**: Establish the baseline this feature's refactor is measured against
 
-- [ ] T001 Run `uv run pytest` and record the passing test count — this is the baseline the Phase 2 regression gate (T015) compares against, and it must be green before any code changes
-- [ ] T002 [P] Bump `__version__` to `0.0.2` in `src/endpaper/__init__.py`
-- [ ] T003 [P] Add an Unreleased `0.0.2` section to `CHANGELOG.md` with placeholders for the three new CLI commands and the additive `core` API change (Principle VI)
-- [ ] T004 [P] Extend `tests/conftest.py` with a `frozen_now` helper usable by note creation and a `daily_note_path(workspace, day)` helper, reusing the existing frozen-clock and seeded-id fixtures
+- [X] T001 Run `uv run pytest` and record the passing test count — this is the baseline the Phase 2 regression gate (T015) compares against, and it must be green before any code changes
+- [X] T002 [P] Bump `__version__` to `0.0.2` in `src/endpaper/__init__.py`
+- [X] T003 [P] Add an Unreleased `0.0.2` section to `CHANGELOG.md` with placeholders for the three new CLI commands and the additive `core` API change (Principle VI)
+- [X] T004 [P] Extend `tests/conftest.py` with a `frozen_now` helper usable by note creation and a `daily_note_path(workspace, day)` helper, reusing the existing frozen-clock and seeded-id fixtures
 
 **Checkpoint**: Baseline green and recorded; note-aware fixtures available.
 
@@ -57,19 +57,19 @@ entire suite passes with **zero test files edited**. If a 001 test needs changin
 premise of [R2](./research.md#r2-naming-and-backward-compatibility-of-the-core-api) has broken —
 fix that before building notes on top of it.
 
-- [ ] T005 Rename `Meeting` to `Document` and `MeetingFilter` to `DocumentFilter` in `src/endpaper/core/models.py`, then add `Meeting = Document`, `Note = Document`, and `MeetingFilter = DocumentFilter` as module-level aliases — true aliases, never subclasses, per [data-model.md](./data-model.md#changed-document-was-meeting)
-- [ ] T006 Add the frozen slotted `Collection` dataclass (`id_prefix`, `create_dir`, `scan_dirs`, `reserved_types`) to `src/endpaper/core/models.py` per [data-model.md](./data-model.md#new-collection)
-- [ ] T007 Add the frozen slotted `DailyNote` dataclass (`path`, `document: Document | None`, `created: bool`) to `src/endpaper/core/models.py` per [data-model.md](./data-model.md#new-dailynote)
-- [ ] T008 Add `notes_dir` and `daily_dir` properties to `Workspace` in `src/endpaper/core/models.py`
-- [ ] T009 Add `new_document_id(when, prefix)` to `src/endpaper/core/text.py` and reduce `new_meeting_id(when)` to a one-line binding of it with `"m_"`, keeping its signature unchanged
-- [ ] T010 Create `src/endpaper/core/documents.py` by moving `_validate_token`, `create_meeting`, `scan_meetings`, `filter_meetings`, and `match_meeting` out of `meetings.py` and renaming them to `create_document`, `scan_documents`, `filter_documents`, `match_document`, each taking a `collection: Collection` parameter — behaviour must be byte-for-byte the same as today for the meetings case
-- [ ] T011 In `src/endpaper/core/documents.py`, make `create_document` take its target directory from `collection.create_dir` and its id prefix from `collection.id_prefix`, and reject `type` values in `collection.reserved_types` with a `UsageError` raised **before any filesystem work** per [R8](./research.md#r8-the-reserved-daily-type)
-- [ ] T012 In `src/endpaper/core/documents.py`, make `scan_documents` walk every directory in `collection.scan_dirs` with a non-recursive `glob("*.md")`, concatenate the results before sorting, and treat a missing directory as contributing nothing rather than as a warning per [data-model.md](./data-model.md#scan-behaviour)
-- [ ] T013 Add a `_read_document(path) -> Document | None` helper to `src/endpaper/core/documents.py` that parses one file's frontmatter and returns `None` rather than raising when it does not parse, and refactor `scan_documents` to use it so single-file and bulk parsing cannot diverge
-- [ ] T014 Reduce `src/endpaper/core/meetings.py` to the `MEETINGS` descriptor (`Collection("m_", "meetings", ("meetings",), frozenset())`) plus four bound wrappers whose signatures exactly match feature 001's, and create `src/endpaper/core/notes.py` with the `NOTES` descriptor (`Collection("n_", "notes", ("notes", "notes/daily"), frozenset({"daily"}))`) plus `create_note` and `scan_notes` bindings
-- [ ] T015 Update `src/endpaper/core/frontmatter.py` to annotate `render_frontmatter` against `Document`, and update `src/endpaper/core/__init__.py` to export `Document`, `Note`, `Collection`, `DailyNote`, `DocumentFilter`, the generic document functions, and the notes functions, keeping every feature 001 export in place per [contracts/core-api.md](./contracts/core-api.md)
-- [ ] T016 **Regression gate**: run `uv run pytest` and confirm the same passing count as T001 with **zero test files edited**. Do not proceed to Phase 3 until this holds
-- [ ] T017 [P] Create `tests/unit/test_collection.py` asserting the `MEETINGS` and `NOTES` descriptor values, that `new_document_id` honours its prefix, that `Meeting is Document` and `Note is Document`, and that a reserved type raises before any directory is created
+- [X] T005 Rename `Meeting` to `Document` and `MeetingFilter` to `DocumentFilter` in `src/endpaper/core/models.py`, then add `Meeting = Document`, `Note = Document`, and `MeetingFilter = DocumentFilter` as module-level aliases — true aliases, never subclasses, per [data-model.md](./data-model.md#changed-document-was-meeting)
+- [X] T006 Add the frozen slotted `Collection` dataclass (`id_prefix`, `create_dir`, `scan_dirs`, `reserved_types`) to `src/endpaper/core/models.py` per [data-model.md](./data-model.md#new-collection)
+- [X] T007 Add the frozen slotted `DailyNote` dataclass (`path`, `document: Document | None`, `created: bool`) to `src/endpaper/core/models.py` per [data-model.md](./data-model.md#new-dailynote)
+- [X] T008 Add `notes_dir` and `daily_dir` properties to `Workspace` in `src/endpaper/core/models.py`
+- [X] T009 Add `new_document_id(when, prefix)` to `src/endpaper/core/text.py` and reduce `new_meeting_id(when)` to a one-line binding of it with `"m_"`, keeping its signature unchanged
+- [X] T010 Create `src/endpaper/core/documents.py` by moving `_validate_token`, `create_meeting`, `scan_meetings`, `filter_meetings`, and `match_meeting` out of `meetings.py` and renaming them to `create_document`, `scan_documents`, `filter_documents`, `match_document`, each taking a `collection: Collection` parameter — behaviour must be byte-for-byte the same as today for the meetings case
+- [X] T011 In `src/endpaper/core/documents.py`, make `create_document` take its target directory from `collection.create_dir` and its id prefix from `collection.id_prefix`, and reject `type` values in `collection.reserved_types` with a `UsageError` raised **before any filesystem work** per [R8](./research.md#r8-the-reserved-daily-type)
+- [X] T012 In `src/endpaper/core/documents.py`, make `scan_documents` walk every directory in `collection.scan_dirs` with a non-recursive `glob("*.md")`, concatenate the results before sorting, and treat a missing directory as contributing nothing rather than as a warning per [data-model.md](./data-model.md#scan-behaviour)
+- [X] T013 Add a `_read_document(path) -> Document | None` helper to `src/endpaper/core/documents.py` that parses one file's frontmatter and returns `None` rather than raising when it does not parse, and refactor `scan_documents` to use it so single-file and bulk parsing cannot diverge
+- [X] T014 Reduce `src/endpaper/core/meetings.py` to the `MEETINGS` descriptor (`Collection("m_", "meetings", ("meetings",), frozenset())`) plus four bound wrappers whose signatures exactly match feature 001's, and create `src/endpaper/core/notes.py` with the `NOTES` descriptor (`Collection("n_", "notes", ("notes", "notes/daily"), frozenset({"daily"}))`) plus `create_note` and `scan_notes` bindings
+- [X] T015 Update `src/endpaper/core/frontmatter.py` to annotate `render_frontmatter` against `Document`, and update `src/endpaper/core/__init__.py` to export `Document`, `Note`, `Collection`, `DailyNote`, `DocumentFilter`, the generic document functions, and the notes functions, keeping every feature 001 export in place per [contracts/core-api.md](./contracts/core-api.md)
+- [X] T016 **Regression gate**: run `uv run pytest` and confirm the same passing count as T001 with **zero test files edited**. Do not proceed to Phase 3 until this holds
+- [X] T017 [P] Create `tests/unit/test_collection.py` asserting the `MEETINGS` and `NOTES` descriptor values, that `new_document_id` honours its prefix, that `Meeting is Document` and `Note is Document`, and that a reserved type raises before any directory is created
 
 **Checkpoint**: Core is collection-parameterised, meetings behave exactly as before, and notes have a
 descriptor. User stories can now proceed.
@@ -89,20 +89,20 @@ the second call, and it is reachable from the notes list.
 
 > **Write these first and confirm they FAIL before implementing.**
 
-- [ ] T018 [P] [US1] Create `tests/integration/test_daily_note.py` covering US1 scenarios 1–4: first call creates `notes/daily/YYYY-MM-DD.md` with `type: daily` and title equal to the ISO date; second call same day returns the same path, creates no second file, and leaves the file **byte-identical and mtime-identical** per [R10](./research.md#r10-test-strategy-for-the-file-did-not-change)
-- [ ] T019 [P] [US1] Add to `tests/integration/test_daily_note.py` the edge cases from spec §Edge Cases: a missing `notes/daily/` is recreated (US1 scenario 5); an existing file with broken frontmatter is still opened, not replaced, and not repaired; a zero-byte existing file is treated as existing; no other workspace file is modified (US1 scenario 6)
-- [ ] T020 [P] [US1] Add a concurrency test to `tests/integration/test_daily_note.py` that invokes the daily-note path 20 times from threads and asserts exactly one file results — the property `O_EXCL` buys per [R3](./research.md#r3-making-the-daily-note-idempotent-without-a-read-modify-write)
+- [X] T018 [P] [US1] Create `tests/integration/test_daily_note.py` covering US1 scenarios 1–4: first call creates `notes/daily/YYYY-MM-DD.md` with `type: daily` and title equal to the ISO date; second call same day returns the same path, creates no second file, and leaves the file **byte-identical and mtime-identical** per [R10](./research.md#r10-test-strategy-for-the-file-did-not-change)
+- [X] T019 [P] [US1] Add to `tests/integration/test_daily_note.py` the edge cases from spec §Edge Cases: a missing `notes/daily/` is recreated (US1 scenario 5); an existing file with broken frontmatter is still opened, not replaced, and not repaired; a zero-byte existing file is treated as existing; no other workspace file is modified (US1 scenario 6)
+- [X] T020 [P] [US1] Add a concurrency test to `tests/integration/test_daily_note.py` that invokes the daily-note path 20 times from threads and asserts exactly one file results — the property `O_EXCL` buys per [R3](./research.md#r3-making-the-daily-note-idempotent-without-a-read-modify-write)
 
 ### Implementation for User Story 1
 
-- [ ] T021 [US1] Implement `open_daily_note(workspace, *, now=None) -> DailyNote` in `src/endpaper/core/notes.py`: build the path from the local date, `mkdir` the daily directory, then `os.open(..., O_CREAT | O_EXCL | O_WRONLY)` and treat `FileExistsError` as the already-exists path, returning `DailyNote(path, _read_document(path), created=False)` per [contracts/core-api.md](./contracts/core-api.md#notes)
-- [ ] T022 [US1] Export `open_daily_note` and `DailyNote` from `src/endpaper/core/__init__.py`
-- [ ] T023 [US1] Add the `note today` subparser and a `_cmd_note_today` handler to `src/endpaper/cli/main.py` that prints the returned path relative to the workspace root and exits 0 in both the created and existing cases per [contracts/cli.md](./contracts/cli.md#endpaper-note-today)
-- [ ] T024 [US1] Add `note` to `VERBS` in `src/endpaper/tui/command_bar.py` and post a new `DailyRequested` message when the input is bare `/note` — no type part and no description — per [contracts/tui.md](./contracts/tui.md#the-note-grammar)
-- [ ] T025 [US1] Add an `open_daily_note_and_track` method to `src/endpaper/tui/app.py` that calls `open_daily_note` and inserts into the in-memory notes list only when `created and document is not None`
-- [ ] T026 [US1] Change `render_preview_markdown` in `src/endpaper/tui/rendering.py` to take `(path, document: Document | None)`, rendering the heading and metadata line from the record when present and falling back to a filename heading with no metadata line when it is `None`, stripping the frontmatter block in both cases
-- [ ] T027 [US1] Update `src/endpaper/tui/preview_screen.py` and `src/endpaper/tui/list_screen.py` for the new `render_preview_markdown` signature, and handle `DailyRequested` in `list_screen.py` by pushing the preview and surfacing a status-bar note when the frontmatter could not be read per [contracts/tui.md](./contracts/tui.md#opening-the-daily-note-from-the-bar)
-- [ ] T028 [US1] Create `tests/integration/test_daily_note_tui.py` driving `/note` headless via `Pilot` for all three `DailyNote` outcomes, asserting the user lands in preview each time and the list insert happens only on creation
+- [X] T021 [US1] Implement `open_daily_note(workspace, *, now=None) -> DailyNote` in `src/endpaper/core/notes.py`: build the path from the local date, `mkdir` the daily directory, then `os.open(..., O_CREAT | O_EXCL | O_WRONLY)` and treat `FileExistsError` as the already-exists path, returning `DailyNote(path, _read_document(path), created=False)` per [contracts/core-api.md](./contracts/core-api.md#notes)
+- [X] T022 [US1] Export `open_daily_note` and `DailyNote` from `src/endpaper/core/__init__.py`
+- [X] T023 [US1] Add the `note today` subparser and a `_cmd_note_today` handler to `src/endpaper/cli/main.py` that prints the returned path relative to the workspace root and exits 0 in both the created and existing cases per [contracts/cli.md](./contracts/cli.md#endpaper-note-today)
+- [X] T024 [US1] Add `note` to `VERBS` in `src/endpaper/tui/command_bar.py` and post a new `DailyRequested` message when the input is bare `/note` — no type part and no description — per [contracts/tui.md](./contracts/tui.md#the-note-grammar)
+- [X] T025 [US1] Add an `open_daily_note_and_track` method to `src/endpaper/tui/app.py` that calls `open_daily_note` and inserts into the in-memory notes list only when `created and document is not None`
+- [X] T026 [US1] Change `render_preview_markdown` in `src/endpaper/tui/rendering.py` to take `(path, document: Document | None)`, rendering the heading and metadata line from the record when present and falling back to a filename heading with no metadata line when it is `None`, stripping the frontmatter block in both cases
+- [X] T027 [US1] Update `src/endpaper/tui/preview_screen.py` and `src/endpaper/tui/list_screen.py` for the new `render_preview_markdown` signature, and handle `DailyRequested` in `list_screen.py` by pushing the preview and surfacing a status-bar note when the frontmatter could not be read per [contracts/tui.md](./contracts/tui.md#opening-the-daily-note-from-the-bar)
+- [X] T028 [US1] Create `tests/integration/test_daily_note_tui.py` driving `/note` headless via `Pilot` for all three `DailyNote` outcomes, asserting the user lands in preview each time and the list insert happens only on creation
 
 **Checkpoint**: US1 is complete. A user has a friction-free daily note from both front doors — the
 highest-value half of §3.2 and the MVP boundary.
@@ -119,18 +119,18 @@ the files for location, name, frontmatter, title, and tags.
 
 ### Tests for User Story 2 ⚠️
 
-- [ ] T029 [P] [US2] Create `tests/integration/test_create_note_cli.py` covering US2 scenarios 1–4: typed creation with tags, untyped creation omitting the type segment, same-day collision suffixing with the original untouched, `#tag` inside a quoted description, and repeated `--tag` preserving order while deduplicating
-- [ ] T030 [P] [US2] Create `tests/integration/test_create_note_tui.py` covering US2 scenarios 1 and 5: `/note.research vendor landscape #procurement` creates a typed note, and `/note vendor landscape` creates an **untyped note** while leaving today's daily note neither created nor opened
-- [ ] T031 [P] [US2] Create `tests/integration/test_note_parity.py` for US2 scenario 2: with a fixed `now` and a seeded id, the CLI and TUI create paths produce files identical in every byte except `id`, `created`, and `updated`
-- [ ] T032 [P] [US2] Create `tests/integration/test_reserved_type.py` for US2 scenarios 6–7: `--type daily` and `/note.daily` are both rejected with exit 2 and a message naming `endpaper note today`, no file is created, and a type containing `/`, `\`, `.`, or a leading `-` is rejected so nothing is written outside `notes/`
+- [X] T029 [P] [US2] Create `tests/integration/test_create_note_cli.py` covering US2 scenarios 1–4: typed creation with tags, untyped creation omitting the type segment, same-day collision suffixing with the original untouched, `#tag` inside a quoted description, and repeated `--tag` preserving order while deduplicating
+- [X] T030 [P] [US2] Create `tests/integration/test_create_note_tui.py` covering US2 scenarios 1 and 5: `/note.research vendor landscape #procurement` creates a typed note, and `/note vendor landscape` creates an **untyped note** while leaving today's daily note neither created nor opened
+- [X] T031 [P] [US2] Create `tests/integration/test_note_parity.py` for US2 scenario 2: with a fixed `now` and a seeded id, the CLI and TUI create paths produce files identical in every byte except `id`, `created`, and `updated`
+- [X] T032 [P] [US2] Create `tests/integration/test_reserved_type.py` for US2 scenarios 6–7: `--type daily` and `/note.daily` are both rejected with exit 2 and a message naming `endpaper note today`, no file is created, and a type containing `/`, `\`, `.`, or a leading `-` is rejected so nothing is written outside `notes/`
 
 ### Implementation for User Story 2
 
-- [ ] T033 [US2] Add the `note new` subparser to `src/endpaper/cli/main.py` with `description`, `--type`, and repeatable `--tag`, reusing the `#`-hazard wording from `meeting new`'s description text
-- [ ] T034 [US2] Add a `_cmd_note_new` handler to `src/endpaper/cli/main.py` that calls `create_note` and prints the created path relative to the workspace root, exit 0
-- [ ] T035 [US2] Extend `_run_command` in `src/endpaper/tui/command_bar.py` to implement the full `/note` grammar table in [contracts/tui.md](./contracts/tui.md#the-note-grammar): a non-empty rest creates a note with the type part, and `/note.<type>` with an empty description produces a bar-level usage error naming the missing description rather than falling through to core
-- [ ] T036 [US2] Add a `create_note_and_track` method to `src/endpaper/tui/app.py` mirroring `create_meeting_and_track`, inserting the new note at the head of the in-memory notes list and recording `last_create_error` on `UsageError`
-- [ ] T037 [US2] Handle the note `CreateRequested` variant in `src/endpaper/tui/list_screen.py`, landing the user in the preview of the new note and surfacing a create error in the status bar
+- [X] T033 [US2] Add the `note new` subparser to `src/endpaper/cli/main.py` with `description`, `--type`, and repeatable `--tag`, reusing the `#`-hazard wording from `meeting new`'s description text
+- [X] T034 [US2] Add a `_cmd_note_new` handler to `src/endpaper/cli/main.py` that calls `create_note` and prints the created path relative to the workspace root, exit 0
+- [X] T035 [US2] Extend `_run_command` in `src/endpaper/tui/command_bar.py` to implement the full `/note` grammar table in [contracts/tui.md](./contracts/tui.md#the-note-grammar): a non-empty rest creates a note with the type part, and `/note.<type>` with an empty description produces a bar-level usage error naming the missing description rather than falling through to core
+- [X] T036 [US2] Add a `create_note_and_track` method to `src/endpaper/tui/app.py` mirroring `create_meeting_and_track`, inserting the new note at the head of the in-memory notes list and recording `last_create_error` on `UsageError`
+- [X] T037 [US2] Handle the note `CreateRequested` variant in `src/endpaper/tui/list_screen.py`, landing the user in the preview of the new note and surfacing a create error in the status bar
 
 **Checkpoint**: US1 and US2 both work independently. Notes can be captured from both front doors.
 
