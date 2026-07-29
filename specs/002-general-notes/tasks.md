@@ -146,20 +146,20 @@ verify list ordering, live filtering, preview rendering, and each command-line f
 
 ### Tests for User Story 3 ⚠️
 
-- [ ] T038 [P] [US3] Create `tests/integration/test_list_notes_cli.py` covering US3 scenarios 4–6: `--json` emits the seven-key schema, `--type`/`--tag`/`--since` combine conjunctively, `--type daily` selects exactly the daily notes, and an empty workspace prints `[]` and exits 0
-- [ ] T039 [P] [US3] Create `tests/integration/test_collection_separation.py` for US3 scenario 7 and FR-018: `note list` returns no meeting, `meeting list` returns no note, and files under `notes/` that are not markdown plus directories under `notes/` other than `daily/` are ignored (FR-023)
-- [ ] T040 [P] [US3] Create `tests/integration/test_list_notes_tui.py` covering US3 scenarios 1–3 and 8: daily and typed notes appear together sorted by date descending, live filtering narrows rows, `enter` opens a rendered preview, and switching between collections shows current content in each including notes created during the session
-- [ ] T041 [P] [US3] Add a malformed-note case to `tests/integration/test_malformed.py`: a note with unparseable frontmatter is skipped with a warning on stderr, is never rewritten, and does not prevent other notes from listing (FR-021)
+- [X] T038 [P] [US3] Create `tests/integration/test_list_notes_cli.py` covering US3 scenarios 4–6: `--json` emits the seven-key schema, `--type`/`--tag`/`--since` combine conjunctively, `--type daily` selects exactly the daily notes, and an empty workspace prints `[]` and exits 0
+- [X] T039 [P] [US3] Create `tests/integration/test_collection_separation.py` for US3 scenario 7 and FR-018: `note list` returns no meeting, `meeting list` returns no note, and files under `notes/` that are not markdown plus directories under `notes/` other than `daily/` are ignored (FR-023)
+- [X] T040 [P] [US3] Create `tests/integration/test_list_notes_tui.py` covering US3 scenarios 1–3 and 8: daily and typed notes appear together sorted by date descending, live filtering narrows rows, `enter` opens a rendered preview, and switching between collections shows current content in each including notes created during the session
+- [X] T041 [P] [US3] Add a malformed-note case to `tests/integration/test_malformed.py`: a note with unparseable frontmatter is skipped with a warning on stderr, is never rewritten, and does not prevent other notes from listing (FR-021)
 
 ### Implementation for User Story 3
 
-- [ ] T042 [US3] Rename the printers in `src/endpaper/cli/output.py` to document terms (`relative_path`, `print_documents_table`, `print_documents_json`) keeping the seven-key JSON schema byte-identical, and update `src/endpaper/cli/main.py`'s meeting handlers to the new names
-- [ ] T043 [US3] Add the `note list` subparser with `--json`, `--type`, repeatable `--tag`, and `--since` to `src/endpaper/cli/main.py`, plus a `_cmd_note_list` handler that scans notes, prints warnings to stderr, applies `DocumentFilter`, and emits table or JSON per [contracts/cli.md](./contracts/cli.md#endpaper-note-list)
-- [ ] T044 [US3] Change `src/endpaper/tui/app.py` to scan both collections at mount into `documents: dict[str, list[Document]]` keyed by collection name with an `active` name, and re-derive `visible_documents` from the active collection per [R6](./research.md#r6-holding-two-collections-in-a-one-screen-tui)
-- [ ] T045 [US3] Add a `switch_collection(name)` method to `src/endpaper/tui/app.py` that sets `active` and clears the filter, and update `apply_filter`, `create_meeting_and_track`, and `create_note_and_track` to operate on the correct collection's list
-- [ ] T046 [US3] Add `notes` to `VERBS` in `src/endpaper/tui/command_bar.py` and post a `CollectionRequested` message for both `/notes` and `/meetings`
-- [ ] T047 [US3] Update `src/endpaper/tui/list_screen.py` to render rows from `Document` rather than `Meeting`, handle `CollectionRequested` by switching and resetting the selection to the top, and make the empty-state message name the active collection and its create command
-- [ ] T048 [US3] Add an active-collection indicator to `src/endpaper/tui/status_bar.py` and render it from `list_screen.py`'s `_render_status`, so the collection is identifiable in both the status bar and the empty state (FR-025)
+- [X] T042 [US3] Rename the printers in `src/endpaper/cli/output.py` to document terms (`relative_path`, `print_documents_table`, `print_documents_json`) keeping the seven-key JSON schema byte-identical, and update `src/endpaper/cli/main.py`'s meeting handlers to the new names
+- [X] T043 [US3] Add the `note list` subparser with `--json`, `--type`, repeatable `--tag`, and `--since` to `src/endpaper/cli/main.py`, plus a `_cmd_note_list` handler that scans notes, prints warnings to stderr, applies `DocumentFilter`, and emits table or JSON per [contracts/cli.md](./contracts/cli.md#endpaper-note-list)
+- [X] T044 [US3] Change `src/endpaper/tui/app.py` to scan both collections at mount into `documents: dict[str, list[Document]]` keyed by collection name with an `active` name, and re-derive `visible_documents` from the active collection per [R6](./research.md#r6-holding-two-collections-in-a-one-screen-tui)
+- [X] T045 [US3] Add a `switch_collection(name)` method to `src/endpaper/tui/app.py` that sets `active` and clears the filter, and update `apply_filter`, `create_meeting_and_track`, and `create_note_and_track` to operate on the correct collection's list
+- [X] T046 [US3] Add `notes` to `VERBS` in `src/endpaper/tui/command_bar.py` and post a `CollectionRequested` message for both `/notes` and `/meetings`
+- [X] T047 [US3] Update `src/endpaper/tui/list_screen.py` to render rows from `Document` rather than `Meeting`, handle `CollectionRequested` by switching and resetting the selection to the top, and make the empty-state message name the active collection and its create command
+- [X] T048 [US3] Add an active-collection indicator to `src/endpaper/tui/status_bar.py` and render it from `list_screen.py`'s `_render_status`, so the collection is identifiable in both the status bar and the empty state (FR-025)
 
 **Checkpoint**: All three user-facing stories work independently. Notes are capturable and findable.
 
