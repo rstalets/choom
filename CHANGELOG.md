@@ -4,6 +4,50 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### 0.0.2
+
+Daily notes and typed notes, on the same machinery meetings already use.
+
+**Command surface added**
+
+```
+endpaper note today                         # open (creating if needed) today's daily note
+endpaper note new <description>             # create a typed or untyped note
+      [--type <type>] [--tag <tag>]...
+endpaper note list                          # list notes, daily and typed together
+      [--json] [--type <type>] [--tag <tag>]... [--since <YYYY-MM-DD>]
+```
+
+**`core` API** — additive: `Document`/`DocumentFilter` are now the canonical types, with
+`Meeting`/`MeetingFilter`/`Note` retained as aliases. `create_document`, `scan_documents`,
+`filter_documents`, and `match_document` generalise `create_meeting` et al., which remain
+exported with unchanged signatures. No name removed, no signature changed.
+
+**`note list --json` schema** — the same seven keys as `meeting list --json`, `n_`-prefixed
+id, `notes/`-prefixed path:
+
+```
+id, path, title, type, tags, created, updated
+```
+
+`note today` is idempotent: it prints the same path every time it is called on the same day
+and never modifies an existing daily note's bytes or mtime, even if its frontmatter is
+broken by hand. `--type daily` is reserved and rejected by `note new` before any file is
+written.
+
+**TUI**: `/note` opens today's daily note; `/note.<type> <description>` and
+`/note <description>` create a typed or untyped note; `/notes` and `/meetings` switch which
+collection the existing list and preview panes show. A persistent collection menu pane
+(`Meetings` / `Notes`) is now always visible to the left of the list, navigable with `h`/`l`
+(or `left`/`right`) to move focus and `j`/`k`/arrows to browse it, switching live as you
+move. Creating a document, or opening the daily note, now switches to its collection
+automatically, so escaping the preview always shows what you just made. The active
+collection is shown in the menu, the status bar, and the empty-state message.
+
+**Guarantees**: unchanged from 0.0.1, extended to notes — malformed note files are skipped
+with a warning and never rewritten; the daily note is never opened for writing once it
+exists.
+
 ### 0.0.1
 
 Initial release: workspace scaffolding, meeting capture, and meeting retrieval, from both a

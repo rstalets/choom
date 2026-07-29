@@ -31,3 +31,30 @@ def test_malformed_file_is_skipped_warned_and_left_byte_identical(
 
     after = broken.read_bytes()
     assert before == after
+
+
+def test_malformed_note_is_skipped_warned_and_left_byte_identical_and_others_still_list(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["note", "new", "vendor landscape", "--type", "research"])
+    capsys.readouterr()
+
+    broken = tmp_path / "notes" / "2026-07-28-broken.md"
+    broken.write_text("---\nid: broken\n", encoding="utf-8")
+    before = broken.read_bytes()
+
+    exit_code = main(["note", "list", "--json"])
+    assert exit_code == 0
+
+    captured = capsys.readouterr()
+    records = json.loads(captured.out)
+    assert len(records) == 1
+    assert records[0]["title"] == "vendor landscape"
+
+    assert "broken" in captured.err
+
+    after = broken.read_bytes()
+    assert before == after

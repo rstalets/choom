@@ -21,5 +21,9 @@ def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> 
     assert _run(["meeting", "new", "Q3 planning"], tmp_path).returncode == 0
     assert _run(["meeting", "list", "--json"], tmp_path).returncode == 0
     assert _run(["meeting", "list"], tmp_path).returncode == 0
+    assert _run(["note", "today"], tmp_path).returncode == 0
+    assert _run(["note", "new", "an idea"], tmp_path).returncode == 0
+    assert _run(["note", "list", "--json"], tmp_path).returncode == 0
+    assert _run(["note", "list"], tmp_path).returncode == 0
     assert _run(["--version"], tmp_path).returncode == 0
     assert _run(["--help"], tmp_path).returncode == 0

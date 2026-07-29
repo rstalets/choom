@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Input, Static
 
-VERBS = {"meeting", "meetings", "init"}
+VERBS = {"meeting", "meetings", "note", "notes", "init"}
 
 
 def _normalize(text: str) -> str:
@@ -53,9 +53,23 @@ class CommandBar(Static):
             super().__init__()
 
     class CreateRequested(Message):
-        def __init__(self, description: str, type: str) -> None:
+        def __init__(self, kind: str, description: str, type: str) -> None:
+            self.kind = kind  # "meeting" | "note"
             self.description = description
             self.type = type
+            super().__init__()
+
+    class DailyRequested(Message):
+        pass
+
+    class CollectionRequested(Message):
+        def __init__(self, name: str) -> None:
+            self.name = name
+            super().__init__()
+
+    class BarError(Message):
+        def __init__(self, message: str) -> None:
+            self.message = message
             super().__init__()
 
     class ClearRequested(Message):
@@ -107,7 +121,17 @@ class CommandBar(Static):
         stem, _, type_part = verb_token.partition(".")
         stem = stem.lower()
         if stem == "meeting":
-            self.post_message(self.CreateRequested(rest, type_part))
+            self.post_message(self.CreateRequested("meeting", rest, type_part))
         elif stem == "meetings":
-            self.post_message(self.ClearRequested())
+            self.post_message(self.CollectionRequested("meetings"))
+        elif stem == "note":
+            if not rest:
+                if type_part:
+                    self.post_message(self.BarError(f"note.{type_part} needs a description"))
+                else:
+                    self.post_message(self.DailyRequested())
+            else:
+                self.post_message(self.CreateRequested("note", rest, type_part))
+        elif stem == "notes":
+            self.post_message(self.CollectionRequested("notes"))
         # "init" is a registered verb for future features; no TUI action this feature.

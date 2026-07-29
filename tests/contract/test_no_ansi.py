@@ -29,3 +29,21 @@ def test_no_ansi_in_any_redirected_command_output(tmp_path: Path, monkeypatch, c
     captured = capsys.readouterr()
     _assert_clean(captured.out)
     _assert_clean(captured.err)
+
+    main(["note", "today"])
+    _assert_clean(capsys.readouterr().out)
+
+    main(["note", "new", "an idea", "--type", "idea", "--tag", "misc"])
+    _assert_clean(capsys.readouterr().out)
+
+    main(["note", "list"])
+    _assert_clean(capsys.readouterr().out)
+
+    main(["note", "list", "--json"])
+    _assert_clean(capsys.readouterr().out)
+
+    exit_code = main(["note", "list", "--since", "not-a-date"])
+    assert exit_code == 2
+    captured = capsys.readouterr()
+    _assert_clean(captured.out)
+    _assert_clean(captured.err)
