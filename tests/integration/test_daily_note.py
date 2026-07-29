@@ -31,14 +31,14 @@ def test_second_call_same_day_returns_same_path_and_creates_no_second_file(
     first = open_daily_note(tmp_workspace, now=frozen_now)
 
     daily_dir = tmp_workspace.daily_dir
-    files_after_first = sorted(daily_dir.glob("*.md"))
+    files_after_first = sorted(daily_dir.rglob("*.md"))
     assert len(files_after_first) == 1
 
     second = open_daily_note(tmp_workspace, now=frozen_now)
 
     assert second.path == first.path
     assert second.created is False
-    files_after_second = sorted(daily_dir.glob("*.md"))
+    files_after_second = sorted(daily_dir.rglob("*.md"))
     assert files_after_second == files_after_first
 
 
@@ -110,7 +110,7 @@ def test_no_other_workspace_file_is_modified(
     before = {
         p: p.stat().st_mtime_ns
         for p in tmp_workspace.root.rglob("*")
-        if p.is_file() and p != tmp_workspace.daily_dir / f"{frozen_now:%Y-%m-%d}.md"
+        if p.is_file() and p != daily_note_path(tmp_workspace, frozen_now.date())
     }
 
     open_daily_note(tmp_workspace, now=frozen_now)
@@ -136,7 +136,7 @@ def test_cli_note_today_is_idempotent_and_prints_same_relative_path(
     second_out = capsys.readouterr().out.strip()
     assert second_out == first_out
 
-    files = list((tmp_path / "notes" / "daily").glob("*.md"))
+    files = list((tmp_path / "notes" / "daily").rglob("*.md"))
     assert len(files) == 1
 
 
@@ -165,7 +165,7 @@ def test_twenty_concurrent_calls_produce_exactly_one_file(
 
     assert not errors
     assert len(results) == 20
-    files = list(tmp_workspace.daily_dir.glob("*.md"))
+    files = list(tmp_workspace.daily_dir.rglob("*.md"))
     assert len(files) == 1
     created_count = sum(1 for r in results if r.created)  # type: ignore[attr-defined]
     assert created_count == 1

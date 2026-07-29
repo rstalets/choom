@@ -26,7 +26,7 @@ async def test_dotted_note_command_creates_typed_note(tmp_workspace: Workspace) 
         assert document.title == "vendor landscape"
         assert document.type == "research"
         assert document.tags == ("procurement",)
-        assert document.path.parent == tmp_workspace.notes_dir
+        assert document.path.is_relative_to(tmp_workspace.notes_dir)
 
 
 async def test_bare_note_with_description_creates_untyped_note_not_daily(

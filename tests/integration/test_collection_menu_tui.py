@@ -16,7 +16,7 @@ async def test_menu_shows_both_collections_with_meetings_active_at_launch(
         await pilot.pause()
         menu = app.screen.query_one("#collection-menu", ListView)
         names = [row.collection_name for row in menu.children if isinstance(row, CollectionRow)]
-        assert names == ["meetings", "notes"]
+        assert names == ["meetings", "notes", "tasks"]
         assert menu.index == 0
         assert app.active == "meetings"
 

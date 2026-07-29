@@ -6,7 +6,7 @@ from textual.binding import Binding
 from textual.message import Message
 from textual.widgets import Input, Static
 
-VERBS = {"meeting", "meetings", "note", "notes", "init"}
+VERBS = {"meeting", "meetings", "note", "notes", "task", "tasks", "init"}
 
 
 def _normalize(text: str) -> str:
@@ -54,7 +54,7 @@ class CommandBar(Static):
 
     class CreateRequested(Message):
         def __init__(self, kind: str, description: str, type: str) -> None:
-            self.kind = kind  # "meeting" | "note"
+            self.kind = kind  # "meeting" | "note" | "task"
             self.description = description
             self.type = type
             super().__init__()
@@ -134,4 +134,11 @@ class CommandBar(Static):
                 self.post_message(self.CreateRequested("note", rest, type_part))
         elif stem == "notes":
             self.post_message(self.CollectionRequested("notes"))
+        elif stem == "task":
+            if not rest:
+                self.post_message(self.BarError("task needs a description"))
+            else:
+                self.post_message(self.CreateRequested("task", rest, type_part))
+        elif stem == "tasks":
+            self.post_message(self.CollectionRequested("tasks"))
         # "init" is a registered verb for future features; no TUI action this feature.

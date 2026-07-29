@@ -53,7 +53,7 @@ def create_document(
     date_str = when.strftime("%Y-%m-%d")
     stem = "-".join([date_str, *([normalized_type] if normalized_type else []), slug])
 
-    create_dir = workspace.root / collection.create_dir
+    create_dir = workspace.root / collection.create_dir / f"{when:%Y/%m}"
     create_dir.mkdir(parents=True, exist_ok=True)
 
     partial = Document(
@@ -151,7 +151,7 @@ def scan_documents(
         if not directory.is_dir():
             continue
 
-        for path in sorted(directory.glob("*.md")):
+        for path in sorted(directory.rglob("*.md")):
             text = path.read_text(encoding="utf-8", errors="replace")
             document, warning = _parse_document(text, path)
             if document is not None:

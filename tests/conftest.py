@@ -29,4 +29,15 @@ def seeded_id(monkeypatch: pytest.MonkeyPatch) -> Iterator[str]:
 
 
 def daily_note_path(workspace: Workspace, day: date) -> Path:
-    return workspace.daily_dir / f"{day:%Y-%m-%d}.md"
+    return workspace.daily_dir / f"{day:%Y/%m}" / f"{day:%Y-%m-%d}.md"
+
+
+def tasks_file(workspace: Workspace) -> Path:
+    return workspace.root / "tasks.md"
+
+
+def write_tasks(workspace: Workspace, text: str, *, newline: str = "\n") -> Path:
+    path = tasks_file(workspace)
+    with open(path, "w", encoding="utf-8", newline=newline) as fh:
+        fh.write(text)
+    return path

@@ -57,7 +57,7 @@ async def test_bare_note_with_unparseable_existing_file_previews_with_no_documen
     import datetime
 
     now = datetime.datetime.now()
-    path = tmp_workspace.daily_dir / f"{now:%Y-%m-%d}.md"
+    path = tmp_workspace.daily_dir / f"{now:%Y/%m}" / f"{now:%Y-%m-%d}.md"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("not frontmatter at all", encoding="utf-8")
 

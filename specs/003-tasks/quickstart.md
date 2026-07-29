@@ -124,13 +124,16 @@ Then confirm append behaves as the plan specifies — the previously-final line 
 endpaper task add "gamma" && xxd tasks.md | tail -2
 ```
 
-Read-only degradation (FR-038):
+Read-only degradation (FR-038). Writes go through a temp-file-plus-`os.replace` (R6), which on
+POSIX only needs write permission on the *directory* — `chmod a-w tasks.md` alone does not block
+it, since rename doesn't consult the destination file's own permission bit. Make the directory
+unwritable to get a faithful repro:
 
 ```bash
-chmod a-w tasks.md
+chmod a-w .
 endpaper task list --json   # still lists; bare tasks show "id": null; warning on stderr; exit 0
 endpaper task done t_1111   # exit 3, file unchanged
-chmod u+w tasks.md
+chmod u+w .
 ```
 
 ---

@@ -1,27 +1,34 @@
 from __future__ import annotations
 
+from typing import cast
+
 from textual import on
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Label, ListItem, ListView, Markdown
 
-from endpaper.core.models import Document
+from endpaper.core.models import Document, Task
 from endpaper.tui.command_bar import CommandBar
 from endpaper.tui.rendering import render_preview_markdown
-from endpaper.tui.status_bar import LIST_HELP, StatusBar, collection_indicator
+from endpaper.tui.status_bar import LIST_HELP, TASK_LIST_HELP, StatusBar, collection_indicator
 
 EMPTY_STATE_MESSAGE = "No meetings yet. Press / then 'meeting <description>' to create one."
 _NOTES_EMPTY_STATE_MESSAGE = (
     "No notes yet. Press / then 'note' for today's note, or 'note <description>'."
 )
+_TASKS_EMPTY_STATE_MESSAGE = "No tasks yet. Press / then 'task <description>' to create one."
 
-COLLECTIONS = ("meetings", "notes")
-_COLLECTION_LABELS = {"meetings": "Meetings", "notes": "Notes"}
+COLLECTIONS = ("meetings", "notes", "tasks")
+_COLLECTION_LABELS = {"meetings": "Meetings", "notes": "Notes", "tasks": "Tasks"}
 
 
 def _empty_state_message(active: str) -> str:
-    return _NOTES_EMPTY_STATE_MESSAGE if active == "notes" else EMPTY_STATE_MESSAGE
+    if active == "notes":
+        return _NOTES_EMPTY_STATE_MESSAGE
+    if active == "tasks":
+        return _TASKS_EMPTY_STATE_MESSAGE
+    return EMPTY_STATE_MESSAGE
 
 
 class DocumentRow(ListItem):
@@ -48,6 +55,27 @@ class DocumentRow(ListItem):
 MeetingRow = DocumentRow  # alias, feature 001 compatibility
 
 
+class TaskRow(ListItem):
+    def __init__(self, task: Task) -> None:
+        text = self._row_text(task)
+        if task.done:
+            text = f"[strike]{text}[/strike]"
+        super().__init__(Label(text))
+        self.record = task
+
+    @staticmethod
+    def _row_text(task: Task) -> str:
+        parts = ["[x]" if task.done else "[ ]"]
+        if task.created:
+            parts.append(task.created.isoformat())
+        if task.type:
+            parts.append(task.type)
+        parts.append(task.text)
+        if task.tags:
+            parts.append(",".join(task.tags))
+        return "  ".join(parts)
+
+
 class CollectionRow(ListItem):
     def __init__(self, name: str) -> None:
         super().__init__(Label(_COLLECTION_LABELS[name]))
@@ -63,6 +91,8 @@ class ListScreen(Screen[None]):
         ("l", "focus_list", "List"),
         ("right", "focus_list", "List"),
         ("/", "open_command_bar", "Filter/command"),
+        ("space", "toggle_task", "Toggle"),
+        ("a", "toggle_show_done", "All"),
     ]
 
     def __init__(self) -> None:
@@ -107,23 +137,29 @@ class ListScreen(Screen[None]):
     def refresh_rows(self, *, select_id: str | None = None, reset_selection: bool = False) -> None:
         app = self.app
         list_view = self.query_one("#meeting-list", ListView)
+        is_tasks = app.active == "tasks"  # type: ignore[attr-defined]
 
         if select_id is None and not reset_selection:
             highlighted = list_view.highlighted_child
             if isinstance(highlighted, DocumentRow):
                 select_id = highlighted.document.id
+            elif isinstance(highlighted, TaskRow):
+                select_id = highlighted.record.id
 
         list_view.clear()
-        documents = app.visible_documents  # type: ignore[attr-defined]
-        if not documents:
+        items = cast(
+            "list[Document | Task]",
+            app.visible_tasks if is_tasks else app.visible_documents,  # type: ignore[attr-defined]
+        )
+        if not items:
             list_view.append(ListItem(Label(_empty_state_message(app.active))))  # type: ignore[attr-defined]
         else:
-            for document in documents:
-                list_view.append(DocumentRow(document))
+            for item in items:
+                list_view.append(TaskRow(item) if is_tasks else DocumentRow(item))  # type: ignore[arg-type]
             index = 0
             if select_id is not None:
-                for i, document in enumerate(documents):
-                    if document.id == select_id:
+                for i, item in enumerate(items):
+                    if item.id == select_id:
                         index = i
                         break
             list_view.index = index
@@ -156,7 +192,8 @@ class ListScreen(Screen[None]):
             status.update(f"{label}   enter run   esc cancel")
             return
         active = self.app.active  # type: ignore[attr-defined]
-        text = f"{collection_indicator(active)}   {LIST_HELP}"
+        help_text = TASK_LIST_HELP if active == "tasks" else LIST_HELP
+        text = f"{collection_indicator(active)}   {help_text}"
         warnings = len(self.app.warnings[active])  # type: ignore[attr-defined]
         if warnings:
             text += f"   {warnings} warning{'s' if warnings != 1 else ''}"
@@ -207,6 +244,26 @@ class ListScreen(Screen[None]):
     def action_open_command_bar(self) -> None:
         self.query_one(CommandBar).open()
 
+    def action_toggle_task(self) -> None:
+        if self.app.active != "tasks":  # type: ignore[attr-defined]
+            return
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+        if not isinstance(highlighted, TaskRow) or highlighted.record.id is None:
+            return
+        task_id = highlighted.record.id
+        self.app.toggle_task_and_track(task_id)  # type: ignore[attr-defined]
+        error = self.app.last_task_error  # type: ignore[attr-defined]
+        self.refresh_rows(select_id=task_id)
+        if error:
+            self._render_status(error=error)
+
+    def action_toggle_show_done(self) -> None:
+        if self.app.active != "tasks":  # type: ignore[attr-defined]
+            return
+        self.app.toggle_show_done()  # type: ignore[attr-defined]
+        self.refresh_rows()
+
     @on(CommandBar.ModeChanged)
     def _on_mode_changed(self, message: CommandBar.ModeChanged) -> None:
         self._render_status(mode=message.mode, verb=message.verb, bar_open=True)
@@ -223,6 +280,16 @@ class ListScreen(Screen[None]):
 
     @on(CommandBar.CreateRequested)
     def _on_create_requested(self, message: CommandBar.CreateRequested) -> None:
+        if message.kind == "task":
+            task = self.app.add_task_and_track(  # type: ignore[attr-defined]
+                message.description, message.type
+            )
+            if task is not None:
+                self._pending_error = None
+                self.refresh_rows(select_id=task.id)
+            else:
+                self._pending_error = self.app.last_create_error  # type: ignore[attr-defined]
+            return
         if message.kind == "note":
             document = self.app.create_note_and_track(  # type: ignore[attr-defined]
                 message.description, message.type

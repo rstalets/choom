@@ -21,7 +21,7 @@ def test_meetings_descriptor_values() -> None:
 def test_notes_descriptor_values() -> None:
     assert NOTES.id_prefix == "n_"
     assert NOTES.create_dir == "notes"
-    assert NOTES.scan_dirs == ("notes", "notes/daily")
+    assert NOTES.scan_dirs == ("notes",)
     assert NOTES.reserved_types == frozenset({"daily"})
 
 

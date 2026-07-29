@@ -4,6 +4,58 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### 0.0.3
+
+Standalone tasks, and the `YYYY/MM/` layout amendment.
+
+**Command surface added**
+
+```
+endpaper task add <description>             # capture a task
+      [--type <type>] [--tag <tag>]...
+endpaper task list                          # list tasks, open ones first, oldest first
+      [--json] [--all] [--type <type>] [--tag <tag>]...
+endpaper task done <id>                     # mark a task complete
+endpaper task undone <id>                   # mark a task incomplete
+```
+
+`task add` prints the new task's identifier, not a path. `--all` on `task list` includes
+completed tasks; without it, only open tasks are shown. `task done`/`task undone` are silent on
+success and idempotent — setting a task's existing state is a no-op, not an error.
+
+**`task list --json` schema** — seven keys, in order: `id`, `text`, `done`, `type`, `tags`,
+`created`, `line`. `id` and `created` may be `null`; `type` and `tags` are `""`/`[]` when
+absent, never null.
+
+**Task line format** — one markdown checkbox per task in `tasks.md`, metadata in a trailing
+HTML comment invisible to any markdown viewer:
+
+```
+- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->
+```
+
+Fields appear in the order `id`, `type`, `tags`, `created`, omitted entirely when empty.
+`tasks.md` is safe to hand-edit: a bare `- [ ] ...` checkbox is picked up and given an id in
+place on the next scan; malformed metadata is skipped with a warning and left byte-identical;
+every write preserves the file's existing line endings and the presence or absence of a final
+newline.
+
+**TUI**: tasks are a third collection (`Meetings` / `Notes` / `Tasks`) in the existing list
+screen. `space` toggles the selected task; `a` shows completed tasks as well as open ones,
+struck through. `/task <description>` and `/task.<type> <description>` create a task and land
+on the tasks collection with it selected; `/tasks` switches to the collection. The preview pane
+stays visible and empty on tasks, reserved for a future feature.
+
+**Layout change (breaking)**: dated files now partition by `YYYY/MM/` under their collection
+root — `meetings/YYYY/MM/`, `notes/YYYY/MM/`, `notes/daily/YYYY/MM/` — instead of sitting flat
+in the collection directory. Existing files are not moved; frontmatter is authoritative, so a
+file left in its old location, or placed under the wrong month, still lists correctly. `tasks.md`
+is unaffected — it remains a single file at the workspace root.
+
+**Guarantees**: unchanged from 0.0.1 and 0.0.2, extended to tasks — a write to `tasks.md` never
+truncates or reorders the user's file, and a scan never raises on malformed content. Exit codes
+are unchanged: `0` success, `1` not found, `2` usage error, `3` workspace error.
+
 ### 0.0.2
 
 Daily notes and typed notes, on the same machinery meetings already use.
