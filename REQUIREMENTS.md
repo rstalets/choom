@@ -186,43 +186,12 @@ CLI:  endpaper init
 - Only the four collection roots are created at init. Date partitions (`meetings/YYYY/MM/`) are created on demand by the first file written into them, so a fresh workspace has no empty year directories.
 - This directory is now the workspace and the root.
 
-**Named workspace in a shared root**
-
-```
-TUI:  /init <name>
-CLI:  endpaper init <name>
-```
-
-- Creates `<name>/` in the current directory with the structure above.
-- If a root workspace file (`.endpaper/root.toml`) exists in the current directory, adds `<name>` to it. If not, creates one.
-- Intended use: a OneDrive or shared-drive folder where each team member has their own workspace directory.
-
-**Switching**
-
-```
-TUI:  /workspace
-CLI:  endpaper workspace list [--json]
-      endpaper workspace use <name>
-      endpaper workspace current
-```
-
-- `/workspace` presents the workspaces listed in the root file and sets the current one on selection.
-- The current workspace persists across sessions until changed.
-- **The current-workspace setting is stored in per-user local state, not in the workspace directory** — otherwise two people sharing a OneDrive folder would overwrite each other's selection.
-
-**Cross-workspace visibility**
-
-- `/meetings`, `/notes`, and search operate on the current workspace by default.
-- `--all` (CLI) and a scope toggle (`tab` in the TUI) widen to every workspace in the root.
-- All workspaces are readable. v0.0.1 does not prevent writing to another member's workspace; it simply doesn't provide a command that does.
-
 **Acceptance criteria**
 
 1. `endpaper init` in an empty directory creates all five paths above and exits 0.
-2. `endpaper init alice` followed by `endpaper init bob` in the same directory produces two workspace directories and one root file listing both.
-3. `endpaper workspace use bob`, then a new shell, then `endpaper workspace current` prints `bob`.
-4. Running `endpaper init` in a directory that is already a workspace exits non-zero with a clear message and changes nothing.
-5. Running `endpaper init <name>` from inside an existing workspace exits non-zero with a message naming the root directory where it should be run instead. Workspaces do not nest.
+2. Running `endpaper init` in a directory that is already a workspace exits non-zero with a clear message and changes nothing.
+
+> Named workspaces in a shared root, workspace switching, and cross-workspace visibility are deferred — see [§6 Backlog / future](#6-backlog--future).
 
 ### 3.5 Viewing and editing (meetings and notes)
 
@@ -387,3 +356,47 @@ updated: 2026-07-28T09:41:00
 - Conflict resolution for simultaneous edits — OneDrive's own conflict-copy behaviour is the answer
 - MCP server
 - Any configuration beyond workspace paths
+
+---
+
+## 6. Backlog / future
+
+### 6.1 Multi-user shared workspaces
+
+De-scoped from v0.0.1 (originally part of §3.4). The single-workspace `endpaper init` remains in v0.0.1 scope; the shared-root/multi-workspace features below do not.
+
+**Named workspace in a shared root**
+
+```
+TUI:  /init <name>
+CLI:  endpaper init <name>
+```
+
+- Creates `<name>/` in the current directory with the structure above.
+- If a root workspace file (`.endpaper/root.toml`) exists in the current directory, adds `<name>` to it. If not, creates one.
+- Intended use: a OneDrive or shared-drive folder where each team member has their own workspace directory.
+
+**Switching**
+
+```
+TUI:  /workspace
+CLI:  endpaper workspace list [--json]
+      endpaper workspace use <name>
+      endpaper workspace current
+```
+
+- `/workspace` presents the workspaces listed in the root file and sets the current one on selection.
+- The current workspace persists across sessions until changed.
+- **The current-workspace setting is stored in per-user local state, not in the workspace directory** — otherwise two people sharing a OneDrive folder would overwrite each other's selection.
+
+**Cross-workspace visibility**
+
+- `/meetings`, `/notes`, and search operate on the current workspace by default.
+- `--all` (CLI) and a scope toggle (`tab` in the TUI) widen to every workspace in the root.
+- All workspaces are readable. v0.0.1 does not prevent writing to another member's workspace; it simply doesn't provide a command that does.
+
+**Acceptance criteria**
+
+1. `endpaper init alice` followed by `endpaper init bob` in the same directory produces two workspace directories and one root file listing both.
+2. `endpaper workspace use bob`, then a new shell, then `endpaper workspace current` prints `bob`.
+3. Running `endpaper init <name>` from inside an existing workspace exits non-zero with a message naming the root directory where it should be run instead. Workspaces do not nest.
