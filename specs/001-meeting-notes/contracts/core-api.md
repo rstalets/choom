@@ -17,7 +17,7 @@ this by walking `core`'s imports.
 class Workspace:
     root: Path
     @property
-    def meetings_dir(self) -> Path: ...
+    def meetings_dir(self) -> Path: ...   # collection root; files live in YYYY/MM/ beneath it
 
 @dataclass(frozen=True, slots=True)
 class Meeting:

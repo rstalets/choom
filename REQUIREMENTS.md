@@ -67,7 +67,7 @@ CLI:  endpaper meeting new <description> --type <type> --tag <tag>
 - `<type>` is a free-form string (`standup`, `1on1`, `vendor`, `retro`). Optional; omitting the dot suffix creates an untyped meeting.
 - `<description>` is free text, used for the title and slugified into the filename.
 - `#<tag>` is optional and repeatable.
-- File is created at `meetings/YYYY-MM-DD-<type>-<slug>.md` with frontmatter, then opened for editing immediately (TUI) or its path printed to stdout (CLI).
+- File is created at `meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md` with frontmatter, then opened for editing immediately (TUI) or its path printed to stdout (CLI). The `YYYY/MM/` partition is created on demand; see §4.6.
 - Filename collisions on the same day append `-2`, `-3`.
 
 **Browse**
@@ -99,7 +99,7 @@ TUI:  /note
 CLI:  endpaper note today
 ```
 
-- Creates `notes/daily/YYYY-MM-DD.md` if it does not exist; opens the existing file if it does. Never creates a second file for the same day.
+- Creates `notes/daily/YYYY/MM/YYYY-MM-DD.md` if it does not exist; opens the existing file if it does. Never creates a second file for the same day — uniqueness is per date, not per directory, so a stray copy of the same date under a different partition is a duplicate and must not be created.
 
 **Create — typed note**
 
@@ -108,7 +108,7 @@ TUI:  /note.<type> <description> #<tag>
 CLI:  endpaper note new <description> --type <type> --tag <tag>
 ```
 
-- Same semantics as meetings. File at `notes/YYYY-MM-DD-<type>-<slug>.md`.
+- Same semantics as meetings. File at `notes/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md`.
 - Intended for idea documents, research notes, drafts, reference material.
 
 **Browse**
@@ -183,6 +183,7 @@ CLI:  endpaper init
   notes/daily/
   tasks.md
   ```
+- Only the four collection roots are created at init. Date partitions (`meetings/YYYY/MM/`) are created on demand by the first file written into them, so a fresh workspace has no empty year directories.
 - This directory is now the workspace and the root.
 
 **Named workspace in a shared root**
@@ -299,7 +300,7 @@ This is a hard requirement, not a preference. The CLI is the assistant's only in
 
 **There is no index and no database.** The markdown files are the only state endpaper has.
 
-- On launch, `core` globs the workspace (or root, when scope is widened), parses frontmatter from each file, and holds the result in memory as a list of records.
+- On launch, `core` globs the workspace recursively (or the root, when scope is widened), walking the `YYYY/MM/` partitions described in §4.6, parses frontmatter from each file, and holds the result in memory as a list of records.
 - The TUI's live filter operates on that in-memory list. No disk access per keystroke.
 - On save, re-read and re-parse only the file that changed.
 - `endpaper find <query>` performs a plain substring scan over titles, tags, and file bodies in pure Python. No `ripgrep` or other external binary dependency — it cannot be assumed installable on a locked-down machine.
@@ -345,8 +346,26 @@ updated: 2026-07-28T09:41:00
 
 - Filenames: `YYYY-MM-DD-<type>-<slug>.md`, ISO date first so lexical sort equals chronological sort.
 - Slugs: lowercase, alphanumeric and hyphens only, truncated to 40 characters.
-- **`type` is carried in frontmatter and in the filename only. Never as a directory.** Types are free-form and user-invented, so directory-per-type would fragment the vault into a long tail of one-file folders and complicate cross-workspace scanning. The directory structure is fixed at `meetings/`, `notes/`, `notes/daily/`, and `tasks.md`, and does not grow.
-- Paths must stay well under the Windows 260-character limit — assume the root is already something like `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\`.
+- **Dated files are partitioned by `YYYY/MM/` under their collection root.** The layout is:
+
+  ```
+  meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
+  notes/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
+  notes/daily/YYYY/MM/YYYY-MM-DD.md
+  tasks.md
+  ```
+
+  The partition is derived from the file's own date — the same date already in its filename and its `created` frontmatter — so a file's location is a pure function of data it already carries, and no lookup or index is needed to find or place one.
+
+  **The full ISO date stays in the filename**, redundantly with the directory. A file that is copied, attached to an email, or dragged out of the vault must still say what it is, and lexical sort must still equal chronological sort within a directory. Filename collisions on the same day append `-2`, `-3` as before; the partition never disambiguates.
+
+  Rationale: a flat collection accumulates one file per meeting and one per day forever. At a few years of daily use that is thousands of entries in a single directory — slow to open in Explorer and Finder, unpleasant to scroll, and awkward for OneDrive's per-folder sync behaviour. Partitioning is stated here, before v0.0.1 ships, specifically so it never has to be a migration. Changing this layout after users have vaults means moving their files, and moving a user's files is the one thing this tool must never need to do.
+
+- **`type` is carried in frontmatter and in the filename only. Never as a directory.** Types are free-form and user-invented, so directory-per-type would fragment the vault into a long tail of one-file folders and complicate cross-workspace scanning. Date is the only axis the directory tree encodes, because date is the only attribute every file has exactly one of.
+- **The set of collections is fixed** — `meetings/`, `notes/`, `notes/daily/`, `tasks.md` — and does not grow. Only date partitions inside them grow, and only by year and month.
+- **Partitions are created on demand and never pruned.** Writing the first file of a month creates its directory; nothing creates directories in advance, and an empty partition left behind by a deleted file is harmless and is left alone.
+- **Scans are recursive.** Reading a collection means walking its whole subtree, not listing one directory. A file the user has filed under the wrong month still lists — its date comes from frontmatter, never from its path. endpaper never moves a file to match its partition.
+- Paths must stay well under the Windows 260-character limit — assume the root is already something like `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\`. The partition adds 8 characters (`/YYYY/MM`), taking the worst-case generated path from 107 to 115 characters below the workspace root.
 
 ### 4.7 Platform and environment
 
