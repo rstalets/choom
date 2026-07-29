@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from endpaper.core.models import Workspace
-from endpaper.core.notes import open_daily_note
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.list_screen import ListScreen
 from endpaper.tui.preview_screen import PreviewScreen

@@ -31,3 +31,23 @@ def test_literal_leading_slash_is_tolerated_for_dotted_verb() -> None:
 
 def test_literal_leading_slash_is_tolerated_for_filter_text() -> None:
     assert resolve_mode("/vendor") == ("filter", "")
+
+
+def test_bare_note_verb_is_a_command() -> None:
+    assert resolve_mode("note") == ("command", "note")
+
+
+def test_note_with_description_is_a_command() -> None:
+    assert resolve_mode("note vendor landscape") == ("command", "note")
+
+
+def test_dotted_note_verb_is_a_command() -> None:
+    assert resolve_mode("note.research vendor landscape") == ("command", "note.research")
+
+
+def test_notes_verb_is_a_command() -> None:
+    assert resolve_mode("notes") == ("command", "notes")
+
+
+def test_leading_space_forces_filter_even_for_the_literal_word_notes() -> None:
+    assert resolve_mode(" notes") == ("filter", "")

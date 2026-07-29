@@ -1,4 +1,9 @@
-from endpaper.core.documents import create_document, filter_documents, match_document, scan_documents
+from endpaper.core.documents import (
+    create_document,
+    filter_documents,
+    match_document,
+    scan_documents,
+)
 from endpaper.core.errors import EndpaperError, NotFoundError, UsageError, WorkspaceError
 from endpaper.core.frontmatter import read_frontmatter, render_frontmatter
 from endpaper.core.meetings import create_meeting, filter_meetings, match_meeting, scan_meetings

@@ -103,7 +103,9 @@ def _parse_document(text: str, path: Path) -> tuple[Document | None, ScanWarning
     try:
         data = read_frontmatter(block)
     except FrontmatterError as exc:
-        return None, ScanWarning(path=path, reason=exc.reason, message=f"{path.name}: {exc.message}")
+        return None, ScanWarning(
+            path=path, reason=exc.reason, message=f"{path.name}: {exc.message}"
+        )
 
     type_value = str(data["type"])
     tag_values = [str(t) for t in data["tags"]]

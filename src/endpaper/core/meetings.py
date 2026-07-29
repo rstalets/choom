@@ -3,7 +3,12 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from datetime import datetime
 
-from endpaper.core.documents import create_document, filter_documents, match_document, scan_documents
+from endpaper.core.documents import (
+    create_document,
+    filter_documents,
+    match_document,
+    scan_documents,
+)
 from endpaper.core.models import Collection, Document, DocumentFilter, ScanWarning, Workspace
 
 MEETINGS = Collection("m_", "meetings", ("meetings",), frozenset())

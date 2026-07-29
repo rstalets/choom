@@ -195,15 +195,15 @@ describes the commands used.
 
 **Purpose**: Properties that span the stories, and the release record
 
-- [ ] T056 [P] Extend `tests/unit/test_path_budget.py` to cover `notes/YYYY-MM-DD-<type>-<slug>.md` and `notes/daily/YYYY-MM-DD.md`, asserting both stay within the Windows budget already established for meetings per [R9](./research.md#r9-windows-path-budget-for-notes)
-- [ ] T057 [P] Extend `tests/fixtures/generate.py` to generate an N-note workspace including daily notes, and extend `tests/performance/test_scan.py` and `tests/performance/test_filter.py` to cover a 1,000-note workspace with both collections scanned at mount (SC-005)
-- [ ] T058 [P] Update `tests/unit/test_command_bar_resolve_mode.py` for the `note` and `notes` verbs, including that a leading space still forces filter mode for the literal word "notes"
-- [ ] T059 [P] Finalise the `0.0.2` section of `CHANGELOG.md`: the three new CLI commands, the additive `core` API change (new names added, none removed), and the `AGENTS.md` restructure
-- [ ] T060 [P] Update `README.md` to mention daily notes and typed notes alongside meetings in the quickstart
-- [ ] T061 Run the full `quickstart.md` validation pass end to end in a scratch workspace, including the concurrency and mtime checks in §1
-- [ ] T062 Run `uv run ruff check . && uv run ruff format --check . && uv run mypy src` and fix anything the refactor surfaced
-- [ ] T063 Verify the TUI on the target terminals — Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — with attention to the collection indicator and the empty-state message
-- [ ] T064 Verify SC-011 on Windows, macOS, and Linux, including workspace paths containing spaces and non-ASCII characters
+- [X] T056 [P] Extend `tests/unit/test_path_budget.py` to cover `notes/YYYY-MM-DD-<type>-<slug>.md` and `notes/daily/YYYY-MM-DD.md`, asserting both stay within the Windows budget already established for meetings per [R9](./research.md#r9-windows-path-budget-for-notes)
+- [X] T057 [P] Extend `tests/fixtures/generate.py` to generate an N-note workspace including daily notes, and extend `tests/performance/test_scan.py` and `tests/performance/test_filter.py` to cover a 1,000-note workspace with both collections scanned at mount (SC-005)
+- [X] T058 [P] Update `tests/unit/test_command_bar_resolve_mode.py` for the `note` and `notes` verbs, including that a leading space still forces filter mode for the literal word "notes"
+- [X] T059 [P] Finalise the `0.0.2` section of `CHANGELOG.md`: the three new CLI commands, the additive `core` API change (new names added, none removed), and the `AGENTS.md` restructure
+- [X] T060 [P] Update `README.md` to mention daily notes and typed notes alongside meetings in the quickstart
+- [X] T061 Run the full `quickstart.md` validation pass end to end in a scratch workspace, including the concurrency and mtime checks in §1
+- [X] T062 Run `uv run ruff check . && uv run ruff format --check . && uv run mypy src` and fix anything the refactor surfaced
+- [X] T063 Verify the TUI on the target terminals — Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — with attention to the collection indicator and the empty-state message
+- [X] T064 Verify SC-011 on Windows, macOS, and Linux, including workspace paths containing spaces and non-ASCII characters
 
 ---
 

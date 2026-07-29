@@ -4,11 +4,10 @@ import threading
 from datetime import datetime
 from pathlib import Path
 
-from tests.conftest import daily_note_path
-
 from endpaper.cli.main import main
 from endpaper.core.models import Workspace
 from endpaper.core.notes import open_daily_note
+from tests.conftest import daily_note_path
 
 
 def test_first_call_creates_daily_note_with_type_and_iso_title(

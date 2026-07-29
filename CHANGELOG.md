@@ -23,7 +23,26 @@ endpaper note list                          # list notes, daily and typed togeth
 `filter_documents`, and `match_document` generalise `create_meeting` et al., which remain
 exported with unchanged signatures. No name removed, no signature changed.
 
-**TODO**: fill in the note-list JSON schema and TUI behaviour once implementation lands.
+**`note list --json` schema** — the same seven keys as `meeting list --json`, `n_`-prefixed
+id, `notes/`-prefixed path:
+
+```
+id, path, title, type, tags, created, updated
+```
+
+`note today` is idempotent: it prints the same path every time it is called on the same day
+and never modifies an existing daily note's bytes or mtime, even if its frontmatter is
+broken by hand. `--type daily` is reserved and rejected by `note new` before any file is
+written.
+
+**TUI**: `/note` opens today's daily note; `/note.<type> <description>` and
+`/note <description>` create a typed or untyped note; `/notes` and `/meetings` switch which
+collection the existing list and preview panes show. No new screen, no new key binding — the
+active collection is shown in the status bar and in the empty-state message.
+
+**Guarantees**: unchanged from 0.0.1, extended to notes — malformed note files are skipped
+with a warning and never rewritten; the daily note is never opened for writing once it
+exists.
 
 ### 0.0.1
 
