@@ -1,5 +1,17 @@
 # endpaper
 
+```
+╔══════════════════════╗
+║░░░░░░░░░░░░░░░░░░░░░░║
+║░┌──────────────────┐░║
+║░│ [x] standup      │░║
+║░│ [ ] follow-up    │░║
+║░│ #platform        │░║
+║░└──────────────────┘░║
+║░░░░░░░░░░░░░░░░░░░░░░║
+╚══════════════════════╝
+```
+
 A local-only, terminal-based tool for capturing and organizing meeting notes, general notes, and tasks as plain markdown files — structured enough for a human to navigate through a TUI, and legible enough that an AI assistant can search and edit the vault through a CLI without any integration work.
 
 ## Why
