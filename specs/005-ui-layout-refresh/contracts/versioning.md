@@ -30,6 +30,7 @@ fallback-version = "0.0.0"          # changed from "0.0.1"
 
 [tool.hatch.build.hooks.vcs]
 version-file = "src/endpaper/_version.py"
+enable-by-default = false           # see "Verification during implementation" below
 ```
 
 ```python
@@ -61,10 +62,15 @@ src/endpaper/_version.py
 ### Verification during implementation
 
 hatch-vcs documents the build hook as running on *build or install*, so `uv pip install -e .` may
-write `_version.py` and produce a development version instead of the `0.0.0` fallback. The
-implementation must check this and, if the hook fires on editable installs, scope it to the wheel
-and sdist targets so the editable path falls through. FR-043 is the acceptance criterion: a source
-checkout reports `0.0.0`.
+write `_version.py` and produce a development version instead of the `0.0.0` fallback. Confirmed:
+it does. Scoping the hook to the wheel/sdist *targets* does not exempt an editable install, because
+an editable install builds the `wheel` target too — target scoping cannot tell the two apart.
+
+The mechanism that does work is hatchling's own hook gate: `enable-by-default = false` on the hook,
+enabled explicitly with the `HATCH_BUILD_HOOKS_ENABLE=1` environment variable wherever a real stamp
+is wanted — `publish.yml`'s build step and `release-dry-run.yml`. `uv pip install -e .` never sets
+that variable, so the hook stays off and `__init__.py`'s `ImportError` fallback fires. FR-043 is the
+acceptance criterion: a source checkout reports `0.0.0`.
 
 ---
 
@@ -92,7 +98,7 @@ on:
 | 2 | Checkout with `fetch-depth: 0` | — |
 | 3 | `ruff format --check .`, `ruff check .`, `mypy` | The quality gate fails |
 | 4 | `uv run --extra dev pytest -q` | Any test fails |
-| 5 | `uv build --no-sources` with `SETUPTOOLS_SCM_PRETEND_VERSION: ${{ inputs.version }}` | The build fails |
+| 5 | `uv build --no-sources` with `SETUPTOOLS_SCM_PRETEND_VERSION: ${{ inputs.version }}` and `HATCH_BUILD_HOOKS_ENABLE: "1"` | The build fails |
 | 6 | Install the built wheel into a clean environment | The wheel does not install |
 | 7 | Assert `endpaper --version` equals `endpaper ${{ inputs.version }}` | The stamp does not match the request |
 | 8 | `actions/upload-artifact` with `dist/*` | — |

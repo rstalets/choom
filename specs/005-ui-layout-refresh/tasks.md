@@ -32,14 +32,14 @@ integration,contract,performance,fixtures}/`, plus `pyproject.toml` and `.github
 first because FR-042 cannot be honestly tested while `__version__` is a hardcoded literal that can
 disagree with the package. See [contracts/versioning.md](./contracts/versioning.md) and research R9.
 
-- [ ] T001 Set `fallback-version = "0.0.0"` and add `[tool.hatch.build.hooks.vcs]` with `version-file = "src/endpaper/_version.py"` in `pyproject.toml`
-- [ ] T002 Replace the hardcoded literal in `src/endpaper/__init__.py` with a `try: from endpaper._version import __version__ / except ImportError: __version__ = "0.0.0"`
-- [ ] T003 [P] Add `src/endpaper/_version.py` to `.gitignore`
-- [ ] T004 Verify what `uv pip install -e .` produces (research R9 open item) and, if the build hook stamps a dev version instead of leaving the fallback, scope the hook to the wheel and sdist targets in `pyproject.toml` so a source checkout reports `0.0.0`
-- [ ] T005 [P] Unit test that `__version__` falls back to `0.0.0` with no `_version.py` present, in `tests/unit/test_version_fallback.py`
-- [ ] T006 [P] Contract test that the TUI status bar string and `endpaper --version` report the same version, asserting parity and never a literal, in `tests/contract/test_version_parity.py`
-- [ ] T007 Add `.github/workflows/release-dry-run.yml`: `workflow_dispatch` with a required `version` input, PEP 440 input validation, full quality gate, `uv build --no-sources` under `SETUPTOOLS_SCM_PRETEND_VERSION`, clean-venv install, assert `endpaper --version` matches the input, then `actions/upload-artifact` of `dist/` — with **no** `environment: pypi` and **no** `id-token: write`
-- [ ] T008 [P] Record the versioning change (build-stamped `__version__`, `0.0.0` from source) in `CHANGELOG.md`
+- [X] T001 Set `fallback-version = "0.0.0"` and add `[tool.hatch.build.hooks.vcs]` with `version-file = "src/endpaper/_version.py"` in `pyproject.toml`
+- [X] T002 Replace the hardcoded literal in `src/endpaper/__init__.py` with a `try: from endpaper._version import __version__ / except ImportError: __version__ = "0.0.0"`
+- [X] T003 [P] Add `src/endpaper/_version.py` to `.gitignore`
+- [X] T004 Verify what `uv pip install -e .` produces (research R9 open item) and, if the build hook stamps a dev version instead of leaving the fallback, scope the hook to the wheel and sdist targets in `pyproject.toml` so a source checkout reports `0.0.0`
+- [X] T005 [P] Unit test that `__version__` falls back to `0.0.0` with no `_version.py` present, in `tests/unit/test_version_fallback.py`
+- [X] T006 [P] Contract test that the TUI status bar string and `endpaper --version` report the same version, asserting parity and never a literal, in `tests/contract/test_version_parity.py`
+- [X] T007 Add `.github/workflows/release-dry-run.yml`: `workflow_dispatch` with a required `version` input, PEP 440 input validation, full quality gate, `uv build --no-sources` under `SETUPTOOLS_SCM_PRETEND_VERSION`, clean-venv install, assert `endpaper --version` matches the input, then `actions/upload-artifact` of `dist/` — with **no** `environment: pypi` and **no** `id-token: write`
+- [X] T008 [P] Record the versioning change (build-stamped `__version__`, `0.0.0` from source) in `CHANGELOG.md`
 
 **Checkpoint**: `endpaper --version` reports `0.0.0` from a checkout and the real version from a
 build; the dry-run workflow can rehearse a release without publishing.

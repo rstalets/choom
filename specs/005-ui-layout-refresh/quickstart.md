@@ -146,10 +146,12 @@ python -c "import endpaper; print(endpaper.__version__)"   # 0.0.0
 endpaper --version                                          # endpaper 0.0.0
 ```
 
-A real build carries the real version:
+A real build carries the real version. The build hook is disabled by default
+(`enable-by-default = false` in `pyproject.toml`) precisely so `uv pip install -e .` does not stamp
+a development version — a real build opts back in with `HATCH_BUILD_HOOKS_ENABLE=1`:
 
 ```bash
-uv build --no-sources
+HATCH_BUILD_HOOKS_ENABLE=1 uv build --no-sources
 python -m venv /tmp/ep-check && /tmp/ep-check/bin/pip install --quiet dist/*.whl
 /tmp/ep-check/bin/endpaper --version        # the VCS tag, e.g. endpaper 0.0.4
 ```
@@ -157,15 +159,18 @@ python -m venv /tmp/ep-check && /tmp/ep-check/bin/pip install --quiet dist/*.whl
 And a pretended version is honoured, which is the mechanism the dry-run workflow uses:
 
 ```bash
-SETUPTOOLS_SCM_PRETEND_VERSION=9.9.9 uv build --no-sources
+HATCH_BUILD_HOOKS_ENABLE=1 SETUPTOOLS_SCM_PRETEND_VERSION=9.9.9 uv build --no-sources
 python -m venv /tmp/ep-pretend && /tmp/ep-pretend/bin/pip install --quiet dist/endpaper-9.9.9*.whl
 /tmp/ep-pretend/bin/endpaper --version      # endpaper 9.9.9
 ```
 
-**Check while implementing** (research R9): confirm `uv pip install -e .` still reports `0.0.0`. The
-build hook is documented to run on install as well as build, so if an editable install stamps a
-development version instead, scope the hook to the wheel and sdist targets. FR-043 is the
-acceptance criterion.
+**Verified during implementation** (research R9): `uv pip install -e .` stamps a development
+version by default — hatch-vcs's build hook documents that it runs on install as well as build,
+and scoping it to the wheel/sdist *targets* does not exempt an editable install, because an
+editable install also builds the `wheel` target. The mechanism that actually works is
+hatchling's own hook gate: `enable-by-default = false` plus `HATCH_BUILD_HOOKS_ENABLE=1` opt-in
+for real builds (`publish.yml`, `release-dry-run.yml`). FR-043's acceptance criterion — a source
+checkout reports `0.0.0` — holds under this mechanism.
 
 Automated: `tests/unit/test_version_fallback.py`, `tests/contract/test_version_parity.py`
 
@@ -187,7 +192,7 @@ Expected:
 Locally, the same rehearsal without GitHub:
 
 ```bash
-SETUPTOOLS_SCM_PRETEND_VERSION=0.0.4 uv build --no-sources && ls dist/
+HATCH_BUILD_HOOKS_ENABLE=1 SETUPTOOLS_SCM_PRETEND_VERSION=0.0.4 uv build --no-sources && ls dist/
 ```
 
 Verify the safety property by reading the workflow rather than by running it: the job must declare

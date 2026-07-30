@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Versioning
+
+`__version__` is no longer a hardcoded literal. It is stamped into `src/endpaper/_version.py` at
+build time by `hatch-vcs`'s build hook (`fallback-version` is now `0.0.0`, was `0.0.1`), and
+`endpaper/__init__.py` falls back to `0.0.0` when that file is absent — the case for a source
+checkout, including an editable (`pip install -e .`) install. The build hook is disabled by
+default (`enable-by-default = false`) precisely so an editable install does not stamp a
+development version; real builds (`publish.yml`, the new `release-dry-run.yml`) opt in with
+`HATCH_BUILD_HOOKS_ENABLE=1`. A new `workflow_dispatch` workflow,
+`.github/workflows/release-dry-run.yml`, rehearses a release end to end — quality gate, build
+with a proposed version via `SETUPTOOLS_SCM_PRETEND_VERSION`, install, and assert
+`endpaper --version` matches — and uploads `dist/` to the workflow run. It has no PyPI
+credentials and cannot publish.
+
 ### 0.0.3
 
 Standalone tasks, the `YYYY/MM/` layout amendment, viewing and editing, and `endpaper init`
