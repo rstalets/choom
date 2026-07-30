@@ -1,0 +1,52 @@
+name: "✨ Feature / Enhancement Request"
+description: Suggest an idea or improvement for this project
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to suggest an improvement! A little detail
+        goes a long way toward getting this looked at quickly.
+
+  - type: checkboxes
+    id: duplicate-check
+    attributes:
+      label: Check for existing issues
+      description: Please search open and closed issues before filing to avoid duplicates.
+      options:
+        - label: I searched existing issues and didn't find one already open for this
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the limitation, pain point, or use case that prompted this request.
+      placeholder: "I'm trying to do X, but currently..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like to happen? A rough sketch is fine — you don't need a full spec.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you've considered
+      description: Any workarounds or other approaches you've tried.
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, screenshots, related issues/PRs, mockups, etc.
+    validations:
+      required: false
