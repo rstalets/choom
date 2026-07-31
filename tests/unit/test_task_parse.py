@@ -123,3 +123,24 @@ def test_mixed_line_endings_roundtrip() -> None:
     parsed = parse_tasks(text)
     assert "".join(parsed.lines) == text
     assert len(parsed.tasks) == 4
+
+
+def test_pre_feature_file_with_no_bodies_parses_identically_and_is_not_rewritten() -> None:
+    """A tasks.md written before this feature (007) has no indented continuation
+    lines at all. Every task must still list exactly as it did, with an empty
+    body and a zero-width span -- proof that adding body support changes
+    nothing about a file that never had one (FR-006, SC-006)."""
+    text = (
+        "# My tasks\n\n"
+        "- [ ] one <!-- id:t_0001 created:2026-07-20 -->\n"
+        "- [ ] two <!-- id:t_0002 type:followup tags:legal created:2026-07-21 -->\n"
+        "- [x] three <!-- id:t_0003 created:2026-07-22 -->\n"
+    )
+    parsed = parse_tasks(text)
+
+    assert "".join(parsed.lines) == text
+    assert len(parsed.tasks) == 3
+    assert [t.id for t in parsed.tasks] == ["t_0001", "t_0002", "t_0003"]
+    for task, span in zip(parsed.tasks, parsed.bodies, strict=True):
+        assert task.body == ""
+        assert span.start == span.end
