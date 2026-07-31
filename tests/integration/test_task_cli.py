@@ -208,6 +208,48 @@ def test_unknown_id_exits_1_changes_nothing(cli) -> None:
     assert tasks_path.read_bytes() == before
 
 
+def test_task_show_prints_the_body_in_human_form(cli) -> None:
+    cli("task", "add", "call the vendor", "--type", "followup", "--tag", "procurement")
+    tasks_path = cli.root / "tasks.md"
+    text = tasks_path.read_text(encoding="utf-8")
+    task_id = re.search(r"id:(t_[0-9a-f]{4})", text).group(1)  # type: ignore[union-attr]
+    tasks_path.write_text(text + "\n  Need the Q3 comparison.\n", encoding="utf-8")
+
+    result = cli("task", "show", task_id)
+
+    assert result.exit_code == 0
+    lines = result.out.splitlines()
+    assert lines[0].split("\t")[0] == task_id
+    assert "Need the Q3 comparison." in result.out
+
+
+def test_task_show_with_no_body_prints_the_summary_line_alone(cli) -> None:
+    result = cli("task", "add", "buy milk")
+    task_id = result.out
+
+    result = cli("task", "show", task_id)
+
+    assert result.exit_code == 0
+    assert result.out.count("\n") == 0
+    assert result.out.split("\t")[0] == task_id
+
+
+def test_task_done_leaves_the_body_intact(cli) -> None:
+    result = cli("task", "add", "call the vendor")
+    task_id = result.out
+    tasks_path = cli.root / "tasks.md"
+    tasks_path.write_text(
+        tasks_path.read_text(encoding="utf-8") + "\n  Need the Q3 comparison.\n",
+        encoding="utf-8",
+    )
+
+    assert cli("task", "done", task_id).exit_code == 0
+
+    text = cli.read("tasks.md")
+    assert "[x] call the vendor" in text
+    assert "Need the Q3 comparison." in text
+
+
 def test_duplicated_id_exits_2_naming_both_lines(cli) -> None:
     (cli.root / "tasks.md").write_text(
         "- [ ] first <!-- id:t_dupe -->\n- [ ] second <!-- id:t_dupe -->\n",
