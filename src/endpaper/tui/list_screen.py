@@ -360,8 +360,12 @@ class ListScreen(Screen[None]):
             )
             if task is not None:
                 self._pending_error = None
-                await self._refresh_scope_pane()
-                await self.refresh_rows(select_id=task.id)
+                # Only refill the panes when Tasks is the view being shown --
+                # from any other collection, the task is added in the
+                # background and the current view is left untouched.
+                if self.app.active == "tasks":  # type: ignore[attr-defined]
+                    await self._refresh_scope_pane()
+                    await self.refresh_rows(select_id=task.id)
             else:
                 self._pending_error = self.app.last_create_error  # type: ignore[attr-defined]
             return

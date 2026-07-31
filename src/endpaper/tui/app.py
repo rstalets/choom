@@ -297,6 +297,11 @@ class EndpaperApp(App[None]):
         self.select_scope(collection, month)
 
     def add_task_and_track(self, description: str, type: str) -> Task | None:
+        """Adding a task is a quick capture, not a navigation: it never changes
+        the active collection. When Tasks is already active, land on To-Do with
+        the new task highlighted (spec US3 scenario 6); from any other
+        collection, the task is filed in the background and the current view
+        is left exactly as it was."""
         try:
             task = add_task(self.workspace, description, type=type)
         except UsageError as exc:
@@ -304,9 +309,9 @@ class EndpaperApp(App[None]):
             return None
         self.last_create_error = None
         self.tasks.append(task)
-        self.active = "tasks"
-        self.task_category = "todo"
-        self.filter_query = ""
+        if self.active == "tasks":
+            self.task_category = "todo"
+            self.filter_query = ""
         return task
 
     def toggle_task_and_track(self, task_id: str) -> None:

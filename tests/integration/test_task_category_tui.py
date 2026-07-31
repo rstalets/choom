@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, set_task_state
+from endpaper.core.notes import create_note
+from endpaper.core.tasks import add_task, load_tasks, set_task_state
 from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import ListView, TaskRow
+from endpaper.tui.collection_bar import CollectionBar
+from endpaper.tui.list_screen import DocumentRow, ListView, TaskRow
 from endpaper.tui.scope_pane import CategoryRow
 
 
@@ -90,3 +92,38 @@ async def test_creating_a_task_from_done_returns_to_todo(tmp_workspace: Workspac
         highlighted = list_view.highlighted_child
         assert isinstance(highlighted, TaskRow)
         assert highlighted.record.text == "a fresh one"
+
+
+async def test_task_created_from_another_collection_does_not_change_the_view(
+    tmp_workspace: Workspace,
+) -> None:
+    # Regression: /task.followup from Notes used to flip the left/middle panes
+    # to Tasks without updating the top bar's active marker, leaving the
+    # screen in an inconsistent state. Adding a task is a quick, background
+    # capture -- it must never change which collection is displayed.
+    create_note(tmp_workspace, "an idea")
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        await pilot.press("tab")  # tasks -> notes
+        await pilot.pause()
+        assert app.active == "notes"
+
+        await pilot.press("/")
+        await pilot.pause()
+        for ch in "task.followup Call Sam":
+            await pilot.press("space" if ch == " " else ch)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert app.active == "notes"
+        bar = app.screen.query_one(CollectionBar)
+        assert "[reverse] Notes [/reverse]" in str(bar.content)
+
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]
+        assert titles == ["an idea"]
+
+        tasks, _ = load_tasks(tmp_workspace)
+        assert any(t.text == "Call Sam" and t.type == "followup" for t in tasks)
