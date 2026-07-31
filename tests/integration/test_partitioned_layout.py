@@ -5,6 +5,28 @@ from datetime import datetime
 from endpaper.core.meetings import create_meeting, scan_meetings
 from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
+from endpaper.tui.app import EndpaperApp
+
+
+async def test_collection_menu_pane_is_gone_and_its_width_returned_to_the_content_panes(
+    tmp_workspace: Workspace,
+) -> None:
+    # FR-006: the vertical collection menu is removed; the 14 columns it used
+    # go to the scope pane (fixed 14, for `YYYY-MM` + padding) and the freed
+    # width goes to the list/preview split, which keeps its 2fr/3fr ratio.
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+
+        assert len(app.screen.query("#menu-pane")) == 0
+        assert len(app.screen.query("#collection-menu")) == 0
+
+        scope_pane = app.screen.query_one("#scope-pane")
+        list_pane = app.screen.query_one("#list-pane")
+        preview_pane = app.screen.query_one("#preview-pane")
+        assert str(scope_pane.styles.width) == "14"
+        assert str(list_pane.styles.width) == "2fr"
+        assert str(preview_pane.styles.width) == "3fr"
 
 
 def test_meeting_lands_in_meetings_yyyy_mm(tmp_workspace: Workspace) -> None:

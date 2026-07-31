@@ -4,6 +4,43 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### UI layout refresh
+
+**TUI, user-visible**
+
+The three collections now live on one top-line bar (`Endpaper >>  Tasks  Notes  Meetings`);
+`tab`/`shift+tab` cycle between them and the panes refill immediately, focus landing on the
+middle pane. The vertical collection menu is gone; the 14 columns it used go back to the
+list/preview split. The tool now **opens on Tasks** at launch (was Meetings).
+
+For Notes and Meetings, the left pane is now a month list (`YYYY-MM`, most-recent-first, plus an
+**Unfiled** entry when a document sits outside the `YYYY/MM` layout) instead of a full-collection
+scan — opening a collection or moving months now reads only that month from disk. For Tasks, the
+left pane is **To-Do** / **Done**; the **`a` show-all binding is retired** in favour of selecting
+Done directly, and the preview pane stays blank for Tasks.
+
+Pressing **`e`** on a highlighted document now opens it directly in the editor, and creating a
+note, meeting, or the daily note lands straight in the editor instead of a read-only preview
+first.
+
+The command bar always shows a `/` prefix that cannot be deleted. **`filter`** (alias `f`) is now
+an explicit verb — bare words are no longer silently treated as a search, and an unrecognised
+first word is a visible `unknown command: '<word>'` error instead. In Notes and Meetings, an
+active filter searches every month (not just the displayed one), reading each month at most once
+per session. `/help` opens a pane listing every command and key binding without leaving the list
+screen. The running version now renders in the bottom-right of every screen.
+
+**Public API**
+
+- `endpaper.core.models`: new `YearMonth`, `MonthListing`; `TaskFilter` gains `only_done: bool =
+  False` (completed-only selection; wins over `include_done`).
+- `endpaper.core.documents`: new `list_months()`, `scan_month()`, `scan_unfiled()` — month-scoped
+  counterparts to `scan_documents()`, which keeps its full-collection semantics unchanged.
+- `endpaper.core.meetings` / `endpaper.core.notes`: new `list_meeting_months()` /
+  `scan_meeting_month()` and `list_note_months()` / `scan_note_month()` thin wrappers.
+- `endpaper.core.tasks.filter_tasks()`: honours `TaskFilter.only_done`.
+- CLI: new `endpaper task list --done` (completed tasks only; wins if combined with `--all`).
+
 ### Versioning
 
 `__version__` is no longer a hardcoded literal. It is stamped into `src/endpaper/_version.py` at

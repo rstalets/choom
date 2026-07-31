@@ -263,10 +263,10 @@ confirm the screen underneath is untouched; separately confirm the bottom-right 
 
 ## Phase 9: Polish & Cross-Cutting Concerns
 
-- [ ] T087 [P] Record the public API changes in `CHANGELOG.md`: `TaskFilter.only_done`, `list_months`/`scan_month`/`scan_unfiled` and their wrappers, and `task list --done`
-- [ ] T088 [P] Record the user-visible behaviour changes in `CHANGELOG.md`: startup collection is now Tasks, the `a` show-all binding is retired, `filter` is an explicit verb, create opens the editor
-- [ ] T089 [P] Update the TUI description in `README.md` and the command list in the `AGENTS.md` template under `src/endpaper/core/templates/` if the new verbs change what an assistant should know
-- [ ] T090 Confirm every FR in the [quickstart.md](./quickstart.md) FR → test map has a passing test, and add any that are missing
+- [X] T087 [P] Record the public API changes in `CHANGELOG.md`: `TaskFilter.only_done`, `list_months`/`scan_month`/`scan_unfiled` and their wrappers, and `task list --done`
+- [X] T088 [P] Record the user-visible behaviour changes in `CHANGELOG.md`: startup collection is now Tasks, the `a` show-all binding is retired, `filter` is an explicit verb, create opens the editor
+- [X] T089 [P] Update the TUI description in `README.md` and the command list in the `AGENTS.md` template under `src/endpaper/core/templates/` if the new verbs change what an assistant should know
+- [X] T090 Confirm every FR in the [quickstart.md](./quickstart.md) FR → test map has a passing test, and add any that are missing
 - [ ] T091 Run the full gate — `ruff format --check .`, `ruff check .`, `mypy`, `pytest` — and fix what it reports
 - [ ] T092 Walk all eight scenarios in [quickstart.md](./quickstart.md) by hand, including the local build and pretend-version rehearsals
 - [ ] T093 Verify the TUI on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — specifically that `shift+tab` arrives, the top bar renders at 80 columns, and the modal help pane redraws on resize
