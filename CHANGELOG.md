@@ -55,6 +55,29 @@ with a proposed version via `SETUPTOOLS_SCM_PRETEND_VERSION`, install, and asser
 `endpaper --version` matches — and uploads `dist/` to the workflow run. It has no PyPI
 credentials and cannot publish.
 
+### Test suite
+
+**No change to `src/`.** Following the constitution's v1.1.0 amendment to Principle VI
+(risk-based coverage instead of one test per acceptance criterion), the suite was retrofitted
+against the new rule: 361 tests / 6,347 lines → 337 tests / 5,538 lines, with **coverage of
+`core` and `cli` unchanged at 95%** — the same 49 uncovered statements, module for module.
+
+CLI and TUI tests for one behaviour no longer live in parallel `_cli.py` / `_tui.py` /
+`_parity.py` files. The three parity files became one parametrized `test_cli_tui_parity.py`;
+note-vs-meeting duplicates merged into their meeting counterparts, parametrized over the noun;
+four single-purpose chrome files became `test_chrome_tui.py`. Tests moved to the layer Principle
+VI names for them: `test_month_scope.py` moved out of `performance/` (it asserts read scoping,
+not time) into `integration/`, and the `performance/` tests that regenerated a 1,000-file
+workspace per assertion now share one.
+
+`core`'s freedom from adapter imports is now enforced by ruff (`TID251` banned-api) instead of a
+test that walked the AST — so it fails in the editor, not just under pytest.
+
+Full-suite wall time drops from **118s to 62s** serially, and to **~8.5s** with `pytest -n auto`,
+which the new `.github/workflows/tests.yml` uses. That workflow is also the first to run the
+tests on push and pull request at all; previously they ran only at release time or on manual
+dispatch.
+
 ### 0.0.3
 
 Standalone tasks, the `YYYY/MM/` layout amendment, viewing and editing, and `endpaper init`

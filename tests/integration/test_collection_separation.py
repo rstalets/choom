@@ -1,61 +1,39 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-
-from endpaper.cli.main import main
 
 
-def test_note_list_never_returns_a_meeting_and_vice_versa(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    main(["init"])
-    capsys.readouterr()
-    main(["meeting", "new", "Q3 planning"])
-    capsys.readouterr()
-    main(["note", "new", "an idea"])
-    capsys.readouterr()
+def test_note_list_never_returns_a_meeting_and_vice_versa(cli) -> None:
+    cli("meeting", "new", "Q3 planning")
+    cli("note", "new", "an idea")
 
-    main(["note", "list", "--json"])
-    notes = json.loads(capsys.readouterr().out)
+    notes = json.loads(cli("note", "list", "--json").out)
     assert len(notes) == 1
     assert notes[0]["id"].startswith("n_")
 
-    main(["meeting", "list", "--json"])
-    meetings = json.loads(capsys.readouterr().out)
+    meetings = json.loads(cli("meeting", "list", "--json").out)
     assert len(meetings) == 1
     assert meetings[0]["id"].startswith("m_")
 
 
-def test_non_markdown_files_under_notes_are_ignored(tmp_path: Path, monkeypatch, capsys) -> None:
-    monkeypatch.chdir(tmp_path)
-    main(["init"])
-    capsys.readouterr()
-    main(["note", "new", "an idea"])
-    capsys.readouterr()
+def test_non_markdown_files_under_notes_are_ignored(cli) -> None:
+    cli("note", "new", "an idea")
 
-    (tmp_path / "notes" / "readme.txt").write_text("not a note", encoding="utf-8")
+    (cli.root / "notes" / "readme.txt").write_text("not a note", encoding="utf-8")
 
-    exit_code = main(["note", "list", "--json"])
-    assert exit_code == 0
-    records = json.loads(capsys.readouterr().out)
+    result = cli("note", "list", "--json")
+    assert result.exit_code == 0
+    records = json.loads(result.out)
     assert len(records) == 1
 
 
-def test_notes_subtree_is_scanned_recursively_including_arbitrary_subdirectories(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
+def test_notes_subtree_is_scanned_recursively_including_arbitrary_subdirectories(cli) -> None:
     # Post-003 (YYYY/MM partitioning): scan_documents walks a collection's whole
     # subtree, not just its top level, so any nested .md file with valid
     # frontmatter is now discoverable -- including a user's own subdirectories.
-    monkeypatch.chdir(tmp_path)
-    main(["init"])
-    capsys.readouterr()
-    main(["note", "new", "an idea"])
-    capsys.readouterr()
+    cli("note", "new", "an idea")
 
-    nested_dir = tmp_path / "notes" / "archive"
+    nested_dir = cli.root / "notes" / "archive"
     nested_dir.mkdir()
     (nested_dir / "2020-01-01-old.md").write_text(
         '---\nid: n_20200101_deadbeef\ntype: ""\ntitle: "old"\ntags: []\n'
@@ -63,9 +41,9 @@ def test_notes_subtree_is_scanned_recursively_including_arbitrary_subdirectories
         encoding="utf-8",
     )
 
-    exit_code = main(["note", "list", "--json"])
-    assert exit_code == 0
-    records = json.loads(capsys.readouterr().out)
+    result = cli("note", "list", "--json")
+    assert result.exit_code == 0
+    records = json.loads(result.out)
     assert len(records) == 2
     titles = {r["title"] for r in records}
     assert titles == {"an idea", "old"}

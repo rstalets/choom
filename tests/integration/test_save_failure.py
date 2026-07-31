@@ -10,6 +10,7 @@ from endpaper.core.meetings import create_meeting, scan_meetings
 from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
+from tests.helpers import to_collection
 
 
 async def test_read_only_directory_save_shows_error_stays_in_edit_buffer_intact(
@@ -24,9 +25,7 @@ async def test_read_only_directory_save_shows_error_stays_in_edit_buffer_intact(
     try:
         app = EndpaperApp(tmp_workspace)
         async with app.run_test(size=(80, 24)) as pilot:
-            await pilot.pause()
-            await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-            await pilot.pause()
+            await to_collection(app, pilot, "meetings")
             await pilot.press("enter")
             await pilot.pause()
             await pilot.press("e")
@@ -76,9 +75,7 @@ async def test_ctrl_x_on_failed_save_does_not_leave_edit_state(tmp_workspace: Wo
     try:
         app = EndpaperApp(tmp_workspace)
         async with app.run_test(size=(80, 24)) as pilot:
-            await pilot.pause()
-            await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-            await pilot.pause()
+            await to_collection(app, pilot, "meetings")
             await pilot.press("enter")
             await pilot.pause()
             await pilot.press("e")
@@ -102,9 +99,7 @@ async def test_deleting_frontmatter_and_saving_writes_as_typed_and_warns(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
         await pilot.press("e")
@@ -141,9 +136,7 @@ async def test_emptied_buffer_saves_as_empty_file_without_crashing(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
         await pilot.press("e")

@@ -21,6 +21,10 @@ endpaper = "endpaper.cli.main:main"
 dev = [
     "pytest",
     "pytest-asyncio",
+    # The suite is dominated by Textual's message pump, not by CPU -- it is ~75%
+    # idle, so it parallelises almost linearly. CI passes `-n auto`; local runs
+    # stay serial by default so failure output remains readable.
+    "pytest-xdist",
     "ruff",
     "mypy",
     "types-PyYAML",
@@ -46,7 +50,17 @@ target-version = "py311"
 extend-exclude = ["specs", ".specify"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B"]
+select = ["E", "F", "I", "UP", "B", "TID"]
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"argparse".msg = "core must stay adapter-agnostic; argparse belongs in cli/"
+"textual".msg = "core must stay adapter-agnostic; textual belongs in tui/"
+"rich".msg = "core must stay adapter-agnostic; rich belongs in tui/"
+
+[tool.ruff.lint.per-file-ignores]
+"src/endpaper/cli/*" = ["TID251"]
+"src/endpaper/tui/*" = ["TID251"]
+"tests/*" = ["TID251"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -59,3 +73,5 @@ files = ["src"]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--strict-markers"
+markers = ["performance: has a real time budget to protect"]

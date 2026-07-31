@@ -8,17 +8,7 @@ from endpaper.tui.app import EndpaperApp
 from endpaper.tui.discard_dialog import DiscardDialog
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.preview_screen import PreviewScreen
-
-
-async def _open_edit(app: EndpaperApp, pilot) -> None:  # type: ignore[no-untyped-def]
-    await pilot.pause()
-    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-    await pilot.pause()
-    await pilot.press("enter")
-    await pilot.pause()
-    await pilot.press("e")
-    await pilot.pause()
-    assert isinstance(app.screen, EditScreen)
+from tests.helpers import open_edit
 
 
 async def test_esc_with_changes_raises_dialog_with_nothing_written(
@@ -28,8 +18,7 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
-        edit_screen = app.screen
+        edit_screen = await open_edit(app, pilot)
         path = edit_screen.file.path
         before_bytes = path.read_bytes()
 
@@ -48,8 +37,7 @@ async def test_cancel_returns_with_buffer_and_cursor_intact(tmp_workspace: Works
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
-        edit_screen = app.screen
+        edit_screen = await open_edit(app, pilot)
         editor = edit_screen.query_one("#editor", TextArea)
         editor.text = editor.text + "unsaved change"
         editor.cursor_location = (0, 2)
@@ -75,7 +63,7 @@ async def test_discard_leaves_file_byte_identical(tmp_workspace: Workspace) -> N
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "unsaved change"
 
@@ -96,7 +84,7 @@ async def test_no_changes_means_no_dialog(tmp_workspace: Workspace) -> None:
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
 
         await pilot.press("escape")
         await pilot.pause()
@@ -109,7 +97,7 @@ async def test_no_dialog_after_ctrl_o_save(tmp_workspace: Workspace) -> None:
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "\nnew content\n"
 
@@ -128,8 +116,7 @@ async def test_no_dialog_after_retyping_original_text_by_hand(tmp_workspace: Wor
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
-        edit_screen = app.screen
+        edit_screen = await open_edit(app, pilot)
         editor = edit_screen.query_one("#editor", TextArea)
         original = editor.text
 

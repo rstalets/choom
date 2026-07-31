@@ -16,8 +16,3 @@ def test_tui_and_cli_report_the_same_version(capsys: pytest.CaptureFixture[str])
 
     assert cli_output == f"endpaper {endpaper.__version__}"
     assert render_version() == f"v{endpaper.__version__}"
-
-
-def test_version_is_never_a_hardcoded_literal() -> None:
-    # A literal here would silently stop catching drift between the two front-ends.
-    assert render_version() != "v0.0.3"

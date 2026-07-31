@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.core.tasks import add_task, load_tasks, set_task_state
+from endpaper.core.tasks import add_task, set_task_state
 from endpaper.tui.app import EndpaperApp
-from endpaper.tui.collection_bar import CollectionBar
-from endpaper.tui.list_screen import DocumentRow, ListView, TaskRow
+from endpaper.tui.list_screen import ListView, TaskRow
 from endpaper.tui.scope_pane import CategoryRow
+from tests.helpers import list_view, task_rows, type_command
 
 
 async def test_todo_is_the_default_category(tmp_workspace: Workspace) -> None:
@@ -25,27 +24,35 @@ async def test_todo_is_the_default_category(tmp_workspace: Workspace) -> None:
 
 
 async def test_toggling_moves_a_task_between_categories(tmp_workspace: Workspace) -> None:
-    task = add_task(tmp_workspace, "buy milk")
+    task = add_task(tmp_workspace, "buy milk", type="errand", tags=("home",))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        assert any(isinstance(r, TaskRow) and r.record.id == task.id for r in list_view.children)
+        assert any(r.record.id == task.id for r in task_rows(app))
 
         await pilot.press("space")
         await pilot.pause()
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        assert not any(
-            isinstance(r, TaskRow) and r.record.id == task.id for r in list_view.children
-        )
 
+        # The TUI's toggle bridges to the same core write the CLI uses, and
+        # must preserve the fields already on the line.
+        text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+        assert "[x]" in text
+        assert "type:errand" in text
+        assert "tags:home" in text
+
+        # FR-020: it moved out of To-Do (the default category)...
+        assert not any(r.record.id == task.id for r in task_rows(app))
+
+        # ...and into Done.
         await pilot.press("h")
         await pilot.pause()
         await pilot.press("j")  # To-Do -> Done
         await pilot.pause()
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        assert any(isinstance(r, TaskRow) and r.record.id == task.id for r in list_view.children)
+        done_rows = task_rows(app)
+        assert len(done_rows) == 1
+        assert done_rows[0].record.id == task.id
+        assert done_rows[0].record.done is True
 
 
 async def test_preview_pane_stays_blank_for_tasks(tmp_workspace: Workspace) -> None:
@@ -65,6 +72,41 @@ async def test_preview_pane_stays_blank_for_tasks(tmp_workspace: Workspace) -> N
         assert str(preview._markdown or "") == ""  # type: ignore[attr-defined]
 
 
+async def test_done_category_lists_only_completed_and_survives_collection_switch(
+    tmp_workspace: Workspace,
+) -> None:
+    add_task(tmp_workspace, "open task")
+    done_task = add_task(tmp_workspace, "done task")
+    set_task_state(tmp_workspace, done_task.id, done=True)  # type: ignore[arg-type]
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await pilot.pause()
+        assert app.active == "tasks"
+        assert app.task_category == "todo"
+        assert len(task_rows(app)) == 1
+
+        await pilot.press("h")
+        await pilot.pause()
+        await pilot.press("j")  # To-Do -> Done
+        await pilot.pause()
+        assert app.task_category == "done"
+        assert len(task_rows(app)) == 1
+
+        # Switching away and back resets to To-Do (FR-018).
+        await pilot.press("l")
+        await pilot.pause()
+        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+        await pilot.pause()
+        assert app.active == "meetings"
+        await pilot.press("tab")  # meetings -> tasks, wrapping
+        await pilot.pause()
+        assert app.active == "tasks"
+        assert app.task_category == "todo"
+
+        assert len(task_rows(app)) == 1
+
+
 async def test_creating_a_task_from_done_returns_to_todo(tmp_workspace: Workspace) -> None:
     existing = add_task(tmp_workspace, "existing done task")
     set_task_state(tmp_workspace, existing.id, done=True)  # type: ignore[arg-type]
@@ -80,50 +122,9 @@ async def test_creating_a_task_from_done_returns_to_todo(tmp_workspace: Workspac
 
         await pilot.press("l")
         await pilot.pause()
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "task a fresh one":
-            await pilot.press("space" if ch == " " else ch)
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, "task a fresh one")
 
         assert app.task_category == "todo"
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        highlighted = list_view.highlighted_child
+        highlighted = list_view(app).highlighted_child
         assert isinstance(highlighted, TaskRow)
         assert highlighted.record.text == "a fresh one"
-
-
-async def test_task_created_from_another_collection_does_not_change_the_view(
-    tmp_workspace: Workspace,
-) -> None:
-    # Regression: /task.followup from Notes used to flip the left/middle panes
-    # to Tasks without updating the top bar's active marker, leaving the
-    # screen in an inconsistent state. Adding a task is a quick, background
-    # capture -- it must never change which collection is displayed.
-    create_note(tmp_workspace, "an idea")
-
-    app = EndpaperApp(tmp_workspace)
-    async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab")  # tasks -> notes
-        await pilot.pause()
-        assert app.active == "notes"
-
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "task.followup Call Sam":
-            await pilot.press("space" if ch == " " else ch)
-        await pilot.press("enter")
-        await pilot.pause()
-
-        assert app.active == "notes"
-        bar = app.screen.query_one(CollectionBar)
-        assert "[reverse] Notes [/reverse]" in str(bar.content)
-
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]
-        assert titles == ["an idea"]
-
-        tasks, _ = load_tasks(tmp_workspace)
-        assert any(t.text == "Call Sam" and t.type == "followup" for t in tasks)

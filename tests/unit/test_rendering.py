@@ -26,14 +26,3 @@ def test_preview_markdown_strips_frontmatter_and_headings_the_title(
     assert "---" not in rendered
     assert "standup" in rendered
     assert "#platform" in rendered
-
-
-def test_preview_markdown_includes_body_content(tmp_workspace: Workspace) -> None:
-    meeting = create_meeting(tmp_workspace, "hallway chat")
-    meeting.path.write_text(
-        meeting.path.read_text(encoding="utf-8") + "Some notes go here.\n",
-        encoding="utf-8",
-    )
-
-    rendered = render_preview_markdown(meeting.path, meeting)
-    assert "Some notes go here." in rendered

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from datetime import datetime
 
-from textual.widgets import ListView, TextArea
+from textual.widgets import TextArea
 
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
@@ -11,21 +11,10 @@ from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import DocumentRow
 from endpaper.tui.preview_screen import PreviewScreen
+from tests.helpers import list_view, open_edit, row_titles, to_collection, type_literally
 
 _UPDATED = re.compile(r"^updated: (.+)$", re.MULTILINE)
 _CREATED = re.compile(r"^created: (.+)$", re.MULTILINE)
-
-
-async def _open_edit(app: EndpaperApp, pilot) -> None:  # type: ignore[no-untyped-def]
-    await pilot.pause()
-    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-    await pilot.pause()
-    await pilot.press("enter")
-    await pilot.pause()
-    assert isinstance(app.screen, PreviewScreen)
-    await pilot.press("e")
-    await pilot.pause()
-    assert isinstance(app.screen, EditScreen)
 
 
 async def test_e_opens_raw_markdown_including_frontmatter(tmp_workspace: Workspace) -> None:
@@ -34,7 +23,7 @@ async def test_e_opens_raw_markdown_including_frontmatter(tmp_workspace: Workspa
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text == original_text
         assert editor.text.startswith("---\n")
@@ -45,7 +34,7 @@ async def test_ctrl_o_writes_and_preserves_cursor_position(tmp_workspace: Worksp
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "\nAn appended line.\n"
         editor.cursor_location = (2, 3)
@@ -64,7 +53,7 @@ async def test_ctrl_s_behaves_identically_to_ctrl_o(tmp_workspace: Workspace) ->
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "\nSaved via ctrl+s.\n"
 
@@ -83,7 +72,7 @@ async def test_ctrl_x_saves_and_returns_to_preview_with_new_content(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text.replace("Q3 planning", "Q3 planning (revised)")
 
@@ -106,11 +95,8 @@ async def test_title_change_appears_in_list_row_with_no_other_row_moved(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        list_view.index = 1  # "second meeting" (newest-first: third, second, first)
+        await to_collection(app, pilot, "meetings")
+        list_view(app).index = 1  # "second meeting" (newest-first: third, second, first)
 
         await pilot.press("enter")
         await pilot.pause()
@@ -125,9 +111,7 @@ async def test_title_change_appears_in_list_row_with_no_other_row_moved(
         await pilot.press("escape")
         await pilot.pause()
 
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        titles = [row.meeting.title for row in list_view.children if isinstance(row, DocumentRow)]
-        assert titles == ["third meeting", "second meeting (renamed)", "first meeting"]
+        assert row_titles(app) == ["third meeting", "second meeting (renamed)", "first meeting"]
 
 
 async def test_updated_advances_while_created_stays_fixed(tmp_workspace: Workspace) -> None:
@@ -141,7 +125,7 @@ async def test_updated_advances_while_created_stays_fixed(tmp_workspace: Workspa
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "\nnew body content\n"
 
@@ -166,7 +150,7 @@ async def test_esc_without_editing_leaves_bytes_and_mtime_untouched(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
 
         await pilot.press("escape")
         await pilot.pause()
@@ -183,7 +167,7 @@ async def test_resize_while_editing_preserves_buffer_cursor_and_dirty_state(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _open_edit(app, pilot)
+        await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = editor.text + "\nresize me not away.\n"
         editor.cursor_location = (1, 3)
@@ -207,21 +191,20 @@ async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "meetings")
         await pilot.press("/")
         await pilot.pause()
-        for ch in "filter vendor":
-            await pilot.press("space" if ch == " " else ch)
+        # Kept on `type_literally` deliberately: this asserts on the live,
+        # narrows-as-you-type filtering, which `type_command`'s single
+        # assignment shortcut would not exercise.
+        await type_literally(pilot, "filter vendor")
         await pilot.pause()
         assert len(app.visible_documents()) == 1
 
         await pilot.press("enter")  # closes the filter bar, applying the filter
         await pilot.pause()
 
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        assert isinstance(list_view.highlighted_child, DocumentRow)
+        assert isinstance(list_view(app).highlighted_child, DocumentRow)
 
         await pilot.press("enter")
         await pilot.pause()
@@ -236,10 +219,10 @@ async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining
         await pilot.press("escape")
         await pilot.pause()
 
-        list_view = app.screen.query_one("#meeting-list", ListView)
         # the edited document no longer matches "vendor" -- it must not remain
         # selected, and the list must not be left with nothing highlighted
+        highlighted = list_view(app).highlighted_child
         assert len(app.visible_documents()) == 0 or (
-            isinstance(list_view.highlighted_child, DocumentRow)
-            and list_view.highlighted_child.document.title != "totally different title"
+            isinstance(highlighted, DocumentRow)
+            and highlighted.document.title != "totally different title"
         )
