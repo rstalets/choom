@@ -267,11 +267,11 @@ confirm the screen underneath is untouched; separately confirm the bottom-right 
 - [X] T088 [P] Record the user-visible behaviour changes in `CHANGELOG.md`: startup collection is now Tasks, the `a` show-all binding is retired, `filter` is an explicit verb, create opens the editor
 - [X] T089 [P] Update the TUI description in `README.md` and the command list in the `AGENTS.md` template under `src/endpaper/core/templates/` if the new verbs change what an assistant should know
 - [X] T090 Confirm every FR in the [quickstart.md](./quickstart.md) FR → test map has a passing test, and add any that are missing
-- [ ] T091 Run the full gate — `ruff format --check .`, `ruff check .`, `mypy`, `pytest` — and fix what it reports
-- [ ] T092 Walk all eight scenarios in [quickstart.md](./quickstart.md) by hand, including the local build and pretend-version rehearsals
+- [X] T091 Run the full gate — `ruff format --check .`, `ruff check .`, `mypy`, `pytest` — and fix what it reports
+- [X] T092 Walk all eight scenarios in [quickstart.md](./quickstart.md) by hand, including the local build and pretend-version rehearsals
 - [ ] T093 Verify the TUI on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — specifically that `shift+tab` arrives, the top bar renders at 80 columns, and the modal help pane redraws on resize
-- [ ] T094 Verify the layout degrades legibly in a terminal too narrow for three panes, keeping the highlighted collection identifiable
-- [ ] T095 Run the release dry-run workflow once with a proposed version and confirm the artifact installs and reports that version
+- [X] T094 Verify the layout degrades legibly in a terminal too narrow for three panes, keeping the highlighted collection identifiable
+- [X] T095 Run the release dry-run workflow once with a proposed version and confirm the artifact installs and reports that version
 
 ---
 
