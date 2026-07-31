@@ -1,39 +1,43 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: (uninitialized template) → 1.0.0
-Bump rationale: Initial ratification. All placeholder tokens replaced with
-concrete governance for the endpaper project.
+Version change: 1.0.0 → 1.1.0
+Bump rationale: MINOR. Principle VI's testing rule is materially rewritten
+(risk-based coverage replaces the 1:1 acceptance-criterion-to-test mandate,
+plus new guidance on what each test layer is for), but no principle is
+removed or renamed, and the change only loosens what was previously
+required — nothing that satisfied the old rule becomes non-compliant.
 
 Modified principles:
-  - [PRINCIPLE_1_NAME] → I. Core Is the Product
-  - [PRINCIPLE_2_NAME] → II. Two Interfaces, One Contract
-  - [PRINCIPLE_3_NAME] → III. Simplicity Is the Default (NON-NEGOTIABLE)
-  - [PRINCIPLE_4_NAME] → IV. Never Lose the User's Words
-  - [PRINCIPLE_5_NAME] → V. The Interface Is Specified, Not Improvised
-  - (added)           → VI. Readable Python, Enforced Automatically
+  - VI. Readable Python, Enforced Automatically — testing bullet replaced:
+    "every acceptance criterion in a spec MUST map to at least one test"
+    → risk-based coverage chosen by the author, plus a definition of what
+    contract/integration/unit/performance tests are each for.
 
-Added sections:
-  - Platform & Distribution Constraints (was [SECTION_2_NAME])
-  - Development Workflow & Quality Gates (was [SECTION_3_NAME])
-
+Added sections: none
 Removed sections: none
 
 Templates requiring updates:
-  ✅ .specify/templates/plan-template.md — Constitution Check gates populated
+  ✅ .specify/templates/plan-template.md — Constitution Check gate VI row
+     updated to describe risk-based coverage instead of the AC-mapping rule
+  ✅ .specify/templates/tasks-template.md — per-user-story test scaffolding
+     no longer offers an unconditional contract test + integration test;
+     both are now conditioned on the story actually needing that layer, and
+     integration tests are directed to be parametrized across CLI/TUI
+     adapters instead of duplicated into separate files
   ✅ .specify/templates/spec-template.md — reviewed; no constitution-driven
-     mandatory sections added or removed (principles constrain HOW, spec
-     template governs WHAT)
-  ✅ .specify/templates/tasks-template.md — sample Foundational tasks rewritten
-     to core-first (they led with database/auth setup, contradicting III);
-     Polish phase now includes terminal- and platform-verification tasks
-  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated agent-specific
-     references requiring generic guidance
+     mandatory sections added or removed
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated references to
+     the old 1:1 AC→test rule found
+  ✅ README.md / AGENTS.md — reviewed; neither references the old rule
 
 Follow-up TODOs:
   - README.md names the project "cairn" while REQUIREMENTS.md, the command
     name, and this constitution use "endpaper". Not changed here (outside the
     constitution workflow's scope); resolve before first public release.
+  - The actual retrofit of tests/ (consolidating CLI/TUI duplicate files,
+    dropping tests that don't survive the new rule) is deferred — see
+    Next Actions. This command only updates governance and templates.
 -->
 
 # endpaper Constitution
@@ -139,8 +143,16 @@ by strangers.
 - Python 3.11+. Formatting and linting are enforced by tooling in CI, not by reviewers.
 - Public functions in `core` carry type hints and a docstring stating what they do and
   what they raise. Type checking runs in CI.
-- Tests use `pytest` and run against `core` without a terminal. Every acceptance criterion
-  in a spec MUST map to at least one test.
+- Tests use `pytest` and run against `core` without a terminal. Coverage is risk-based:
+  every user-facing behaviour MUST be covered, but the author chooses where — the layer
+  and the number of tests are driven by what could plausibly break, not generated
+  mechanically from the spec's acceptance scenarios. A spec with ten acceptance scenarios
+  for one behaviour does not require ten tests. `contract/` covers the CLI's AI-facing
+  surface (`--json` schema, exit codes, stream separation, non-blocking behaviour);
+  `integration/` covers one end-to-end path per user story, parametrized across CLI and
+  TUI adapters rather than duplicated into separate files; `unit/` covers `core` logic
+  worth isolating (parsing, id generation); `performance/` covers only scenarios with a
+  real budget to protect. A behaviour does not get re-verified at every layer it touches.
 - Prefer a plain function to a class, a class to a framework, and an explicit branch to a
   clever abstraction. Names say what the thing is; comments explain only why.
 - Public API changes — `--json` schemas, exit codes, frontmatter fields, the task line
@@ -204,4 +216,4 @@ in writing is removed rather than merged.
 `REQUIREMENTS.md` holds the current version's scope and acceptance criteria; `AGENTS.md`
 in a workspace holds runtime guidance for AI assistants. Neither overrides this document.
 
-**Version**: 1.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-28
+**Version**: 1.1.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-30
