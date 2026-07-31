@@ -31,12 +31,12 @@
 
 ## Notes
 
-### Two decisions carried forward for confirmation
+### One decision carried forward for confirmation
 
-Neither is left as a `[NEEDS CLARIFICATION]` marker, because the constitution supersedes other
-inputs and therefore supplies the resolution. Both are recorded in Assumptions with the principle
-that drove them, and both are worth an explicit nod before `/speckit-plan`, because each departs
-from the literal text of issue #19:
+It is not left as a `[NEEDS CLARIFICATION]` marker, because the constitution supersedes other inputs
+and therefore supplies the resolution. It is recorded in Assumptions with the principle that drove
+it, and is worth an explicit nod before `/speckit-plan`, because it departs from the literal text of
+issue #19:
 
 1. **`endpaper init` records the assistant from an argument instead of asking.** Issue #19 item 3
    says the user "should be asked" at `init`. Constitution II forbids the command line from
@@ -45,14 +45,23 @@ from the literal text of issue #19:
    wants a genuine question at `init`, it has to live in the terminal interface's own `/init` verb —
    already reserved in the verb table but with no action — and that is a different requirement than
    the one written here.
-2. **Where the assistant setting lives is left to the plan.** Issue #19 says "stored in the toml
-   file". The constitution requires per-user state to live in per-user local state and never in the
-   shared workspace directory, precisely so two people on a synced workspace cannot overwrite each
-   other. FR-029 therefore states the observable requirement — persists, resolves per workspace,
-   does not leak between workspaces — and leaves the file to the plan. Note that endpaper has no
-   per-user state store today, so honouring this creates one; that cost, and the tension with
-   Constitution III ("configuration beyond workspace paths is out of scope"), both belong in the
-   plan's Complexity Tracking table.
+
+### Resolved by the author after the first draft
+
+**Where the assistant setting lives** was initially carried forward as a second open decision. The
+first draft read the constitution's rule — per-user state must never live in the shared workspace
+directory, so two people on a synced folder cannot overwrite each other — as applying here, and
+left the storage location to the plan.
+
+The author confirmed that shared workspaces are not a factor: a workspace is intended for one user,
+and the future shared-workspace design nests each user's workspace one level below a parent
+workspace carrying its own configuration file. A single-user workspace file therefore *is* per-user
+state, the rule is not engaged, and the setting does not have to move when shared workspaces arrive.
+FR-029 now says plainly that the setting is stored in the workspace's own configuration, matching
+issue #19. No new per-user state store is needed.
+
+The remaining tension — Constitution III's "configuration beyond workspace paths is out of scope" —
+is unaffected by this and still belongs in the plan's Complexity Tracking table.
 
 ### Items reviewed and accepted with reasoning
 

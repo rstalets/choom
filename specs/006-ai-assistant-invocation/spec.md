@@ -186,8 +186,8 @@ effect and reported back; verify without invoking any assistant.
   whitespace, or foreign line endings are inserted without corrupting the document's own frontmatter
   or its line-ending convention.
 - **Terminal resize during the wait**: the working indicator and the cancel hint remain legible.
-- **Two workspaces, different assistants**: the setting resolves per workspace context, not
-  globally, so a user working in two workspaces gets the right assistant in each.
+- **Two workspaces, different assistants**: the setting is read from the workspace in scope, not
+  from a global one, so a user working in two workspaces gets the right assistant in each.
 
 ## Requirements *(mandatory)*
 
@@ -266,8 +266,9 @@ effect and reported back; verify without invoking any assistant.
   initialisation. `endpaper init` MUST remain non-blocking and MUST NOT prompt (Constitution II).
 - **FR-028**: An unsupported assistant value MUST be rejected with an error listing the accepted
   values, writing nothing.
-- **FR-029**: The recorded assistant MUST persist across restarts and MUST resolve per workspace
-  context rather than leaking between workspaces.
+- **FR-029**: The recorded assistant MUST be stored in the workspace's own configuration alongside
+  the existing workspace settings, MUST persist across restarts, and MUST NOT leak between
+  workspaces.
 - **FR-030**: A workspace whose configuration contains no assistant setting MUST continue to work
   exactly as before, and reading it MUST NOT be an error.
 
@@ -318,10 +319,10 @@ effect and reported back; verify without invoking any assistant.
 
 ## Assumptions
 
-Defaults chosen where issue #19 did not specify, and the two places where it was reconciled against
+Defaults chosen where issue #19 did not specify, and the one place where it was reconciled against
 the constitution.
 
-**Reconciled with the constitution** — these deviate from the literal text of issue #19 and should
+**Reconciled with the constitution** — this deviates from the literal text of issue #19 and should
 be confirmed before planning:
 
 - **`endpaper init` does not prompt.** Issue #19 item 3 says the user "should be asked" at `init`
@@ -330,17 +331,18 @@ be confirmed before planning:
   interface and a prompt turns an automation into a hang. This spec therefore records the choice via
   an argument to `init` (FR-027) and provides `/config assistant` (FR-025) as the interactive path,
   which together preserve the intent — configure at init, change later — without the prompt.
-- **The setting is scoped per workspace context, not written blindly to the shared workspace file.**
-  Issue #19 says "stored in the toml file". Constitution, *Platform & Distribution Constraints*,
-  states per-user state "MUST live in per-user local state, never in the shared workspace directory,
-  so two people sharing a synced folder cannot overwrite each other's selection" — and which
-  assistant a person runs is exactly that kind of state, since endpaper explicitly supports a
-  OneDrive-synced workspace shared by a team. FR-029 states the observable requirement (persists,
-  resolves per workspace, does not leak) and leaves the storage location to the plan, where the
-  trade-off against Constitution III's "no configuration beyond workspace paths" also has to be
-  justified in the Complexity Tracking table.
 
 **Straightforward defaults**:
+
+- **A workspace belongs to one user**, so the assistant setting lives in that workspace's own
+  configuration file alongside the existing workspace settings, exactly as issue #19 describes. The
+  constitution's rule that per-user state must not go in the shared workspace directory is aimed at
+  two people overwriting each other's choice, which cannot happen while a workspace has a single
+  user. When shared workspaces arrive they will nest each user's workspace one level below a parent
+  workspace with its own configuration file, so the per-user workspace file stays per-user and this
+  setting does not have to move. Adding a setting at all still needs a justification against
+  Constitution III ("configuration beyond workspace paths is out of scope") in the plan's Complexity
+  Tracking table.
 
 - The assistant is invoked once per `/ai`, with no conversation carried between invocations. Session
   continuity is out of scope.
