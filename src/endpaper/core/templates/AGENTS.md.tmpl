@@ -1,7 +1,6 @@
 # endpaper workspace
 
-Plain Markdown files with YAML frontmatter, no database. Every command below is
-non-interactive and produces stable, parseable output.
+Plain Markdown files with YAML frontmatter, no database, non-interactive commands, stable output.
 
 ## Layout
 
@@ -33,11 +32,13 @@ updated: 2026-07-28T09:14:00
 
 ## Tasks
 
-One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment (invisible in
-any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on the next scan:
+One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment; `[ ]` open, `[x]` done.
+An optional body is indented lines beneath the task line, one blank line first:
 
 ```
 - [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->
+
+  Need the Q3 comparison before the renewal meeting.
 ```
 
 ## Commands
@@ -50,14 +51,13 @@ endpaper note new "vendor landscape" --type research --tag procurement
 endpaper note list --json --type daily --since 2026-07-01
 endpaper task add "send the vendor comparison" --type followup --tag procurement
 endpaper task list --json --all --type followup --tag procurement  # --done: completed only
+endpaper task show t_a1b2 [--json]                        # print one task and its body
 endpaper task done t_a1b2                                 # endpaper task undone t_a1b2
 endpaper config assistant [<value>] [--json]              # get/set the /ai assistant
 ```
 
-`--tag` is repeatable and the supported way to attach tags on the command line -- an unquoted
-`#tag` is eaten by the shell first; a `#tag` inside a *quoted* description is parsed out too.
+`--tag` is repeatable; an unquoted `#tag` is eaten by the shell -- use `--tag` or a quoted description.
 
 ## Exit codes
 
-`0` success · `1` not found · `2` usage error · `3` workspace error. Diagnostics go to
-stderr; data goes to stdout; the two are never interleaved.
+`0` success · `1` not found · `2` usage error · `3` workspace error. Data on stdout, errors on stderr, never interleaved.
