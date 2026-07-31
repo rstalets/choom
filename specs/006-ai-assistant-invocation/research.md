@@ -17,21 +17,45 @@ HTTP client.
 or GitHub Copilot CLI installed and authenticated against this workspace. Shelling out to it
 inherits that authentication, that configuration, and that tool's own permissions model for free.
 
-It is also the only option that survives the constitution. Principle III says to prefer the standard
-library and to justify every third-party dependency; `subprocess` is standard library and adds
-nothing to `pyproject.toml`. An SDK would add a package, require endpaper to hold and store an API
-key, and open a network connection — and the Platform constraints say *no operation may require
-network access*. Running a local binary keeps the network dependency entirely inside the tool the
-user chose, where it already was.
+Principle III says to prefer the standard library and to justify every third-party dependency "by
+what it would cost to do without". Here the cost of doing without is one `subprocess.Popen` call
+with `["-p", prompt]`, so the bar is not met by any of the alternatives below.
+
+**"SDK" covers two different things, and they fail for different reasons.** An *API* SDK talks to a
+hosted service; a *CLI* SDK wraps the local binary. Both were considered.
 
 **Alternatives considered**:
 
-- **Anthropic Python SDK / Claude Agent SDK.** Rejected: adds a dependency, needs credentials
-  endpaper has no business storing, works for only one of the two supported assistants, and would
-  make the feature's cost model invisible to the user. It also breaks FR-020 — the two assistants
-  would be reached through entirely different mechanisms.
-- **GitHub Copilot CLI's JSON-RPC SDK.** Rejected for the same asymmetry: it would give Copilot a
-  richer integration than Claude, which is exactly what FR-020 forbids.
+- **Anthropic API SDK.** Rejected: adds a package, requires endpaper to hold and store an API key it
+  has no business holding, and opens its own network connection — against the Platform constraint
+  that no operation may require network access. It also ignores the premise: the user has already
+  installed and authenticated a tool, and this would bypass it and bill them twice over.
+- **GitHub Copilot CLI SDK** (`github/copilot-sdk`). **This one is not an API client** — it spawns
+  the Copilot CLI and talks JSON-RPC to it, managing the process lifecycle. So it needs no API key,
+  opens no separate network path, and would give better structured responses and error handling than
+  parsing stdout. It is rejected on three grounds instead:
+  1. **The Python SDK ships its own runtime.** Installation includes `python -m copilot
+     download-runtime`, and if that step is skipped "the SDK will attempt to download it
+     automatically on first use". A tool that downloads a runtime on first use is the wrong shape
+     for a locked-down corporate machine, and it would run *its* bundled CLI rather than the one the
+     user installed and authenticated — losing the exact property that makes shelling out
+     attractive.
+  2. **It is per-assistant.** Claude Code has no equivalent wrap-the-CLI package in the same shape
+     (the Claude Agent SDK is a different product with a different model), so adopting it would mean
+     one integration path for Copilot and another for Claude — the asymmetry FR-020 exists to
+     prevent. Adding a third assistant would mean adding a third dependency, where the chosen design
+     makes it a row in a table.
+  3. **The payoff is small here.** endpaper needs one string back from one prompt. Session
+     management, streaming, and structured tool events are real advantages for an application built
+     around an agent loop; this feature is a single request whose reply goes straight into a
+     document.
+- **Claude Agent SDK.** Rejected for the mirror-image reason: it is Claude-only, so pairing it with
+  a Copilot integration of any kind reintroduces the same asymmetry.
+
+**What this decision does not claim.** Shelling out is not richer than the CLI SDKs — it is
+narrower on purpose. If a future feature needs multi-turn sessions or streaming partial output into
+the editor, the CLI SDK route deserves a fresh look, and the profile registry's `build_args` seam is
+where that change would land.
 
 ---
 
