@@ -124,9 +124,9 @@ recoverable.
 
 ### User Story 3 - Choose which assistant endpaper calls (Priority: P3)
 
-A user has both Claude Code CLI and GitHub Copilot CLI installed, or has one installed under a name
-endpaper does not recognise, or shares a workspace with a colleague who uses the other one. They
-need to say which assistant is theirs, once, and have it stick.
+A user has both Claude Code CLI and GitHub Copilot CLI installed, or has neither, or wants a
+particular workspace to use the assistant they did not install first. They need to say which
+assistant is theirs, once, and have it stick.
 
 **Why this priority**: Auto-detection covers the common case (US1 works without this story), so this
 is the smaller slice. It becomes necessary only when the choice is ambiguous — but when it is
