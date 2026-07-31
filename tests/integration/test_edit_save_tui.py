@@ -44,7 +44,7 @@ async def test_ctrl_o_writes_and_preserves_cursor_position(tmp_workspace: Worksp
 
         assert isinstance(app.screen, EditScreen)
         assert editor.cursor_location == (2, 3)
-        path = app.screen.file.path
+        path = app.screen.target.display_path
         assert "An appended line." in path.read_text(encoding="utf-8")
 
 
@@ -61,7 +61,7 @@ async def test_ctrl_s_behaves_identically_to_ctrl_o(tmp_workspace: Workspace) ->
         await pilot.pause()
 
         assert isinstance(app.screen, EditScreen)
-        path = app.screen.file.path
+        path = app.screen.target.display_path
         assert "Saved via ctrl+s." in path.read_text(encoding="utf-8")
 
 

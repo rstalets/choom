@@ -33,6 +33,9 @@ def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> 
     task_id = result.stdout.strip()
     assert _run(["task", "list", "--json"], tmp_path).returncode == 0
     assert _run(["task", "list"], tmp_path).returncode == 0
+    assert _run(["task", "show", task_id], tmp_path).returncode == 0
+    assert _run(["task", "show", task_id, "--json"], tmp_path).returncode == 0
+    assert _run(["task", "show", "nope_1234"], tmp_path).returncode == 1
     assert _run(["task", "done", task_id], tmp_path).returncode == 0
     assert _run(["task", "undone", task_id], tmp_path).returncode == 0
     assert _run(["--version"], tmp_path).returncode == 0

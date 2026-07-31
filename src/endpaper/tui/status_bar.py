@@ -11,7 +11,8 @@ LIST_HELP = (
     "enter open   e edit   ctrl+q quit"
 )
 TASK_LIST_HELP = (
-    "tab collection   / filter or command   ↑↓/jk move   h/l pane   space toggle   ctrl+q quit"
+    "tab collection   / filter or command   ↑↓/jk move   h/l pane   e edit   "
+    "space toggle   ctrl+q quit"
 )
 PREVIEW_HELP = "e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
 EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"

@@ -11,6 +11,8 @@ from endpaper.cli.output import (
     print_documents_json,
     print_documents_table,
     print_error,
+    print_task_show,
+    print_task_show_json,
     print_tasks_json,
     print_tasks_table,
     relative_path,
@@ -22,7 +24,7 @@ from endpaper.core.errors import EndpaperError, UsageError, WorkspaceError
 from endpaper.core.meetings import create_meeting, scan_meetings
 from endpaper.core.models import DocumentFilter, TaskFilter
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
-from endpaper.core.tasks import add_task, filter_tasks, load_tasks, set_task_state
+from endpaper.core.tasks import add_task, filter_tasks, get_task, load_tasks, set_task_state
 from endpaper.core.workspace import find_workspace, init_workspace
 
 
@@ -127,6 +129,10 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     task_list_parser.add_argument("--type")
     task_list_parser.add_argument("--tag", action="append", default=[])
+
+    task_show_parser = task_subparsers.add_parser("show", help="print one task and its body")
+    task_show_parser.add_argument("id")
+    task_show_parser.add_argument("--json", action="store_true")
 
     task_done_parser = task_subparsers.add_parser("done", help="mark a task complete")
     task_done_parser.add_argument("id")
@@ -295,6 +301,16 @@ def _cmd_task_list(namespace: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_task_show(namespace: argparse.Namespace) -> int:
+    workspace = find_workspace(Path.cwd())
+    task = get_task(workspace, namespace.id)
+    if namespace.json:
+        print_task_show_json(task)
+    else:
+        print_task_show(task)
+    return 0
+
+
 def _cmd_task_done(namespace: argparse.Namespace) -> int:
     workspace = find_workspace(Path.cwd())
     set_task_state(workspace, namespace.id, done=True)
@@ -354,6 +370,8 @@ def _dispatch(namespace: argparse.Namespace) -> int:
     if namespace.command == "task":
         if namespace.task_command == "add":
             return _cmd_task_add(namespace)
+        if namespace.task_command == "show":
+            return _cmd_task_show(namespace)
         if namespace.task_command == "done":
             return _cmd_task_done(namespace)
         if namespace.task_command == "undone":

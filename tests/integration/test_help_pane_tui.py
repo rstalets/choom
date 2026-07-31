@@ -29,6 +29,14 @@ async def test_help_pane_lists_every_verb_with_a_description(tmp_workspace: Work
             assert verb.description in body
 
 
+async def test_help_pane_names_e_for_a_tasks_details(tmp_workspace: Workspace) -> None:
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await _open_help(pilot)
+        body = str(app.screen.query_one("#help-body").content)  # type: ignore[attr-defined]
+        assert "task's details" in body
+
+
 async def test_help_pane_leaves_the_list_visible_underneath(tmp_workspace: Workspace) -> None:
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
