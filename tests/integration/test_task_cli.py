@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-_ID_PATTERN = re.compile(r"^t_[0-9a-f]{4}$")
+_ID_PATTERN = re.compile(r"^task_[0-9a-f]{4}$")
 
 
 def test_task_add_appends_one_line_with_id_type_tag_and_today(cli) -> None:
@@ -92,17 +92,17 @@ def test_invalid_tag_exits_2(cli) -> None:
 
 
 _SEED = (
-    "- [ ] one <!-- id:t_0001 created:2026-07-20 -->\n"
-    "- [ ] two <!-- id:t_0002 type:followup tags:legal created:2026-07-21 -->\n"
-    "- [x] three <!-- id:t_0003 created:2026-07-22 -->\n"
-    "- [x] four <!-- id:t_0004 created:2026-07-23 -->\n"
-    "- [ ] five <!-- id:t_0005 created:2026-07-19 -->\n"
+    "- [ ] one <!-- id:task_0001 created:2026-07-20 -->\n"
+    "- [ ] two <!-- id:task_0002 type:followup tags:legal created:2026-07-21 -->\n"
+    "- [x] three <!-- id:task_0003 created:2026-07-22 -->\n"
+    "- [x] four <!-- id:task_0004 created:2026-07-23 -->\n"
+    "- [ ] five <!-- id:task_0005 created:2026-07-19 -->\n"
 )
 
 #: Ids whose seeded checkbox is "[x]" -- shared by every case below, since the
 #: seed is fixed. Lets each parametrized case assert the state column/field
 #: without needing its own bespoke expectation.
-_DONE_IDS = {"t_0003", "t_0004"}
+_DONE_IDS = {"task_0003", "task_0004"}
 
 
 def _seed_tasks(cli) -> Path:
@@ -113,28 +113,34 @@ def _seed_tasks(cli) -> Path:
 
 # filter_tasks() (src/endpaper/core/tasks.py) always sorts oldest-first, so every
 # case's expected order is fully determined by the seed's `created` dates, not just
-# by the case's own filter -- t_0005 (07-19), t_0001 (07-20), t_0002 (07-21),
-# t_0003 (07-22), t_0004 (07-23).
+# by the case's own filter -- task_0005 (07-19), task_0001 (07-20), task_0002 (07-21),
+# task_0003 (07-22), task_0004 (07-23).
 _LIST_CASES = [
     pytest.param(
-        ["task", "list"], ["t_0005", "t_0001", "t_0002"], id="default-shows-open-oldest-first"
+        ["task", "list"],
+        ["task_0005", "task_0001", "task_0002"],
+        id="default-shows-open-oldest-first",
     ),
     pytest.param(
         ["task", "list", "--all"],
-        ["t_0005", "t_0001", "t_0002", "t_0003", "t_0004"],
+        ["task_0005", "task_0001", "task_0002", "task_0003", "task_0004"],
         id="all-includes-completed",
     ),
     pytest.param(
         ["task", "list", "--all", "--type", "followup", "--tag", "legal"],
-        ["t_0002"],
+        ["task_0002"],
         id="type-and-tag-are-conjunctive",
     ),
-    pytest.param(["task", "list", "--done"], ["t_0003", "t_0004"], id="done-shows-completed-only"),
     pytest.param(
-        ["task", "list", "--done", "--json"], ["t_0003", "t_0004"], id="done-json-matches-table"
+        ["task", "list", "--done"], ["task_0003", "task_0004"], id="done-shows-completed-only"
     ),
     pytest.param(
-        ["task", "list", "--done", "--all"], ["t_0003", "t_0004"], id="done-wins-over-all"
+        ["task", "list", "--done", "--json"],
+        ["task_0003", "task_0004"],
+        id="done-json-matches-table",
+    ),
+    pytest.param(
+        ["task", "list", "--done", "--all"], ["task_0003", "task_0004"], id="done-wins-over-all"
     ),
 ]
 
@@ -179,13 +185,13 @@ def test_list_checkbox_free_file_lists_nothing(cli) -> None:
 def test_task_done_and_undone_change_the_file(cli) -> None:
     _seed_tasks(cli)
 
-    assert cli("task", "done", "t_0001").exit_code == 0
+    assert cli("task", "done", "task_0001").exit_code == 0
     text = cli.read("tasks.md")
-    assert "- [x] one <!-- id:t_0001 created:2026-07-20 -->\n" in text
+    assert "- [x] one <!-- id:task_0001 created:2026-07-20 -->\n" in text
 
-    assert cli("task", "undone", "t_0003").exit_code == 0
+    assert cli("task", "undone", "task_0003").exit_code == 0
     text = cli.read("tasks.md")
-    assert "- [ ] three <!-- id:t_0003 created:2026-07-22 -->\n" in text
+    assert "- [ ] three <!-- id:task_0003 created:2026-07-22 -->\n" in text
 
 
 def test_noop_toggle_exits_0_without_writing(cli) -> None:
@@ -193,7 +199,7 @@ def test_noop_toggle_exits_0_without_writing(cli) -> None:
     before_mtime = os.stat(tasks_path).st_mtime_ns
     time.sleep(0.01)
 
-    result = cli("task", "undone", "t_0001")
+    result = cli("task", "undone", "task_0001")
     assert result.exit_code == 0
     assert os.stat(tasks_path).st_mtime_ns == before_mtime
 
@@ -202,7 +208,7 @@ def test_unknown_id_exits_1_changes_nothing(cli) -> None:
     tasks_path = _seed_tasks(cli)
     before = tasks_path.read_bytes()
 
-    result = cli("task", "done", "t_zzzz")
+    result = cli("task", "done", "task_zzzz")
     assert result.exit_code == 1
     assert "no task with id" in result.err
     assert tasks_path.read_bytes() == before
@@ -210,10 +216,10 @@ def test_unknown_id_exits_1_changes_nothing(cli) -> None:
 
 def test_duplicated_id_exits_2_naming_both_lines(cli) -> None:
     (cli.root / "tasks.md").write_text(
-        "- [ ] first <!-- id:t_dupe -->\n- [ ] second <!-- id:t_dupe -->\n",
+        "- [ ] first <!-- id:task_dupe -->\n- [ ] second <!-- id:task_dupe -->\n",
         encoding="utf-8",
     )
 
-    result = cli("task", "done", "t_dupe")
+    result = cli("task", "done", "task_dupe")
     assert result.exit_code == 2
     assert "lines 1 and 2" in result.err

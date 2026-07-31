@@ -15,7 +15,7 @@ def _normalize(text: str) -> str:
 def _make_document(newline: str, *, trailing: bool) -> str:
     lines = [
         "---",
-        "id: m_1",
+        "id: meeting_1",
         'title: "line ending test"',
         "created: 2026-01-01T09:00:00",
         "updated: 2026-01-01T09:00:00",
@@ -74,7 +74,7 @@ def test_lf_without_trailing_newline_round_trips(tmp_path: Path) -> None:
 def test_mixed_endings_normalise_to_first_seen_convention(tmp_path: Path) -> None:
     path = tmp_path / "doc.md"
     # First line ending is CRLF; a later one is bare LF.
-    raw = "---\r\nid: m_1\nupdated: 2026-01-01T09:00:00\r\n---\r\n"
+    raw = "---\r\nid: meeting_1\nupdated: 2026-01-01T09:00:00\r\n---\r\n"
     path.write_bytes(raw.encode("utf-8"))
 
     file = load_for_edit(path)

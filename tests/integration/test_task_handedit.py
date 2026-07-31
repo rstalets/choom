@@ -84,7 +84,7 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(
 def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
     tmp_workspace: Workspace,
 ) -> None:
-    original = "- [ ] existing <!-- id:t_aaaa -->"
+    original = "- [ ] existing <!-- id:task_aaaa -->"
     write_raw(tasks_file(tmp_workspace), original, newline="\n")
 
     add_task(tmp_workspace, "new task")
@@ -120,7 +120,7 @@ def test_users_own_comment_is_bare_and_gains_metadata_comment_after_it(
 def test_read_only_file_degrades_gracefully(cli) -> None:
     tasks_path = cli.root / "tasks.md"
     tasks_path.write_text(
-        "- [ ] bare task\n- [ ] typed task <!-- id:t_fixed -->\n",
+        "- [ ] bare task\n- [ ] typed task <!-- id:task_fixed -->\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -139,7 +139,7 @@ def test_read_only_file_degrades_gracefully(cli) -> None:
         assert bare["id"] is None
         assert result.err != ""
 
-        result = cli("task", "done", "t_fixed")
+        result = cli("task", "done", "task_fixed")
         assert result.exit_code == 3
     finally:
         os.chmod(tasks_path.parent, tasks_dir_mode)

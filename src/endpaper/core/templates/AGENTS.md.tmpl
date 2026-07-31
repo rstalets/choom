@@ -20,7 +20,7 @@ Every file in `meetings/` and `notes/` starts with exactly these six keys:
 
 ```yaml
 ---
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: "standup"
 title: "Q3 planning"
 tags: ["platform"]
@@ -29,7 +29,7 @@ updated: 2026-07-28T09:14:00
 ---
 ```
 
-`id` is prefixed `m_` for meetings, `n_` for notes. `type` is `""` when untyped; `tags` is `[]`.
+`id` is prefixed `meeting_` for meetings, `note_` for notes. `type` is `""` when untyped; `tags` is `[]`.
 
 ## Tasks
 
@@ -37,7 +37,7 @@ One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment (i
 any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on the next scan:
 
 ```
-- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->
+- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup tags:procurement created:2026-07-28 -->
 ```
 
 ## Commands
@@ -50,7 +50,7 @@ endpaper note new "vendor landscape" --type research --tag procurement
 endpaper note list --json --type daily --since 2026-07-01
 endpaper task add "send the vendor comparison" --type followup --tag procurement
 endpaper task list --json --all --type followup --tag procurement  # --done: completed only
-endpaper task done t_a1b2                                 # endpaper task undone t_a1b2
+endpaper task done task_a1b2                              # endpaper task undone task_a1b2
 endpaper config assistant [<value>] [--json]              # get/set the /ai assistant
 ```
 

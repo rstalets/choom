@@ -9,11 +9,11 @@ def test_note_list_never_returns_a_meeting_and_vice_versa(cli) -> None:
 
     notes = json.loads(cli("note", "list", "--json").out)
     assert len(notes) == 1
-    assert notes[0]["id"].startswith("n_")
+    assert notes[0]["id"].startswith("note_")
 
     meetings = json.loads(cli("meeting", "list", "--json").out)
     assert len(meetings) == 1
-    assert meetings[0]["id"].startswith("m_")
+    assert meetings[0]["id"].startswith("meeting_")
 
 
 def test_non_markdown_files_under_notes_are_ignored(cli) -> None:
@@ -36,7 +36,7 @@ def test_notes_subtree_is_scanned_recursively_including_arbitrary_subdirectories
     nested_dir = cli.root / "notes" / "archive"
     nested_dir.mkdir()
     (nested_dir / "2020-01-01-old.md").write_text(
-        '---\nid: n_20200101_deadbeef\ntype: ""\ntitle: "old"\ntags: []\n'
+        '---\nid: note_20200101_deadbeef\ntype: ""\ntitle: "old"\ntags: []\n'
         "created: 2020-01-01T09:00:00\nupdated: 2020-01-01T09:00:00\n---\n",
         encoding="utf-8",
     )

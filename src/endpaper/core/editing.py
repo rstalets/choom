@@ -6,7 +6,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from endpaper.core.models import EditableFile, SaveResult
+from endpaper.core.models import EditableFile, SaveResult, ScanWarning, Workspace
 
 _UPDATED_LINE = re.compile(r"^updated:.*$", re.MULTILINE)
 
@@ -72,14 +72,26 @@ def save_buffer(
     file: EditableFile,
     *,
     now: datetime | None = None,
+    workspace: Workspace | None = None,
 ) -> SaveResult:
     """Stamp `updated`, restore `file`'s line endings and trailing newline, and write
     atomically to `path` via a same-directory temp file and os.replace.
+
+    When `workspace` is given, stale links in the body are healed before `updated`
+    is stamped, and any dead link found is reported in `SaveResult.warnings`
+    (never fatal -- a dead link never sets `ok=False`). When `workspace` is None,
+    behaviour is exactly as before this parameter existed.
 
     Never raises on a write failure -- returns SaveResult(ok=False) with a
     user-facing message, leaving the target byte-identical.
     """
     assert path == file.path
+
+    warnings: tuple[ScanWarning, ...] = ()
+    if workspace is not None:
+        from endpaper.core.links import heal_text
+
+        text, _reports, warnings = heal_text(workspace, text, source=path)
 
     when = now or datetime.now()
     timestamp = when.replace(microsecond=0).isoformat()
@@ -98,4 +110,6 @@ def save_buffer(
         if tmp_path is not None and tmp_path.exists():
             tmp_path.unlink()
         return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
-    return SaveResult(ok=True, saved_text=stamped_text, stamped=stamped, message="")
+    return SaveResult(
+        ok=True, saved_text=stamped_text, stamped=stamped, message="", warnings=warnings
+    )

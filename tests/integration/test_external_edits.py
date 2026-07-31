@@ -18,7 +18,7 @@ def _rewrite_externally(path: Path) -> None:
     externally_written = (
         "---\r\n"
         "title: 'Q3 planning'\r\n"
-        "id: m_20260101_aaaa\r\n"
+        "id: meeting_20260101_aaaa\r\n"
         "type: standup\r\n"
         "tags: []\r\n"
         "created: 2026-01-01T09:00:00\r\n"
@@ -73,6 +73,6 @@ async def test_externally_modified_document_opens_edits_and_saves_indistinguisha
     after_text = after_bytes.decode("utf-8")
     assert "\r\n" in after_text
     assert "title: 'Q3 planning'" in after_text
-    assert "id: m_20260101_aaaa" in after_text
+    assert "id: meeting_20260101_aaaa" in after_text
     assert "created: 2026-01-01T09:00:00" in after_text
     assert "Body written by another program, edited." in after_text

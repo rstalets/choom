@@ -13,7 +13,7 @@ def _block(body: str) -> str:
 def test_yaml11_booleans_stay_strings() -> None:
     data = read_frontmatter(
         """
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: standup
 title: "Q3 planning"
 tags: [no, on, off, y]
@@ -27,7 +27,7 @@ updated: 2026-07-28T09:14:00
 def test_bare_timestamp_stays_a_string() -> None:
     data = read_frontmatter(
         """
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: standup
 title: "Q3 planning"
 tags: []
@@ -42,7 +42,7 @@ updated: 2026-07-28T09:14:00
 def test_float_looking_title_stays_a_string() -> None:
     data = read_frontmatter(
         """
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: standup
 title: 3.10
 tags: []
@@ -55,7 +55,7 @@ updated: 2026-07-28T09:14:00
 
 def test_emitter_is_deterministic() -> None:
     meeting = Meeting(
-        id="m_20260728_a1b2c3d4",
+        id="meeting_20260728_a1b2c3d4",
         path=Path("meetings/2026-07-28-standup-q3-planning.md"),
         title="Q3 planning",
         type="standup",
@@ -68,7 +68,7 @@ def test_emitter_is_deterministic() -> None:
     assert first == second
     assert first == (
         "---\n"
-        "id: m_20260728_a1b2c3d4\n"
+        "id: meeting_20260728_a1b2c3d4\n"
         'type: "standup"\n'
         'title: "Q3 planning"\n'
         'tags: ["platform"]\n'
@@ -82,7 +82,7 @@ def test_emitter_is_deterministic() -> None:
 def test_long_title_round_trips_with_no_wrapping() -> None:
     long_title = "A" * 200
     meeting = Meeting(
-        id="m_20260728_a1b2c3d4",
+        id="meeting_20260728_a1b2c3d4",
         path=Path("meetings/2026-07-28-standup-long.md"),
         title=long_title,
         type="",

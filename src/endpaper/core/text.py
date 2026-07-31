@@ -38,11 +38,11 @@ def new_document_id(when: date, prefix: str) -> str:
 
 
 def new_meeting_id(when: date) -> str:
-    return new_document_id(when, "m_")
+    return new_document_id(when, "meeting_")
 
 
 def new_task_id(taken: Container[str]) -> str:
     while True:
-        candidate = f"t_{secrets.token_hex(2)}"
+        candidate = f"task_{secrets.token_hex(2)}"
         if candidate not in taken:
             return candidate

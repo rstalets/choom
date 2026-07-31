@@ -53,7 +53,7 @@ def test_note_list_json_has_exactly_the_same_seven_keys(
     assert len(records) == 1
     record = records[0]
     assert set(record.keys()) == EXPECTED_KEYS
-    assert record["id"].startswith("n_")
+    assert record["id"].startswith("note_")
     assert "/" in record["path"]
     assert "\\" not in record["path"]
 

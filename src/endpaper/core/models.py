@@ -84,6 +84,8 @@ ScanWarningReason = Literal[
     "task_unterminated_comment",
     "task_malformed_comment",
     "task_invalid_value",
+    "link_dead",
+    "link_ambiguous",
 ]
 
 
@@ -118,6 +120,7 @@ class SaveResult:
     saved_text: str
     stamped: bool
     message: str
+    warnings: tuple[ScanWarning, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +139,7 @@ class Task:
     tags: tuple[str, ...]
     created: date | None
     line: int
+    links: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,6 +156,55 @@ class TaskFilter:
     tags: tuple[str, ...] = ()
     include_done: bool = False
     only_done: bool = False
+
+
+LinkStatus = Literal["resolved", "stale", "dead"]
+LinkDirection = Literal["out", "in", "both"]
+
+
+@dataclass(frozen=True, slots=True)
+class Link:
+    """One directed reference, as found in a source file. `start`/`end` are character
+    offsets into the text it was found in, so a repair can splice a new destination
+    into the original string and change nothing else. At least one of `path` and
+    `target_id` is not None -- a `[text]()` with an empty destination is not a link
+    and is never collected."""
+
+    source: Path
+    line: int
+    text: str
+    path: str | None
+    target_id: str | None
+    start: int
+    end: int
+    in_tasks_field: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class LinkReport:
+    """What `links check` and `links heal` emit for one link. Field names are the
+    fixed JSON keys of the CLI contract."""
+
+    file: Path
+    line: int
+    text: str
+    target_id: str | None
+    old_path: str | None
+    new_path: str | None
+    status: LinkStatus
+
+
+@dataclass(frozen=True, slots=True)
+class LinkTarget:
+    """The resolved other end of a link. A link can point at a document or at a
+    task, and the two live in different places, so resolution returns this small
+    union rather than a Document."""
+
+    id: str
+    path: Path
+    title: str
+    kind: Literal["meeting", "note", "task"]
+    line: int | None
 
 
 @dataclass(frozen=True, slots=True)

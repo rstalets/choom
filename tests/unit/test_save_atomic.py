@@ -12,7 +12,7 @@ def test_failed_replace_leaves_target_untouched_and_no_temp_left(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     path = tmp_path / "doc.md"
-    original = "---\nid: m_1\nupdated: 2026-01-01T09:00:00\n---\nbody\n"
+    original = "---\nid: meeting_1\nupdated: 2026-01-01T09:00:00\n---\nbody\n"
     path.write_text(original, encoding="utf-8")
     original_bytes = path.read_bytes()
 

@@ -137,7 +137,7 @@ CLI:  endpaper task add <description> --type <type> --tag <tag>
 
 - Tasks are standalone in v0.0.1 — not attached to a meeting or note.
 - Stored as markdown checkboxes in a single file, `tasks.md`, one per line:
-  `- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->`
+  `- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup tags:procurement created:2026-07-28 -->`
 - The HTML comment carries metadata without breaking rendering in any markdown viewer.
 - **The parser must tolerate hand-editing of `tasks.md`.** Users will edit this file directly, in endpaper and elsewhere. Therefore:
   - A checkbox line with no id comment is valid. On scan, generate an id and write it back.
@@ -160,7 +160,7 @@ CLI:  endpaper task list [--json] [--all] [--tag] [--type]
 **Acceptance criteria**
 
 1. `space` on a task in the TUI changes `- [ ]` to `- [x]` in `tasks.md` within one second, preserving the id comment.
-2. `endpaper task done t_a1b2` produces the identical file change.
+2. `endpaper task done task_a1b2` produces the identical file change.
 3. `tasks.md` remains valid CommonMark and renders as a checklist in any markdown viewer.
 4. The task parser reads checkboxes by scanning markdown, not by reading a database — so that v0.1 can extend it to any file without a migration.
 5. A hand-written line `- [ ] buy milk` with no id comment is picked up on the next scan and given an id, in place, without disturbing surrounding lines.
@@ -304,7 +304,7 @@ Frontmatter — exactly these fields, no more:
 
 ```yaml
 ---
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: standup
 title: Q3 planning
 tags: [platform]

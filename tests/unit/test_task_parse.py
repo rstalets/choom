@@ -64,7 +64,7 @@ def test_comment_without_recognized_keys_is_bare() -> None:
 
 
 def test_malformed_unknown_token_is_skipped() -> None:
-    text = "- [ ] thing <!-- id:t_a1b2 bogus -->\n"
+    text = "- [ ] thing <!-- id:task_a1b2 bogus -->\n"
     parsed = parse_tasks(text)
     assert parsed.tasks == ()
     assert len(parsed.warnings) == 1
@@ -73,11 +73,11 @@ def test_malformed_unknown_token_is_skipped() -> None:
 
 
 def test_well_formed_with_bad_created_is_kept_with_warning() -> None:
-    text = "- [ ] thing <!-- id:t_a1b2 created:yesterday -->\n"
+    text = "- [ ] thing <!-- id:task_a1b2 created:yesterday -->\n"
     parsed = parse_tasks(text)
     assert len(parsed.tasks) == 1
     task = parsed.tasks[0]
-    assert task.id == "t_a1b2"
+    assert task.id == "task_a1b2"
     assert task.created is None
     assert len(parsed.warnings) == 1
     assert parsed.warnings[0].reason == "task_invalid_value"
@@ -86,12 +86,12 @@ def test_well_formed_with_bad_created_is_kept_with_warning() -> None:
 def test_well_formed_task() -> None:
     text = (
         "- [ ] send the vendor comparison "
-        "<!-- id:t_a1b2 type:followup tags:procurement,q3 created:2026-07-28 -->\n"
+        "<!-- id:task_a1b2 type:followup tags:procurement,q3 created:2026-07-28 -->\n"
     )
     parsed = parse_tasks(text)
     assert len(parsed.tasks) == 1
     task = parsed.tasks[0]
-    assert task.id == "t_a1b2"
+    assert task.id == "task_a1b2"
     assert task.text == "send the vendor comparison"
     assert task.type == "followup"
     assert task.tags == ("procurement", "q3")

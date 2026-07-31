@@ -137,7 +137,8 @@ class EditScreen(Screen[None]):
 
     def _save(self) -> bool:
         editor = self.query_one("#editor", TextArea)
-        result = save_buffer(self.file.path, editor.text, self.file)
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        result = save_buffer(self.file.path, editor.text, self.file, workspace=workspace)
         if not result.ok:
             self._render_status(result.message)
             return False
@@ -157,6 +158,8 @@ class EditScreen(Screen[None]):
         self.app.refresh_document(self.file.path)  # type: ignore[attr-defined]
         if not result.stamped:
             self._render_status("frontmatter's updated: field could not be found; saved as typed")
+        elif result.warnings:
+            self._render_status("; ".join(w.message for w in result.warnings))
         else:
             self._render_status(None)
         return True

@@ -57,7 +57,7 @@ def test_one_in_ten_malformed_task_lines_still_lists_all_well_formed(
         if i % 10 == 0:
             lines.append(f"- [ ] broken {i} <!-- id:\n")
         else:
-            lines.append(f"- [ ] task {i} <!-- id:t_{i:04x} -->\n")
+            lines.append(f"- [ ] task {i} <!-- id:task_{i:04x} -->\n")
             well_formed_count += 1
     tmp_workspace.tasks_file.write_text("".join(lines), encoding="utf-8", newline="\n")
 
