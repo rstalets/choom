@@ -117,8 +117,8 @@ The states the editor moves through, and the requirement each transition serves.
                     (FR-016, FR-023, FR-024)   in flight                         │
                                     ┌───────────────┴───────────────┐            │
                                     │ line shows `⋯`                │            │
-                                    │ status: `⋯ working — ctrl+c   │            │
-                                    │          to cancel`  (FR-011) │            │
+                                    │ status: `<breadcrumb>… —      │            │
+                                    │  ctrl+c to cancel`   (FR-011) │            │
                                     │ TextArea.read_only  (FR-012)  │            │
                                     └───────────────┬───────────────┘            │
                     ┌───────────────┬───────────────┼───────────────┐            │
@@ -142,7 +142,7 @@ never a lost line (FR-017, SC-003).
 | Aspect | Behaviour | Requirement |
 |---|---|---|
 | Command line | Replaced by `⋯` in the buffer only; never saved | FR-011 |
-| Status bar | `⋯ working — ctrl+c to cancel`, for the whole wait | FR-011, Principle V |
+| Status bar | `<breadcrumb>… — ctrl+c to cancel`, for the whole wait. See below | FR-011, Principle V |
 | Editing | `TextArea.read_only = True`; keystrokes do not alter the buffer | FR-012 |
 | `ctrl+c` | Cancels; returns control immediately | FR-013, SC-002 |
 | Other keys | No effect on the buffer | FR-012 |
@@ -151,6 +151,72 @@ never a lost line (FR-017, SC-003).
 
 Leaving the editor while a request is in flight is not possible: `escape`, `ctrl+o`, and `ctrl+x`
 are inert until control returns. Cancel first, which is one keystroke and always available.
+
+### Breadcrumbs
+
+The status bar shows a randomly chosen phrase while the assistant works. endpaper's user is taking
+notes *in the meetings these phrases come from*, so the joke is drawn from the room they are sitting
+in.
+
+`BREADCRUMBS` lives in `src/endpaper/tui/status_bar.py`, alongside the existing `EDIT_HELP` and
+`LIST_HELP` — it is display text, which Principle I keeps out of `core`.
+
+```python
+BREADCRUMBS: tuple[str, ...] = (
+    "Circling back",
+    "Double-clicking",
+    "Taking it offline",
+    "Leveraging synergies",
+    "Boiling the ocean",
+    "Peeling the onion",
+    "Running it up the flagpole",
+    "Socialising the doc",
+    "Moving the needle",
+    "Unpacking that",
+    "Actioning",
+    "Aligning stakeholders",
+    "Workshopping",
+    "Whiteboarding",
+    "Ideating",
+    "Operationalising",
+    "Sharpening the pencil",
+    "Putting a pin in it",
+    "Closing the loop",
+    "Touching base",
+    "Gut-checking",
+    "Blue-skying",
+    "Right-sizing",
+    "Sunsetting",
+    "Herding cats",
+)
+```
+
+**One pick per request**, chosen when the request starts and held until control returns. No timer,
+no cycling — which is what keeps [research.md](./research.md) R7's no-animation decision intact.
+A phrase that changed every two seconds would also read as progress, and there is no progress to
+report: the assistant either returns or it does not.
+
+**"Taking it offline" is accidentally accurate.** endpaper requires no network and no server, so the
+most-mocked phrase in the list is a literal description of what the tool is doing.
+
+### Width
+
+Two tiers. The cancel affordance is what Principle V requires to stay visible, so it is never the
+part that yields:
+
+| Available width | Status bar |
+|---|---|
+| Fits | `Leveraging synergies… — ctrl+c to cancel` |
+| Too narrow | `⋯ — ctrl+c to cancel` |
+
+The breadcrumb is dropped whole rather than truncated — `Running it up the fla…` reads as a bug, not
+as a joke. `Running it up the flagpole` is the longest entry at 26 characters, so the fallback
+triggers below roughly 47 columns; feature 005's narrow-terminal test already establishes the shape
+for this kind of degradation.
+
+**Testing**: assert the rendered text's phrase is a member of `BREADCRUMBS`, never a literal string,
+and assert the tight-width form separately. Do not reseed the global RNG in a test — import the
+tuple and check membership.
 
 ---
 

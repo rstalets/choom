@@ -62,7 +62,10 @@ for real rather than mocked.
 
 - The document is saved before anything else happens (mtime changes; the file on disk contains the
   `/ai` line).
-- The command line is replaced by `⋯`; the status bar reads `⋯ working — ctrl+c to cancel`.
+- The command line is replaced by `⋯`; the status bar reads a breadcrumb plus the cancel hint, e.g.
+  `Boiling the ocean… — ctrl+c to cancel`, and the phrase does not change during the wait.
+- Resize the terminal narrow mid-request: the breadcrumb disappears whole and the status bar reads
+  `⋯ — ctrl+c to cancel`. The cancel hint never truncates.
 - Typing does nothing while the request is in flight.
 - The reply lands where the command was, every line in order, surrounding lines untouched.
 - The buffer is dirty; `ctrl+o` saves normally.

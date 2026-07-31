@@ -181,8 +181,9 @@ binding's focus context with it.
 
 ## R7 — The working indicator
 
-**Decision**: The document line shows a static `⋯`; the status bar carries `⋯ working — ctrl+c to
-cancel`. No animation, no timer.
+**Decision**: The document line shows a static `⋯`; the status bar carries a randomly chosen
+corporate-jargon breadcrumb — `Leveraging synergies… — ctrl+c to cancel`. One pick per request. No
+animation, no timer.
 
 **Rationale**: Issue #19 asks for "a working icon such as three dots or a spinning wheel, plus
 'ctrl+c to cancel'" — three dots is one of the two options it names, and it is the one that needs no
@@ -190,6 +191,22 @@ timer. An animated spinner in the document would mean rewriting a document line 
 second, which churns `TextArea`'s undo checkpoints for no user benefit. Putting the motion-free
 placeholder in the document satisfies FR-011's "replaced in place", and the status bar carries the
 cancel affordance for the whole wait, satisfying both FR-011 and Principle V's footer rule.
+
+**Why the breadcrumb costs nothing.** Choosing one phrase when the request starts and holding it
+until control returns needs no timer, so the no-animation decision survives intact. Cycling phrases
+would need a `set_interval` — harmless on the status bar, unlike the document line — but it would
+also *imply progress*, and there is none to imply: the assistant either returns or it does not. A
+phrase that changes every two seconds while nothing has actually advanced is a progress bar that
+lies.
+
+The register is deliberate. endpaper's user is, per the Platform constraints, a corporate employee
+on a managed machine, frequently screen-sharing — so the whimsy is drawn from meeting jargon rather
+than from developer in-jokes. It is the vocabulary of the meetings they are taking notes in, which
+makes it land for this audience specifically and stay safe on a shared screen.
+
+The full list, the width fallback, and the testing rule live in
+[contracts/editor-commands.md](./contracts/editor-commands.md) so there is one place to edit when a
+phrase stops being funny.
 
 **Crash safety**: the indicator exists only in the buffer and is never saved. The pre-invocation
 save (FR-008) writes the document *including* the `/ai <prompt>` line, so a crash mid-request leaves
