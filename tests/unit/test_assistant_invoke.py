@@ -75,3 +75,29 @@ def test_reply_mode_returns_the_fixed_multiline_text(
 
     assert reply.ok is True
     assert reply.text == "line one\nline two\nline three"
+
+
+def test_claude_build_args_grants_read_only_permission() -> None:
+    args = _CLAUDE.build_args("a prompt")
+    assert args == ["-p", "a prompt", "--allowedTools", "Read"]
+
+
+def test_copilot_build_args_grants_read_only_permission() -> None:
+    copilot = next(p for p in PROFILES if p.name == "copilot")
+    args = copilot.build_args("a prompt")
+    assert args == ["-p", "a prompt", "--allow-tool", "read"]
+
+
+def test_echo_mode_shows_the_permission_flag_reached_argv(
+    tmp_path: Path, stub_assistant: Callable[[str], None]
+) -> None:
+    # Without --allowedTools "Read", a real Claude Code CLI in -p mode silently
+    # denies the file read compose_prompt asks it to do (research R13) -- this
+    # locks the flag into the actual argv, not just the pure build_args() return.
+    stub_assistant("echo")
+    request = start_request(_CLAUDE, "a prompt", cwd=tmp_path)
+    reply = request.wait()
+
+    assert reply.ok is True
+    assert "--allowedTools" in reply.text
+    assert "Read" in reply.text

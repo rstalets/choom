@@ -15,15 +15,23 @@ The two assistants FR-019 requires, and nothing else:
 
 | `name` | `display_name` | `binary` | Arguments |
 |---|---|---|---|
-| `claude` | Claude Code CLI | `claude` | `["-p", <prompt>]` |
-| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", <prompt>]` |
+| `claude` | Claude Code CLI | `claude` | `["-p", <prompt>, "--allowedTools", "Read"]` |
+| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", <prompt>, "--allow-tool", "read"]` |
 
 Both assistants document `-p` as their non-interactive mode, printing the reply to stdout and
 exiting non-zero on failure ([research.md](./research.md) R2). That they agree on the shape is
 what makes the registry three columns instead of a capability matrix.
 
-`build_args` is a per-profile callable defaulting to `["-p", prompt]`. It exists so an assistant
-with a different shape can be added without touching invocation, error handling, or the editor.
+Each also gets a read-only tool-permission flag, in its own syntax ([research.md](./research.md)
+R13). Neither CLI auto-approves tool calls — including a plain file read — in non-interactive `-p`
+mode by default; without this flag the assistant's attempt to read the document that
+`compose_prompt` points it at (FR-009) is silently denied, since there is no TTY to approve it.
+Granting only `Read` also enforces FR-018 ("do not edit any file") at the permission level, not
+just as an instruction the model could ignore.
+
+`build_args` is a per-profile callable. It exists so an assistant with a different shape — a
+different flag name, no permission model at all, or an entirely different argument order — can be
+added without touching invocation, error handling, or the editor.
 
 `none` is not in this table — it is a legal *setting* value meaning "resolve nothing", handled in
 [config.md](./config.md).

@@ -29,8 +29,18 @@ do not see it anywhere first.
   overwrites the file on the next save, so any edit you make is discarded."""
 
 
-def _default_build_args(prompt: str) -> list[str]:
-    return ["-p", prompt]
+def _claude_build_args(prompt: str) -> list[str]:
+    # Read-only: the composed prompt tells the assistant to read the saved document to
+    # resolve positional references (FR-009), which the CLI's default permission mode
+    # would otherwise silently deny -- there's no TTY in `-p` mode to approve it. Nothing
+    # beyond Read is granted, reinforcing FR-018 ("do not edit any file") at the
+    # permission level rather than leaving it to the instructions alone.
+    return ["-p", prompt, "--allowedTools", "Read"]
+
+
+def _copilot_build_args(prompt: str) -> list[str]:
+    # Same reasoning as _claude_build_args, in Copilot CLI's flag shape.
+    return ["-p", prompt, "--allow-tool", "read"]
 
 
 PROFILES: tuple[AssistantProfile, ...] = (
@@ -38,13 +48,13 @@ PROFILES: tuple[AssistantProfile, ...] = (
         name="claude",
         display_name="Claude Code CLI",
         binary="claude",
-        build_args=_default_build_args,
+        build_args=_claude_build_args,
     ),
     AssistantProfile(
         name="copilot",
         display_name="GitHub Copilot CLI",
         binary="copilot",
-        build_args=_default_build_args,
+        build_args=_copilot_build_args,
     ),
 )
 

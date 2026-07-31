@@ -61,16 +61,18 @@ supporting a new assistant (FR-020).
 | `name` | `str` | The value the user configures: `claude`, `copilot`. |
 | `display_name` | `str` | For messages, e.g. `Claude Code CLI`. |
 | `binary` | `str` | Looked up with `shutil.which`; resolves `.cmd`/`.exe` on Windows via `PATHEXT`. |
-| `build_args` | `Callable[[str], list[str]]` | Prompt → argument list, excluding the binary. Defaults to `["-p", prompt]`. |
+| `build_args` | `Callable[[str], list[str]]` | Prompt → argument list, excluding the binary. |
 
 **Registry**:
 
 | `name` | `display_name` | `binary` | `build_args(prompt)` |
 |---|---|---|---|
-| `claude` | Claude Code CLI | `claude` | `["-p", prompt]` |
-| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", prompt]` |
+| `claude` | Claude Code CLI | `claude` | `["-p", prompt, "--allowedTools", "Read"]` |
+| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", prompt, "--allow-tool", "read"]` |
 
-Both use the default builder — see [research.md](./research.md) R2. `build_args` exists so a future
+Both add a read-only permission flag, in each CLI's own shape — see [research.md](./research.md)
+R2 and R13. Neither grants `Bash`/`Edit`/write: FR-018 ("do not edit any file") is enforced at the
+permission level, not left to the prompt's instructions alone. `build_args` exists so a future
 assistant with a different shape needs no change anywhere else.
 
 `none` is **not** a profile. It is a legal value of the setting meaning "do not resolve one"

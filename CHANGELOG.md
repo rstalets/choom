@@ -24,6 +24,11 @@ choose. A workspace with neither assistant installed keeps every other feature u
 `assistants.py` is the only module that imports `subprocess` for this feature, and nothing else
 in `core` depends on it.
 
+Each assistant is invoked with a read-only permission flag (`--allowedTools "Read"` for Claude
+Code CLI, `--allow-tool "read"` for Copilot CLI) so it can actually read the document
+`compose_prompt` points it at — neither CLI auto-approves tool calls, including a plain file
+read, in non-interactive `-p` mode by default. Nothing beyond `Read` is granted.
+
 **New configuration surface**
 
 - `endpaper config assistant [<value>] [--json]` — get or set which assistant `/ai` calls.

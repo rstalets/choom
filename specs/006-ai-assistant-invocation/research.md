@@ -320,3 +320,31 @@ Layer assignment (Principle VI — a behaviour is not re-verified at every layer
 | Cancel returns control and restores the prompt line | `integration/` |
 | Assistant fails / returns nothing → message shown, document intact | `integration/` |
 | `endpaper config assistant` exit codes, `--json` shape, non-blocking | `contract/` |
+
+---
+
+## R13 — Granting the assistant permission to read the document
+
+**Decision**: Each profile's `build_args` adds a read-only tool-permission flag —
+`--allowedTools "Read"` for Claude Code CLI, `--allow-tool "read"` for GitHub Copilot CLI — on top
+of the shared `["-p", prompt]` shape.
+
+**Rationale**: `compose_prompt` (R8) deliberately passes a file path and a line number rather than
+the document's contents, so that positional requests ("the paragraph above") are answered by the
+assistant reading the file itself. Both CLIs' own documentation is explicit that this does not work
+for free: `-p`/print mode does not auto-approve tool calls, including a plain file read, because the
+approval prompt that would normally ask the user has no TTY to appear on. Claude Code's headless
+docs give exactly this shape as the fix (`--allowedTools "Bash,Read,Edit"`); Copilot CLI's
+equivalent is `--allow-tool "read"`. Without the flag, the assistant's read attempt is silently
+denied and R8's whole design — small invocation, no duplicated document contents, assistant decides
+how much to read — quietly stops working while `/ai` still appears to run normally.
+
+**Read only, nothing else.** Granting `Bash`, `Edit`, or a write-capable tool was not considered:
+FR-018 already instructs the assistant not to edit any file, and enforcing that at the permission
+level — rather than trusting the model to follow the instruction — costs nothing extra here, since
+the two flags are string literals in the profile registry, not a new argument or a new failure mode.
+
+**Alternatives considered**: Embedding the document text in the prompt instead of a path, removing
+the need for the assistant to read anything. Rejected for the same reasons R8 already rejected it —
+unbounded prompt size, and a second copy of the user's notes traveling through a process argument
+list.
