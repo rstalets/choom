@@ -64,3 +64,30 @@ def test_notes_month_scope_also_reads_only_the_current_month(
     assert warnings == []
     assert len(documents) == 5
     assert all(p.parent == expected_dir for p in read_paths)
+
+
+def test_filter_reads_each_month_at_most_once_per_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """FR-035: once a filter has loaded every month into the session cache, a
+    second, different filter term must not re-read any file (research R7)."""
+    from endpaper.tui.app import EndpaperApp
+
+    now = datetime.now()
+    workspace = generate(tmp_path, 60, spread_months=6, now=now, current_month_count=5)
+
+    app = EndpaperApp(workspace)
+    app.active = "meetings"
+
+    with _counting_read_text(monkeypatch) as read_paths:
+        app.set_filter("generated")
+        first_matches = app.visible_documents()
+        reads_after_first_filter = len(read_paths)
+
+        app.set_filter("meeting 1")
+        app.visible_documents()
+        reads_after_second_filter = len(read_paths)
+
+    assert first_matches
+    assert reads_after_first_filter > 0
+    assert reads_after_second_filter == reads_after_first_filter

@@ -30,6 +30,10 @@ class StatusBar(Static):
     bottom-right (FR-042). Right-alignment is computed against the widget's own
     width so it holds regardless of how long the left-hand text is."""
 
+    def __init__(self, content: str = "", **kwargs: object) -> None:
+        super().__init__(**kwargs)  # type: ignore[arg-type]
+        self.update(content)
+
     def update(self, content: str = "", *, layout: bool = True) -> None:  # type: ignore[override]
         text = str(content)
         version = render_version()

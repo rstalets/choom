@@ -211,23 +211,23 @@ unrecognised verb and confirm an error rather than a filtered list.
 
 ### Tests for User Story 5
 
-- [ ] T064 [P] [US5] Unit tests for the verb table and parser — aliases, `verb.type` forms, unknown-verb error, no leading-space escape hatch, no `_normalize` — in `tests/unit/test_command_parsing.py`
-- [ ] T065 [P] [US5] Integration tests for the undeletable prefix (backspace on an empty bar keeps `/` and the bar open) in `tests/integration/test_command_bar_prefix.py`
-- [ ] T066 [P] [US5] Integration tests for `/filter` and `/f` — live narrowing, empty term clears and restores the previous month, escape clears and restores — in `tests/integration/test_filter_verb_tui.py`
-- [ ] T067 [P] [US5] Integration tests for cross-month filtering — matches from other months listed newest-first, scope shown as suspended, opening a match and returning keeps the results — in `tests/integration/test_cross_month_filter_tui.py`
-- [ ] T068 [P] [US5] Extend `tests/performance/test_month_scope.py` to assert a filter reads each month at most once per session
+- [X] T064 [P] [US5] Unit tests for the verb table and parser — aliases, `verb.type` forms, unknown-verb error, no leading-space escape hatch, no `_normalize` — in `tests/unit/test_command_parsing.py`
+- [X] T065 [P] [US5] Integration tests for the undeletable prefix (backspace on an empty bar keeps `/` and the bar open) in `tests/integration/test_command_bar_prefix.py`
+- [X] T066 [P] [US5] Integration tests for `/filter` and `/f` — live narrowing, empty term clears and restores the previous month, escape clears and restores — in `tests/integration/test_filter_verb_tui.py`
+- [X] T067 [P] [US5] Integration tests for cross-month filtering — matches from other months listed newest-first, scope shown as suspended, opening a match and returning keeps the results — in `tests/integration/test_cross_month_filter_tui.py`
+- [X] T068 [P] [US5] Extend `tests/performance/test_month_scope.py` to assert a filter reads each month at most once per session
 
 ### Implementation for User Story 5
 
-- [ ] T069 [P] [US5] Extract the verb table (verb, alias, argument shape, one-line description) into `src/endpaper/tui/commands.py` as the single source for the parser and the help pane, per [contracts/commands.md](./contracts/commands.md)
-- [ ] T070 [US5] Compose the bar as `Horizontal(Static("/", id="bar-prefix"), Input(...))` and style it in `src/endpaper/tui/command_bar.py` and `src/endpaper/tui/app.tcss` (research R3)
-- [ ] T071 [US5] Delete `_normalize()` and the leading-space filter escape hatch, and resolve verbs against the table in `src/endpaper/tui/command_bar.py`
-- [ ] T072 [US5] Add the `filter`/`f` verb with live filtering once the verb is complete, and clearing on an empty term, in `src/endpaper/tui/command_bar.py`
-- [ ] T073 [US5] Emit `unknown command: '<token>'. Press / then 'help' for the list.` for an unrecognised first token, leaving the list untouched, in `src/endpaper/tui/command_bar.py`
-- [ ] T074 [US5] Load every month into `month_cache` on the first filter keystroke using a `@work(thread=True, exclusive=True)` worker, setting `fully_loaded`, in `src/endpaper/tui/app.py` (research R7)
-- [ ] T075 [US5] Capture `pre_filter_scope` when a filter becomes active and restore that month when it clears or is cancelled, in `src/endpaper/tui/app.py`
-- [ ] T076 [US5] Show the scope as suspended in the scope pane while a cross-month filter is active, a `Searching…` row while the load runs, and a distinct `No matches for '<term>'.` state, in `src/endpaper/tui/scope_pane.py` and `src/endpaper/tui/list_screen.py`
-- [ ] T077 [P] [US5] Update `tests/integration/test_command_bar_visibility.py` for the prefix widget and rewrite the bare-word filter assertions in the existing unit filter tests
+- [X] T069 [P] [US5] Extract the verb table (verb, alias, argument shape, one-line description) into `src/endpaper/tui/commands.py` as the single source for the parser and the help pane, per [contracts/commands.md](./contracts/commands.md)
+- [X] T070 [US5] Compose the bar as `Horizontal(Static("/", id="bar-prefix"), Input(...))` and style it in `src/endpaper/tui/command_bar.py` and `src/endpaper/tui/app.tcss` (research R3)
+- [X] T071 [US5] Delete `_normalize()` and the leading-space filter escape hatch, and resolve verbs against the table in `src/endpaper/tui/command_bar.py`
+- [X] T072 [US5] Add the `filter`/`f` verb with live filtering once the verb is complete, and clearing on an empty term, in `src/endpaper/tui/command_bar.py`
+- [X] T073 [US5] Emit `unknown command: '<token>'. Press / then 'help' for the list.` for an unrecognised first token, leaving the list untouched, in `src/endpaper/tui/command_bar.py`
+- [X] T074 [US5] Load every month into `month_cache` on the first filter keystroke using a `@work(thread=True, exclusive=True)` worker, setting `fully_loaded`, in `src/endpaper/tui/app.py` (research R7)
+- [X] T075 [US5] Capture `pre_filter_scope` when a filter becomes active and restore that month when it clears or is cancelled, in `src/endpaper/tui/app.py`
+- [X] T076 [US5] Show the scope as suspended in the scope pane while a cross-month filter is active, a `Searching…` row while the load runs, and a distinct `No matches for '<term>'.` state, in `src/endpaper/tui/scope_pane.py` and `src/endpaper/tui/list_screen.py`
+- [X] T077 [P] [US5] Update `tests/integration/test_command_bar_visibility.py` for the prefix widget and rewrite the bare-word filter assertions in the existing unit filter tests
 
 **Checkpoint**: no typed word can be silently reinterpreted as a search, and filtering reaches the
 whole collection.
@@ -244,18 +244,18 @@ confirm the screen underneath is untouched; separately confirm the bottom-right 
 
 ### Tests for User Story 6
 
-- [ ] T078 [P] [US6] Integration tests for the help pane — every verb in the table appears, the list stays partly visible, escape restores highlighted row, month, and active filter unchanged — in `tests/integration/test_help_pane_tui.py`
-- [ ] T079 [P] [US6] Integration test that the version renders in the bottom-right of every screen, in `tests/integration/test_version_indicator.py`
+- [X] T078 [P] [US6] Integration tests for the help pane — every verb in the table appears, the list stays partly visible, escape restores highlighted row, month, and active filter unchanged — in `tests/integration/test_help_pane_tui.py`
+- [X] T079 [P] [US6] Integration test that the version renders in the bottom-right of every screen, in `tests/integration/test_version_indicator.py`
 
 ### Implementation for User Story 6
 
-- [ ] T080 [P] [US6] Create `HelpScreen(ModalScreen[None])` with a bottom-docked container at `height: 60%` over an alpha background, dismissed by escape, in `src/endpaper/tui/help_screen.py` (research R4)
-- [ ] T081 [US6] Style the help pane in `src/endpaper/tui/app.tcss`
-- [ ] T082 [US6] Render the pane from the verb table in `src/endpaper/tui/commands.py` plus the key bindings, so no accepted command can be missing, in `src/endpaper/tui/help_screen.py`
-- [ ] T083 [US6] Add the `help` verb and push `HelpScreen` from the command bar, in `src/endpaper/tui/command_bar.py` and `src/endpaper/tui/list_screen.py`
-- [ ] T084 [US6] Render `v{__version__}` right-aligned in the bottom bar, importing the same attribute the CLI uses, in `src/endpaper/tui/status_bar.py`
-- [ ] T085 [US6] Ensure the version is present on the preview and edit screens' status bars too, in `src/endpaper/tui/status_bar.py`
-- [ ] T086 [US6] Add a test asserting every verb in the table appears in the rendered pane, in `tests/integration/test_help_pane_tui.py`
+- [X] T080 [P] [US6] Create `HelpScreen(ModalScreen[None])` with a bottom-docked container at `height: 60%` over an alpha background, dismissed by escape, in `src/endpaper/tui/help_screen.py` (research R4)
+- [X] T081 [US6] Style the help pane in `src/endpaper/tui/app.tcss`
+- [X] T082 [US6] Render the pane from the verb table in `src/endpaper/tui/commands.py` plus the key bindings, so no accepted command can be missing, in `src/endpaper/tui/help_screen.py`
+- [X] T083 [US6] Add the `help` verb and push `HelpScreen` from the command bar, in `src/endpaper/tui/command_bar.py` and `src/endpaper/tui/list_screen.py`
+- [X] T084 [US6] Render `v{__version__}` right-aligned in the bottom bar, importing the same attribute the CLI uses, in `src/endpaper/tui/status_bar.py`
+- [X] T085 [US6] Ensure the version is present on the preview and edit screens' status bars too, in `src/endpaper/tui/status_bar.py`
+- [X] T086 [US6] Add a test asserting every verb in the table appears in the rendered pane, in `tests/integration/test_help_pane_tui.py`
 
 **Checkpoint**: all six stories are independently functional.
 
