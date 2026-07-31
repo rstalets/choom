@@ -51,31 +51,80 @@ One string, built the same way for every assistant, passed as the argument to `-
 ```text
 <instructions>
 
-The document is at: <absolute path to the saved file>
+The user's document has just been saved to:
+  <absolute path>
+
+The request is on line <N> of that file. Content above that line comes before it
+in the document; content below comes after.
 
 <the user's prompt text>
 ```
 
-### Instructions (FR-010)
-
-Three things the assistant must know, and one it must not do:
-
-1. Its reply is being inserted **directly into a working-notes editor**, at the position the command
-   occupied.
-2. It should answer the user's request directly, in a form suited to that medium — markdown prose,
-   a list, a table, a fenced diagram. No preamble, no "Here's what I found", no sign-off.
-3. The document has just been saved and it may read it to resolve references like "the process
-   described on lines 15-18" (FR-009).
-4. It should **reply, not edit**. The file on disk is open in an editor whose buffer will win on the
-   next save, so a file edit would be silently discarded (FR-018).
-
-Point 4 also earns its keep by explaining the `/ai <prompt>` line the assistant will find in the
-file: that line is the command being answered, and the reply replaces it. Without that, a careful
-assistant might treat the command text as content worth preserving.
-
 The instructions are **prepended to the prompt** rather than passed via a flag. Claude Code has
 `--append-system-prompt` and Copilot has no non-interactive equivalent; using it would fork the two
 profiles and re-introduce exactly the asymmetry FR-020 forbids ([research.md](./research.md) R3).
+
+### The line number (FR-009)
+
+A path answers "which document"; it does not answer "which paragraph". Prompts like *generate tasks
+for the above paragraph*, *tighten this section*, or *summarise everything below* are positional,
+and without a position they are unanswerable — the assistant would have to guess which part of the
+note the user meant, in a file that may be hundreds of lines long.
+
+So the composed prompt carries the **1-based line number of the `/ai` line in the file as saved**.
+
+Three details that are easy to get wrong, fixed here:
+
+- **1-based**, matching the editor's line-number gutter and what file-reading tools report.
+- **Counted over the whole file including frontmatter**, because that is what the assistant sees
+  when it opens the file. Buffer and file agree: `TextArea`'s cursor row is 0-based over the whole
+  document, so the number is `cursor_row + 1` with no other adjustment.
+- **The `/ai` line really is at that number.** FR-008 saves the document in its current state, which
+  includes the command line, so the position resolves to a line that exists on disk rather than one
+  that only existed in the buffer.
+
+### Instructions (FR-010)
+
+The literal text. Specified here rather than left to implementation because it is the feature's
+voice, and because every clause is load-bearing.
+
+```text
+You are answering a request from inside a plain-text notes editor. Your reply is
+inserted directly into the user's document, replacing the line they typed. They
+do not see it anywhere first.
+
+- Answer directly. No preamble, no restating the question, no sign-off.
+- Write markdown that belongs in working notes: prose, a list, a table, or a
+  fenced diagram, whichever suits the answer. Do not wrap the whole reply in a
+  code fence unless the entire answer is code.
+- Match the length to the request. These are working notes, not a report.
+- You cannot ask a question. Nothing here is interactive and there is no second
+  turn. If the request is ambiguous, take the most reasonable reading, answer it,
+  and note the assumption in one short line.
+- The request may refer to the document by position — "the paragraph above",
+  "this section", "everything below". Read the file and resolve those against the
+  line number given below.
+- Do not edit any file. The document is open in an editor whose unsaved buffer
+  overwrites the file on the next save, so any edit you make is discarded.
+```
+
+Why each clause is there:
+
+| Clause | Serves | Without it |
+|---|---|---|
+| Reply is inserted directly, replacing their line | FR-010 | The assistant writes for a chat window — preamble, restatement, a closing offer of further help |
+| No preamble or sign-off | FR-010 | "Here's what I found:" and "Let me know if you'd like more detail" land in the note |
+| Markdown suited to working notes | FR-010 | Report-shaped output with headings the note did not ask for |
+| Don't fence the whole reply | FR-014 | Ordinary prose arrives wrapped in a code block — wrong in a markdown note and tedious to unpick |
+| Match the length | FR-010 | A one-line question returns six paragraphs the user has to delete |
+| **You cannot ask a question** | FR-010 | A clarifying question is inserted *as document text*. The invocation is one-shot and non-interactive, so there is no way to answer it — the user's only recovery is to delete it and retype. This is the failure the instructions most need to prevent. |
+| Positional references resolve against the line number | FR-009 | "The paragraph above" is answered about the wrong paragraph, or not at all |
+| Do not edit any file | FR-018 | The assistant edits the file, the buffer overwrites it on the next save, and the work vanishes with no error |
+
+The final clause also earns its keep by explaining the `/ai <prompt>` line the assistant will find at
+the given line number: that line is the request being answered, and the reply replaces it. Without
+that, a careful assistant may treat the command text as content worth preserving, or try to edit the
+file to remove it.
 
 ---
 

@@ -66,13 +66,14 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 
 ### Process plumbing
 
-- [ ] T011 Implement `compose_prompt(user_prompt, document)` in `src/endpaper/core/assistants.py`, prepending the four FR-010 instructions and naming the saved document path
-- [ ] T012 Implement `start_request()` and `AssistantRequest.wait()` in `src/endpaper/core/assistants.py`: no shell, argument list, `cwd` at the workspace root, stdin `DEVNULL`, stdout/stderr captured, new process group per platform. `wait()` returns an `AssistantReply` for every row of the failure taxonomy and never raises. **Cancellation is not implemented here — it belongs to US2 (T028).**
+- [ ] T011 Implement `compose_prompt(user_prompt, document, line)` in `src/endpaper/core/assistants.py` using the literal instruction text specified in [contracts/assistants.md](./contracts/assistants.md), and emitting the saved document path plus the 1-based line number of the `/ai` line so positional requests resolve
+- [ ] T012 [P] Add `tests/unit/test_compose_prompt.py` asserting the composed string contains the document path, the line number, and each instruction clause — including the no-clarifying-question rule — and that the user's prompt is last
+- [ ] T013 Implement `start_request()` and `AssistantRequest.wait()` in `src/endpaper/core/assistants.py`: no shell, argument list, `cwd` at the workspace root, stdin `DEVNULL`, stdout/stderr captured, new process group per platform. `wait()` returns an `AssistantReply` for every row of the failure taxonomy and never raises. **Cancellation is not implemented here — it belongs to US2 (T029).**
 
 ### Test fixture
 
-- [ ] T013 Add the `stub_assistant` fixture to `tests/conftest.py`: writes an executable Python script named as the profile binary into `tmp_path`, prepends its directory to `PATH`, and selects `echo`/`reply`/`empty`/`fail`/`sleep` behaviour by environment variable, per [quickstart.md](./quickstart.md)
-- [ ] T014 Add `tests/unit/test_assistant_invoke.py` driving `start_request` against the stub for the success, non-zero-exit, empty-output, and missing-binary rows; assert `wait()` never raises and that the composed prompt reached argv in `echo` mode
+- [ ] T014 Add the `stub_assistant` fixture to `tests/conftest.py`: writes an executable Python script named as the profile binary into `tmp_path`, prepends its directory to `PATH`, and selects `echo`/`reply`/`empty`/`fail`/`sleep` behaviour by environment variable, per [quickstart.md](./quickstart.md)
+- [ ] T015 Add `tests/unit/test_assistant_invoke.py` driving `start_request` against the stub for the success, non-zero-exit, empty-output, and missing-binary rows; assert `wait()` never raises and that the composed prompt reached argv in `echo` mode
 
 **Checkpoint**: `core` can parse an editor line, decide which assistant to call, run it, and report every outcome — all without a terminal, an event loop, or an installed assistant.
 
@@ -86,17 +87,17 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Create the `EditorTextArea` subclass in `src/endpaper/tui/edit_screen.py` overriding `_on_key` to call `core.editor_commands.parse_line` on Enter, calling `event.prevent_default()` and posting an `EditorCommandSubmitted` message only when the line parses; every other line falls through to Textual's own newline handling
-- [ ] T016 [US1] Add the in-flight state to `EditScreen` in `src/endpaper/tui/edit_screen.py`: replace the command line with `⋯`, set `TextArea.read_only = True`, and record the line index and the current request so a stale reply can be identified later
-- [ ] T017 [P] [US1] Add the working and cancel text to `src/endpaper/tui/status_bar.py` (`⋯ working — ctrl+c to cancel`) alongside the existing `EDIT_HELP`
-- [ ] T018 [US1] Wire the `/ai` handler in `src/endpaper/tui/edit_screen.py`: save via the existing `save_buffer` path first, then `resolve_assistant(None)`, then `compose_prompt`, then `start_request`, running `wait()` on a `@work(thread=True)` worker and returning the reply to the main thread with `call_from_thread`
-- [ ] T019 [US1] Implement reply insertion in `src/endpaper/tui/edit_screen.py`: normalise `\r\n` to `\n`, strip the trailing newline, replace the placeholder line with the reply's lines in order, leave the buffer dirty with the cursor after the inserted text
-- [ ] T020 [P] [US1] List in-editor commands in `src/endpaper/tui/help_screen.py`, generated from `EDITOR_COMMANDS` so a command cannot exist without appearing in help
+- [ ] T016 [US1] Create the `EditorTextArea` subclass in `src/endpaper/tui/edit_screen.py` overriding `_on_key` to call `core.editor_commands.parse_line` on Enter, calling `event.prevent_default()` and posting an `EditorCommandSubmitted` message only when the line parses; every other line falls through to Textual's own newline handling
+- [ ] T017 [US1] Add the in-flight state to `EditScreen` in `src/endpaper/tui/edit_screen.py`: replace the command line with `⋯`, set `TextArea.read_only = True`, and record the line index and the current request so a stale reply can be identified later
+- [ ] T018 [P] [US1] Add the working and cancel text to `src/endpaper/tui/status_bar.py` (`⋯ working — ctrl+c to cancel`) alongside the existing `EDIT_HELP`
+- [ ] T019 [US1] Wire the `/ai` handler in `src/endpaper/tui/edit_screen.py`: save via the existing `save_buffer` path first, then `resolve_assistant(None)`, then `compose_prompt(prompt, path, cursor_row + 1)` — the 1-based line of the `/ai` line in the saved file — then `start_request`, running `wait()` on a `@work(thread=True)` worker and returning the reply to the main thread with `call_from_thread`
+- [ ] T020 [US1] Implement reply insertion in `src/endpaper/tui/edit_screen.py`: normalise `\r\n` to `\n`, strip the trailing newline, replace the placeholder line with the reply's lines in order, leave the buffer dirty with the cursor after the inserted text
+- [ ] T021 [P] [US1] List in-editor commands in `src/endpaper/tui/help_screen.py`, generated from `EDITOR_COMMANDS` so a command cannot exist without appearing in help
 
 ### Tests for User Story 1
 
-- [ ] T021 [US1] Create `tests/integration/test_ai_command_tui.py::test_reply_replaces_the_command_line` driving the editor against the stub in `reply` mode: assert the document was saved before invocation, the reply occupies the command's position, surrounding lines are unchanged, and the buffer is dirty
-- [ ] T022 [P] [US1] Add a case to `tests/integration/test_ai_command_tui.py` asserting a reply containing a line starting with `/ai` is inserted as literal text and is not executed
+- [ ] T022 [US1] Create `tests/integration/test_ai_command_tui.py::test_reply_replaces_the_command_line` driving the editor against the stub in `reply` mode: assert the document was saved before invocation, the reply occupies the command's position, surrounding lines are unchanged, and the buffer is dirty
+- [ ] T023 [P] [US1] Add a case to `tests/integration/test_ai_command_tui.py` asserting a reply containing a line starting with `/ai` is inserted as literal text and is not executed
 
 **Checkpoint**: US1 is demoable on any machine with one assistant installed and no configuration.
 
@@ -110,19 +111,19 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 
 ### Implementation for User Story 2
 
-- [ ] T023 [US2] Implement `AssistantRequest.cancel()` in `src/endpaper/core/assistants.py`: terminate the process **group** (`os.killpg` on POSIX, `terminate()` with `CREATE_NEW_PROCESS_GROUP` on Windows), idempotent and safe after the process already exited
-- [ ] T024 [US2] Set `cancelled=True` on the reply produced by a cancelled request in `src/endpaper/core/assistants.py` so the editor can suppress the error message
-- [ ] T025 [US2] Bind `ctrl+c` in `EditScreen` in `src/endpaper/tui/edit_screen.py`, active only while a request is in flight, calling `request.cancel()`
-- [ ] T026 [US2] Implement the restore path in `src/endpaper/tui/edit_screen.py`: on cancel, failure, or empty reply, put back the original `/ai <prompt>` line exactly as typed, clear `read_only`, and return focus
-- [ ] T027 [US2] Discard a reply whose request is no longer the current one in `src/endpaper/tui/edit_screen.py`, so a reply arriving after cancel is never inserted
-- [ ] T028 [US2] Short-circuit on save failure in `src/endpaper/tui/edit_screen.py`: report the save error and return control **without invoking any assistant**
-- [ ] T029 [US2] Surface failure messages in the existing status bar via `src/endpaper/tui/edit_screen.py`, naming the assistant by `display_name` so a configured-but-missing assistant is distinguishable from a generic failure
+- [ ] T024 [US2] Implement `AssistantRequest.cancel()` in `src/endpaper/core/assistants.py`: terminate the process **group** (`os.killpg` on POSIX, `terminate()` with `CREATE_NEW_PROCESS_GROUP` on Windows), idempotent and safe after the process already exited
+- [ ] T025 [US2] Set `cancelled=True` on the reply produced by a cancelled request in `src/endpaper/core/assistants.py` so the editor can suppress the error message
+- [ ] T026 [US2] Bind `ctrl+c` in `EditScreen` in `src/endpaper/tui/edit_screen.py`, active only while a request is in flight, calling `request.cancel()`
+- [ ] T027 [US2] Implement the restore path in `src/endpaper/tui/edit_screen.py`: on cancel, failure, or empty reply, put back the original `/ai <prompt>` line exactly as typed, clear `read_only`, and return focus
+- [ ] T028 [US2] Discard a reply whose request is no longer the current one in `src/endpaper/tui/edit_screen.py`, so a reply arriving after cancel is never inserted
+- [ ] T029 [US2] Short-circuit on save failure in `src/endpaper/tui/edit_screen.py`: report the save error and return control **without invoking any assistant**
+- [ ] T030 [US2] Surface failure messages in the existing status bar via `src/endpaper/tui/edit_screen.py`, naming the assistant by `display_name` so a configured-but-missing assistant is distinguishable from a generic failure
 
 ### Tests for User Story 2
 
-- [ ] T030 [US2] Add `test_cancel_restores_the_line_and_kills_the_process` to `tests/integration/test_ai_command_tui.py` using the stub in `sleep` mode: assert control returns, the command line is restored verbatim, and the child is gone
-- [ ] T031 [P] [US2] Add failure cases to `tests/integration/test_ai_command_tui.py` for non-zero exit, empty reply, and missing binary: each shows a message, restores the line, and leaves the document byte-identical to its saved state
-- [ ] T032 [P] [US2] Add `test_save_failure_never_invokes_the_assistant` to `tests/integration/test_ai_command_tui.py` using a read-only directory, asserting the buffer is intact and no process was spawned
+- [ ] T031 [US2] Add `test_cancel_restores_the_line_and_kills_the_process` to `tests/integration/test_ai_command_tui.py` using the stub in `sleep` mode: assert control returns, the command line is restored verbatim, and the child is gone
+- [ ] T032 [P] [US2] Add failure cases to `tests/integration/test_ai_command_tui.py` for non-zero exit, empty reply, and missing binary: each shows a message, restores the line, and leaves the document byte-identical to its saved state
+- [ ] T033 [P] [US2] Add `test_save_failure_never_invokes_the_assistant` to `tests/integration/test_ai_command_tui.py` using a read-only directory, asserting the buffer is intact and no process was spawned
 
 **Checkpoint**: Every terminal branch of the state machine returns control with the user's words intact.
 
@@ -136,24 +137,24 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 
 ### Implementation for User Story 3
 
-- [ ] T033 [P] [US3] Create `src/endpaper/core/config.py` with `get_assistant()` returning `None` for a missing file, missing table, malformed file, or illegal value — never raising
-- [ ] T034 [US3] Implement `set_assistant()` in `src/endpaper/core/config.py` as a line-targeted edit covering all three file shapes in [contracts/config.md](./contracts/config.md), validating before writing and writing atomically via a same-directory temp file and `os.replace`
-- [ ] T035 [P] [US3] Create `tests/unit/test_config_write.py`: key created in each file shape, comments and unknown keys survive, an invalid value writes nothing, `workspace.schema` is untouched
-- [ ] T036 [US3] Add the keyword-only `assistant` parameter to `init_workspace()` in `src/endpaper/core/workspace.py`, recording the choice when given and leaving existing callers unaffected
-- [ ] T037 [US3] Pass the stored setting into `resolve_assistant()` from `src/endpaper/tui/edit_screen.py`, replacing the `None` placeholder from T018 so a configured assistant wins over detection
-- [ ] T038 [US3] Add the `config assistant [<value>] [--json]` subcommand to `src/endpaper/cli/main.py` with exit codes 0 / 2 / 3 and the four-key JSON schema from [contracts/config.md](./contracts/config.md)
-- [ ] T039 [US3] Add `--assistant` to `endpaper init` in `src/endpaper/cli/main.py`, still non-blocking and still never prompting
-- [ ] T040 [P] [US3] Add the `config` verb to `VERB_TABLE` in `src/endpaper/tui/commands.py` with its argument shape and help description
-- [ ] T041 [US3] Dispatch the `config` verb in `src/endpaper/tui/command_bar.py`, reporting the current value with no argument and naming the accepted values on a bad one
+- [ ] T034 [P] [US3] Create `src/endpaper/core/config.py` with `get_assistant()` returning `None` for a missing file, missing table, malformed file, or illegal value — never raising
+- [ ] T035 [US3] Implement `set_assistant()` in `src/endpaper/core/config.py` as a line-targeted edit covering all three file shapes in [contracts/config.md](./contracts/config.md), validating before writing and writing atomically via a same-directory temp file and `os.replace`
+- [ ] T036 [P] [US3] Create `tests/unit/test_config_write.py`: key created in each file shape, comments and unknown keys survive, an invalid value writes nothing, `workspace.schema` is untouched
+- [ ] T037 [US3] Add the keyword-only `assistant` parameter to `init_workspace()` in `src/endpaper/core/workspace.py`, recording the choice when given and leaving existing callers unaffected
+- [ ] T038 [US3] Pass the stored setting into `resolve_assistant()` from `src/endpaper/tui/edit_screen.py`, replacing the `None` placeholder from T019 so a configured assistant wins over detection
+- [ ] T039 [US3] Add the `config assistant [<value>] [--json]` subcommand to `src/endpaper/cli/main.py` with exit codes 0 / 2 / 3 and the four-key JSON schema from [contracts/config.md](./contracts/config.md)
+- [ ] T040 [US3] Add `--assistant` to `endpaper init` in `src/endpaper/cli/main.py`, still non-blocking and still never prompting
+- [ ] T041 [P] [US3] Add the `config` verb to `VERB_TABLE` in `src/endpaper/tui/commands.py` with its argument shape and help description
+- [ ] T042 [US3] Dispatch the `config` verb in `src/endpaper/tui/command_bar.py`, reporting the current value with no argument and naming the accepted values on a bad one
 
 ### Tests for User Story 3
 
-- [ ] T042 [US3] Update `tests/unit/test_command_parsing.py::test_existing_verbs_unchanged` to include `config` — a deliberate edit to a guarded list, flagged in the spec's Dependencies
-- [ ] T043 [P] [US3] Create `tests/integration/test_config_assistant.py` asserting the CLI and TUI produce an identical config file, parametrized across the two adapters rather than duplicated into separate files
-- [ ] T044 [P] [US3] Extend `tests/contract/test_exit_codes.py` for `config assistant`: 0 on success, 2 on a bad value, 3 outside a workspace
-- [ ] T045 [P] [US3] Extend `tests/contract/test_json_schema.py` for the exact four-key `config assistant --json` shape, asserting `available` is `[]` and never `null`
-- [ ] T046 [P] [US3] Extend `tests/contract/test_non_blocking.py` with `config assistant` and `init --assistant`, confirming both terminate promptly with stdin closed
-- [ ] T047 [P] [US3] Add a case to `tests/integration/test_config_assistant.py` for a config predating this feature (no `[assistant]` table): everything works and reading the setting is not an error
+- [ ] T043 [US3] Update `tests/unit/test_command_parsing.py::test_existing_verbs_unchanged` to include `config` — a deliberate edit to a guarded list, flagged in the spec's Dependencies
+- [ ] T044 [P] [US3] Create `tests/integration/test_config_assistant.py` asserting the CLI and TUI produce an identical config file, parametrized across the two adapters rather than duplicated into separate files
+- [ ] T045 [P] [US3] Extend `tests/contract/test_exit_codes.py` for `config assistant`: 0 on success, 2 on a bad value, 3 outside a workspace
+- [ ] T046 [P] [US3] Extend `tests/contract/test_json_schema.py` for the exact four-key `config assistant --json` shape, asserting `available` is `[]` and never `null`
+- [ ] T047 [P] [US3] Extend `tests/contract/test_non_blocking.py` with `config assistant` and `init --assistant`, confirming both terminate promptly with stdin closed
+- [ ] T048 [P] [US3] Add a case to `tests/integration/test_config_assistant.py` for a config predating this feature (no `[assistant]` table): everything works and reading the setting is not an error
 
 **Checkpoint**: All three stories work independently.
 
@@ -161,14 +162,14 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 
 ## Phase 6: Polish & Cross-Cutting Concerns
 
-- [ ] T048 [P] Record the `[assistant]` config key, the `endpaper config assistant` command, and `init --assistant` in `CHANGELOG.md` with their version (FR-032, Principle VI)
-- [ ] T049 [P] Update `README.md` with `/ai` and the configuration commands
-- [ ] T050 [P] Update the `AGENTS.md` template in `src/endpaper/core/templates/AGENTS.md.tmpl` if the new command belongs there, keeping the file under roughly 60 lines
-- [ ] T051 Amend `REQUIREMENTS.md` §5 to move "AI invocation from inside endpaper" and "Any configuration beyond workspace paths" out of the v0.0.1 out-of-scope list into v0.0.2
-- [ ] T052 Run formatting, linting, and type checking; confirm the full suite is green including the three modified pinned tests
-- [ ] T053 Work through all 7 scenarios in [quickstart.md](./quickstart.md) by hand
-- [ ] T054 Verify `ctrl+c` on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — the binding is the one justified deviation from Principle V, so this is the gate that confirms the justification holds
-- [ ] T055 Verify a workspace path containing spaces and non-ASCII characters works end to end, and that generated paths stay well under the Windows 260-character limit
+- [ ] T049 [P] Record the `[assistant]` config key, the `endpaper config assistant` command, and `init --assistant` in `CHANGELOG.md` with their version (FR-032, Principle VI)
+- [ ] T050 [P] Update `README.md` with `/ai` and the configuration commands
+- [ ] T051 [P] Update the `AGENTS.md` template in `src/endpaper/core/templates/AGENTS.md.tmpl` if the new command belongs there, keeping the file under roughly 60 lines
+- [ ] T052 Amend `REQUIREMENTS.md` §5 to move "AI invocation from inside endpaper" and "Any configuration beyond workspace paths" out of the v0.0.1 out-of-scope list into v0.0.2
+- [ ] T053 Run formatting, linting, and type checking; confirm the full suite is green including the three modified pinned tests
+- [ ] T054 Work through all 7 scenarios in [quickstart.md](./quickstart.md) by hand
+- [ ] T055 Verify `ctrl+c` on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux — the binding is the one justified deviation from Principle V, so this is the gate that confirms the justification holds
+- [ ] T056 Verify a workspace path containing spaces and non-ASCII characters works end to end, and that generated paths stay well under the Windows 260-character limit
 
 ---
 
@@ -177,28 +178,28 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 ### Phase dependencies
 
 - **Setup (T001)**: no dependencies
-- **Foundational (T002–T014)**: depends on Setup — **blocks every user story**
-- **US1 (T015–T022)**: depends on Foundational only
-- **US2 (T023–T032)**: depends on Foundational; touches `edit_screen.py` alongside US1, so in practice runs after US1 rather than beside it
-- **US3 (T033–T047)**: depends on Foundational. T037 is its only touchpoint with US1's code
-- **Polish (T048–T055)**: depends on every story being complete
+- **Foundational (T002–T015)**: depends on Setup — **blocks every user story**
+- **US1 (T016–T023)**: depends on Foundational only
+- **US2 (T024–T033)**: depends on Foundational; touches `edit_screen.py` alongside US1, so in practice runs after US1 rather than beside it
+- **US3 (T034–T048)**: depends on Foundational. T038 is its only touchpoint with US1's code
+- **Polish (T049–T056)**: depends on every story being complete
 
 ### Within Foundational
 
 - T002–T004 (models, errors) are parallel and come first
 - T005 → T006 (parser then its test)
 - T007 → T008 → T009 → T010 (registry, detection, resolution, test)
-- T011, T012 depend on T007 and the models
-- T013 → T014 (fixture then the tests that use it)
+- T011, T013 depend on T007 and the models
+- T014 → T015 (fixture then the tests that use it)
 
 ### Within each story
 
 - Implementation before its tests here, deliberately: the parser and resolution logic that *could*
   be written test-first already were, in Foundational. The story-level tests are editor round trips
   against a live widget, which are written against working behaviour rather than as red-first specs.
-- Within US1: T015 → T016 → T018 → T019; T017 and T020 are independent
-- Within US2: T023 → T024 → T025 → T026 → T027; T028 and T029 are independent of the cancel chain
-- Within US3: T033 → T034 → T035; T038 and T041 both depend on T034
+- Within US1: T016 → T017 → T019 → T020; T018 and T021 are independent
+- Within US2: T024 → T025 → T026 → T027 → T028; T029 and T030 are independent of the cancel chain
+- Within US3: T034 → T035 → T036; T039 and T042 both depend on T035
 
 ### Parallel opportunities
 
@@ -206,16 +207,16 @@ plumbing — plus the test fixture that makes all of it verifiable without an as
 |---|---|
 | Foundational models and errors | T002, T003, T004 |
 | Foundational resolution test | T010 alongside T011 |
-| US1 presentation | T017, T020 alongside the T015→T019 chain |
-| US1 tests | T022 alongside T021 |
-| US2 tests | T031, T032 alongside T030 |
-| US3 core and CLI | T033, T035, T040 |
-| US3 contract tests | T044, T045, T046, T047 — four different files |
-| Polish docs | T048, T049, T050 |
+| US1 presentation | T018, T021 alongside the T016→T020 chain |
+| US1 tests | T023 alongside T022 |
+| US2 tests | T032, T033 alongside T031 |
+| US3 core and CLI | T034, T036, T041 |
+| US3 contract tests | T045, T046, T047, T048 — four different files |
+| Polish docs | T049, T050, T051 |
 
 **Cross-story parallelism**: US3 is genuinely independent of US1 and US2 — it touches
 `core/config.py`, `cli/main.py`, `tui/commands.py`, and `tui/command_bar.py`, none of which US1 or
-US2 modify, apart from the single line in T037. It can be built by a second person as soon as
+US2 modify, apart from the single line in T038. It can be built by a second person as soon as
 Foundational lands. US1 and US2 both rewrite `edit_screen.py` heavily and should not be worked in
 parallel by different people.
 
@@ -247,8 +248,8 @@ Task: "Add the pre-existing-config case to tests/integration/test_config_assista
 ### MVP (User Story 1 only)
 
 1. T001 — confirm baseline
-2. T002–T014 — Foundational
-3. T015–T022 — US1
+2. T002–T015 — Foundational
+3. T016–T023 — US1
 4. **Stop and validate**: quickstart Scenarios 1, 2, and 7
 
 That is a working `/ai` for anyone with exactly one assistant installed — the headline capability,
@@ -279,6 +280,6 @@ commit: it adds three `core` modules and their unit tests and changes no user-vi
 - Every task names its file; none should require reading another task to interpret
 - The one deliberate ordering departure from the template is noted above: tests follow
   implementation inside the story phases, because those tests drive a live widget
-- Three existing tests are modified rather than added to — T042, T044/T045/T046 — and are called out
+- Three existing tests are modified rather than added to — T043, T045/T046/T047 — and are called out
   in the spec's Dependencies so they read as planned work rather than breakage
 - Commit after each task or logical group; stop at any checkpoint to validate a story independently

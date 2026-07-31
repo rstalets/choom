@@ -217,11 +217,13 @@ effect and reported back; verify without invoking any assistant.
 - **FR-008**: On invocation the system MUST save the document in its current state before
   contacting the assistant. If the save fails, the assistant MUST NOT be contacted and the save
   error MUST be reported.
-- **FR-009**: The request MUST identify the saved document to the assistant so the assistant can
-  read the content the prompt refers to (for example, "the process described on lines 15-18").
+- **FR-009**: The request MUST identify the saved document **and the position the command occupies
+  within it**, so the assistant can resolve both content references ("the process described on lines
+  15-18") and positional ones ("the paragraph above", "this section", "everything below").
 - **FR-010**: The request MUST include instructions to the assistant stating that its reply is being
   inserted directly into a working-notes editor, that it should answer the user's query directly in
-  a form appropriate to that medium, and that it should reply rather than edit files itself.
+  a form appropriate to that medium, that it **cannot ask a clarifying question** and must instead
+  answer under a stated assumption, and that it should reply rather than edit files itself.
 - **FR-011**: While a request is in flight the command text MUST be replaced in place by a working
   indicator together with a visible statement that `ctrl+c` cancels.
 - **FR-012**: While a request is in flight the editor MUST NOT accept edits to the document buffer;

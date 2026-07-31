@@ -114,13 +114,17 @@ Full decision table: [data-model.md](../data-model.md#assistantsetting).
 ### `compose_prompt`
 
 ```python
-def compose_prompt(user_prompt: str, document: Path) -> str:
+def compose_prompt(user_prompt: str, document: Path, line: int) -> str:
     """Build the text handed to the assistant.
 
     Prepends the instructions required by FR-010 -- that the reply is inserted directly
     into a working-notes editor, that it should answer directly in a form suited to that
-    medium, and that it should reply rather than edit the file -- and names the saved
-    document so the assistant can resolve references like "lines 15-18".
+    medium, that it cannot ask a question, and that it should reply rather than edit the
+    file -- then names the saved document and the position of the request within it.
+
+    `line` is the 1-based line number of the `/ai` line in the file as saved, counted over
+    the whole file including frontmatter, so the assistant can resolve positional requests
+    like "the paragraph above" or "lines 15-18" (FR-009).
     """
 ```
 
