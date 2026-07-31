@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.models import Document
+from endpaper.core.models import Document, Task
 
 
 def _strip_frontmatter(text: str) -> str:
@@ -40,3 +40,28 @@ def render_preview_markdown(path: Path, document: Document | None) -> str:
     if body:
         return f"{heading}\n\n*{meta}*\n\n{body}"
     return f"{heading}\n\n*{meta}*\n"
+
+
+def render_task_markdown(task: Task) -> str:
+    """Build the markdown shown in the task preview pane: a heading, an italic
+    metadata line (creation date, type, tags -- absent fields omitted -- with a
+    completed task marked), then the body (contracts/tui.md). Reads only from
+    `task`, never from disk, which is what keeps cursor movement through a
+    500-task list responsive (SC-005)."""
+    meta_parts = []
+    if task.created:
+        meta_parts.append(task.created.isoformat())
+    if task.type:
+        meta_parts.append(task.type)
+    if task.tags:
+        meta_parts.append(", ".join(f"#{tag}" for tag in task.tags))
+    if task.done:
+        meta_parts.append("done")
+    meta = " · ".join(meta_parts)
+
+    heading = f"# {task.text}" if task.text else "# (untitled)"
+    header = f"{heading}\n\n*{meta}*" if meta else heading
+
+    if task.body:
+        return f"{header}\n\n{task.body}"
+    return f"{header}\n"

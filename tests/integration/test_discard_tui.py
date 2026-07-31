@@ -19,7 +19,7 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         edit_screen = await open_edit(app, pilot)
-        path = edit_screen.file.path
+        path = edit_screen.target.display_path
         before_bytes = path.read_bytes()
 
         editor = edit_screen.query_one("#editor", TextArea)

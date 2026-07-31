@@ -41,3 +41,10 @@ def test_footer_advertises_every_shown_binding(screen_cls: type, help_text: str)
             f"{screen_cls.__name__} binds {key!r} with show=True, "
             f"but {display!r} is not in its footer {help_text!r}"
         )
+
+
+def test_task_list_footer_names_e_for_editing_a_tasks_body() -> None:
+    # `e` on a task row went from a no-op to opening the body editor (007) --
+    # it must be spelled out in the tasks footer, not merely covered by the
+    # weak substring check every other binding gets above (FR-024).
+    assert "e edit" in TASK_LIST_HELP

@@ -8,8 +8,10 @@ from textual.widgets import TextArea
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.meetings import create_meeting, scan_meetings
 from endpaper.core.models import Workspace
+from endpaper.core.tasks import add_task
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
+from tests.conftest import tasks_file
 from tests.helpers import to_collection
 
 
@@ -127,6 +129,47 @@ async def test_deleting_frontmatter_and_saving_writes_as_typed_and_warns(
     # A subsequent scan must never repair or rewrite the file.
     still_on_disk = meeting.path.read_text(encoding="utf-8")
     assert still_on_disk == on_disk
+
+
+async def test_task_body_save_whose_task_vanished_reports_it_and_keeps_the_buffer(
+    tmp_workspace: Workspace,
+) -> None:
+    task = add_task(tmp_workspace, "buy milk")
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, EditScreen)
+
+        editor = app.screen.query_one("#editor", TextArea)
+        editor.text = "some detail typed while the file moved underneath us"
+
+        # Simulate another process rewriting tasks.md while the editor is open,
+        # removing the task this editor is scoped to (spec edge case "the file
+        # changed underneath the editor").
+        tasks_file(tmp_workspace).write_text(
+            "- [ ] a completely different task <!-- id:t_zzzz -->\n", encoding="utf-8"
+        )
+
+        buffer_before_save = editor.text
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+
+        assert isinstance(app.screen, EditScreen)
+        assert editor.text == buffer_before_save
+
+        from endpaper.tui.status_bar import StatusBar
+
+        status = app.screen.query_one(StatusBar)
+        assert "⚠" in str(status.content)
+        assert task.id in str(status.content)  # type: ignore[operator]
+
+    # Nothing was written -- the vanished task's replacement is the only content.
+    assert tasks_file(tmp_workspace).read_text(encoding="utf-8") == (
+        "- [ ] a completely different task <!-- id:t_zzzz -->\n"
+    )
 
 
 async def test_emptied_buffer_saves_as_empty_file_without_crashing(
