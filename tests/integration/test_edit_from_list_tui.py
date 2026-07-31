@@ -6,13 +6,8 @@ from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import DocumentRow, ListScreen, ListView
-
-
-async def _to_meetings(pilot) -> None:  # type: ignore[no-untyped-def]
-    await pilot.pause()
-    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-    await pilot.pause()
+from endpaper.tui.list_screen import DocumentRow, ListScreen
+from tests.helpers import list_view, to_collection
 
 
 async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> None:
@@ -20,7 +15,7 @@ async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> N
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
 
         await pilot.press("e")
         await pilot.pause()
@@ -39,7 +34,7 @@ async def test_save_and_exit_returns_to_list_with_the_row_updated(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
 
         await pilot.press("e")
         await pilot.pause()
@@ -50,8 +45,7 @@ async def test_save_and_exit_returns_to_list_with_the_row_updated(
         await pilot.pause()
 
         assert isinstance(app.screen, ListScreen)
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        highlighted = list_view.highlighted_child
+        highlighted = list_view(app).highlighted_child
         assert isinstance(highlighted, DocumentRow)
         assert highlighted.document.title == "Q3 planning (revised)"
 
@@ -75,7 +69,7 @@ async def test_e_is_a_noop_on_tasks(tmp_workspace: Workspace) -> None:
 async def test_e_is_a_noop_on_the_empty_state(tmp_workspace: Workspace) -> None:
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
 
         await pilot.press("e")
         await pilot.pause()
@@ -90,7 +84,7 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
 
     from_list = EndpaperApp(tmp_workspace)
     async with from_list.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(from_list, pilot, "meetings")
         await pilot.press("e")
         await pilot.pause()
         list_screen = from_list.screen
@@ -99,7 +93,7 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
 
     from_preview = EndpaperApp(tmp_workspace)
     async with from_preview.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(from_preview, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
         await pilot.press("e")

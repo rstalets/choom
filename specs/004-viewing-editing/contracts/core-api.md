@@ -100,6 +100,9 @@ def init_workspace(target: Path) -> InitResult: ...
 | `tests/integration/test_create_parity.py` | 47 |
 | `tests/fixtures/generate.py` | 18, 37 |
 
+> Historical record of the 004 migration; line numbers were accurate when written. The two parity
+> files above were later merged into `tests/integration/test_cli_tui_parity.py` (issue #29).
+
 `cli/main.py` is the only one that does more than append `.workspace`. `core/__init__.py:45` keeps
 exporting `init_workspace` under the same name; only its return type moves.
 

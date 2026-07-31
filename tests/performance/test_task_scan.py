@@ -3,10 +3,13 @@ from __future__ import annotations
 import time
 from pathlib import Path
 
+import pytest
+
 from endpaper.core.tasks import load_tasks
 from endpaper.core.workspace import init_workspace
 
 
+@pytest.mark.performance
 def test_load_tasks_on_1000_tasks_completes_under_1_second(tmp_path: Path) -> None:
     workspace = init_workspace(tmp_path).workspace
     lines = [

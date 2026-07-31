@@ -6,7 +6,8 @@ from endpaper.core.notes import create_note
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.collection_bar import CollectionBar
 from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import DocumentRow, ListScreen, ListView
+from endpaper.tui.list_screen import ListScreen
+from tests.helpers import row_titles, to_collection, type_command
 
 
 async def test_creating_a_note_while_viewing_meetings_lands_on_notes_after_close(
@@ -16,17 +17,10 @@ async def test_creating_a_note_while_viewing_meetings_lands_on_notes_after_close
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "meetings")
         assert app.active == "meetings"
 
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "note.research vendor landscape":
-            await pilot.press("space" if ch == " " else ch)
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, "note.research vendor landscape")
         assert isinstance(app.screen, EditScreen)
 
         await pilot.press("escape")  # nothing edited yet, so this pops immediately
@@ -37,9 +31,7 @@ async def test_creating_a_note_while_viewing_meetings_lands_on_notes_after_close
         bar = app.screen.query_one(CollectionBar)
         assert "[reverse] Notes [/reverse]" in str(bar.content)
 
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]
-        assert titles == ["vendor landscape"]
+        assert row_titles(app) == ["vendor landscape"]
 
 
 async def test_creating_a_meeting_while_viewing_notes_lands_on_meetings_after_close(
@@ -49,21 +41,10 @@ async def test_creating_a_meeting_while_viewing_notes_lands_on_meetings_after_cl
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
-        await pilot.pause()
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "notes":
-            await pilot.press(ch)
-        await pilot.press("enter")
-        await pilot.pause()
+        await to_collection(app, pilot, "notes")
         assert app.active == "notes"
 
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "meeting.standup Q3 planning":
-            await pilot.press("space" if ch == " " else ch)
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, "meeting.standup Q3 planning")
         assert isinstance(app.screen, EditScreen)
 
         await pilot.press("escape")
@@ -77,12 +58,7 @@ async def test_bare_daily_note_lands_on_notes_view_after_close(tmp_workspace: Wo
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        await pilot.press("/")
-        await pilot.pause()
-        for ch in "note":
-            await pilot.press(ch)
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, "note")
         assert isinstance(app.screen, EditScreen)
 
         await pilot.press("escape")

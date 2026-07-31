@@ -4,7 +4,8 @@ from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.commands import VERB_TABLE
 from endpaper.tui.help_screen import HelpScreen
-from endpaper.tui.list_screen import ListScreen, ListView
+from endpaper.tui.list_screen import ListScreen
+from tests.helpers import list_view, to_collection
 
 
 async def _open_help(pilot) -> None:  # type: ignore[no-untyped-def]
@@ -44,11 +45,8 @@ async def test_escape_dismisses_and_leaves_state_unchanged(tmp_workspace: Worksp
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        highlighted_before = list_view.highlighted_child.document.id  # type: ignore[union-attr]
+        await to_collection(app, pilot, "meetings")
+        highlighted_before = list_view(app).highlighted_child.document.id  # type: ignore[union-attr]
         active_before = app.active
 
         await pilot.press("/")
@@ -63,5 +61,4 @@ async def test_escape_dismisses_and_leaves_state_unchanged(tmp_workspace: Worksp
 
         assert isinstance(app.screen, ListScreen)
         assert app.active == active_before
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        assert list_view.highlighted_child.document.id == highlighted_before  # type: ignore[union-attr]
+        assert list_view(app).highlighted_child.document.id == highlighted_before  # type: ignore[union-attr]

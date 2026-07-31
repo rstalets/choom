@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Iterator
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
 import pytest
 
+from endpaper.cli.main import main
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.workspace import init_workspace
@@ -15,6 +17,44 @@ from endpaper.core.workspace import init_workspace
 @pytest.fixture
 def tmp_workspace(tmp_path: Path) -> Workspace:
     return init_workspace(tmp_path).workspace
+
+
+@dataclass(frozen=True)
+class Result:
+    """One CLI invocation: its exit code and its two streams, both stripped."""
+
+    exit_code: int
+    out: str
+    err: str
+
+
+class Cli:
+    """Runs CLI commands inside an already-initialised workspace.
+
+    Replaces the `monkeypatch.chdir(...)` / `main(["init"])` /
+    `capsys.readouterr()` prologue that every CLI test used to repeat.
+    """
+
+    def __init__(self, root: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        self.root = root
+        self._capsys = capsys
+
+    def __call__(self, *argv: str) -> Result:
+        exit_code = main(list(argv))
+        captured = self._capsys.readouterr()
+        return Result(exit_code, captured.out.strip(), captured.err.strip())
+
+    def read(self, relative: str | Path) -> str:
+        """Read a file the CLI just reported, by its workspace-relative path."""
+        return (self.root / relative).read_text(encoding="utf-8")
+
+
+@pytest.fixture
+def cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> Cli:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    return Cli(tmp_path, capsys)
 
 
 @pytest.fixture

@@ -5,9 +5,10 @@ from datetime import datetime
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace, YearMonth
 from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import DocumentRow, ListView
+from endpaper.tui.list_screen import ListView
 from endpaper.tui.scope_pane import MonthRow
 from endpaper.tui.status_bar import StatusBar
+from tests.helpers import list_view, row_titles, to_collection
 
 
 def _one_month_before(dt: datetime) -> datetime:
@@ -16,19 +17,13 @@ def _one_month_before(dt: datetime) -> datetime:
     return dt.replace(month=dt.month - 1, day=1)
 
 
-async def _to_meetings(pilot) -> None:  # type: ignore[no-untyped-def]
-    await pilot.pause()
-    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-    await pilot.pause()
-
-
 async def test_current_month_is_highlighted_on_selection(tmp_workspace: Workspace) -> None:
     now = datetime.now()
     create_meeting(tmp_workspace, "this month", now=now)
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
         scope_list = app.screen.query_one("#scope-list", ListView)
         highlighted = scope_list.highlighted_child
         assert isinstance(highlighted, MonthRow)
@@ -45,19 +40,15 @@ async def test_moving_the_month_highlight_refills_list_and_preview_without_movin
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]
-        assert titles == ["this month meeting"]
+        await to_collection(app, pilot, "meetings")
+        assert row_titles(app) == ["this month meeting"]
 
         await pilot.press("h")
         await pilot.pause()
         await pilot.press("j")  # move to the next (older) month row
         await pilot.pause()
 
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]
-        assert titles == ["last month meeting"]
+        assert row_titles(app) == ["last month meeting"]
 
         scope_list = app.screen.query_one("#scope-list", ListView)
         assert scope_list.has_focus
@@ -72,9 +63,8 @@ async def test_empty_current_month_shows_a_month_scoped_empty_state(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
-        list_view = app.screen.query_one("#meeting-list", ListView)
-        labels = [str(item.children[0].content) for item in list_view.children]  # type: ignore[attr-defined]
+        await to_collection(app, pilot, "meetings")
+        labels = [str(item.children[0].content) for item in list_view(app).children]  # type: ignore[attr-defined]
         month = YearMonth(now.year, now.month)
         assert labels == [
             f"No meetings in {month}. Press / then 'meeting <description>' to create one."
@@ -91,7 +81,7 @@ async def test_warning_count_is_per_month(tmp_workspace: Workspace) -> None:
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
         status = app.screen.query_one(StatusBar)
         assert "warning" not in str(status.content)
 
@@ -114,7 +104,7 @@ async def test_returning_to_a_collection_resets_to_the_current_month(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await _to_meetings(pilot)
+        await to_collection(app, pilot, "meetings")
         await pilot.press("h")
         await pilot.pause()
         await pilot.press("j")
@@ -123,10 +113,8 @@ async def test_returning_to_a_collection_resets_to_the_current_month(
 
         await pilot.press("l")
         await pilot.pause()
-        await pilot.press("tab", "tab")  # meetings -> tasks -> notes
-        await pilot.pause()
-        await pilot.press("tab")  # notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "notes")  # leave meetings
+        await to_collection(app, pilot, "meetings")  # and come back
 
         assert app.active == "meetings"
         assert app.scope_selection["meetings"] == YearMonth(now.year, now.month)
