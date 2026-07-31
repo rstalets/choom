@@ -4,9 +4,23 @@ import os
 from collections.abc import Sequence
 from datetime import datetime
 
-from endpaper.core.documents import _read_document, create_document, scan_documents
+from endpaper.core.documents import (
+    _read_document,
+    create_document,
+    list_months,
+    scan_documents,
+    scan_month,
+)
 from endpaper.core.frontmatter import render_frontmatter
-from endpaper.core.models import Collection, DailyNote, Document, ScanWarning, Workspace
+from endpaper.core.models import (
+    Collection,
+    DailyNote,
+    Document,
+    MonthListing,
+    ScanWarning,
+    Workspace,
+    YearMonth,
+)
 from endpaper.core.text import new_document_id
 
 NOTES = Collection("n_", "notes", ("notes",), frozenset({"daily"}))
@@ -25,6 +39,16 @@ def create_note(
 
 def scan_notes(workspace: Workspace) -> tuple[list[Document], list[ScanWarning]]:
     return scan_documents(workspace, NOTES)
+
+
+def list_note_months(workspace: Workspace) -> MonthListing:
+    return list_months(workspace, NOTES)
+
+
+def scan_note_month(
+    workspace: Workspace, month: YearMonth
+) -> tuple[list[Document], list[ScanWarning]]:
+    return scan_month(workspace, NOTES, month)
 
 
 def open_daily_note(workspace: Workspace, *, now: datetime | None = None) -> DailyNote:

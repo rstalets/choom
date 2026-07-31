@@ -10,6 +10,8 @@ from endpaper.tui.edit_screen import EditScreen
 
 async def _open_edit(app: EndpaperApp, pilot) -> None:  # type: ignore[no-untyped-def]
     await pilot.pause()
+    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+    await pilot.pause()
     await pilot.press("enter")
     await pilot.pause()
     await pilot.press("e")
@@ -97,7 +99,7 @@ async def test_footer_shows_edit_help(tmp_workspace: Workspace) -> None:
     async with app.run_test(size=(80, 24)) as pilot:
         await _open_edit(app, pilot)
         status = app.screen.query_one(StatusBar)
-        assert str(status.content) == EDIT_HELP
+        assert str(status.content).startswith(EDIT_HELP)
 
 
 async def test_non_ascii_and_emoji_round_trip_intact(tmp_workspace: Workspace) -> None:

@@ -1,0 +1,68 @@
+name: Release dry run
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Proposed version, e.g. 0.0.4"
+        required: true
+        type: string
+
+jobs:
+  dry-run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Validate version input
+        run: |
+          if ! echo "${{ inputs.version }}" | grep -Eq '^[0-9]+(\.[0-9]+){1,3}((a|b|rc)[0-9]+)?(\.post[0-9]+)?(\.dev[0-9]+)?$'; then
+            echo "::error::'${{ inputs.version }}' does not look like a PEP 440 version"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+
+      - name: Format check
+        run: uv run --extra dev ruff format --check .
+
+      - name: Lint
+        run: uv run --extra dev ruff check .
+
+      - name: Type check
+        run: uv run --extra dev mypy
+
+      - name: Test
+        run: uv run --extra dev pytest -q
+
+      - name: Build with the proposed version
+        env:
+          HATCH_BUILD_HOOKS_ENABLE: "1"
+          SETUPTOOLS_SCM_PRETEND_VERSION: ${{ inputs.version }}
+        run: uv build --no-sources
+
+      - name: Install the built wheel into a clean environment
+        run: |
+          python -m venv /tmp/release-dry-run-venv
+          /tmp/release-dry-run-venv/bin/pip install --quiet dist/*.whl
+
+      - name: Assert the installed package reports the proposed version
+        run: |
+          actual="$(/tmp/release-dry-run-venv/bin/endpaper --version)"
+          expected="endpaper ${{ inputs.version }}"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::expected '$expected', got '$actual'"
+            exit 1
+          fi
+
+      - name: Upload dist as a workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ inputs.version }}
+          path: dist/

@@ -1,6 +1,9 @@
 # Claude worktrees
 .claude/worktrees
 
+# Build-stamped version (hatch-vcs)
+src/endpaper/_version.py
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]

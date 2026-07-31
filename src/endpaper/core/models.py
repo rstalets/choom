@@ -43,6 +43,21 @@ Note = Document
 
 
 @dataclass(frozen=True, slots=True)
+class YearMonth:
+    year: int
+    month: int
+
+    def __str__(self) -> str:
+        return f"{self.year:04d}-{self.month:02d}"
+
+
+@dataclass(frozen=True, slots=True)
+class MonthListing:
+    months: tuple[YearMonth, ...]
+    has_unfiled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class Collection:
     id_prefix: str
     create_dir: str
@@ -135,3 +150,4 @@ class TaskFilter:
     type: str | None = None
     tags: tuple[str, ...] = ()
     include_done: bool = False
+    only_done: bool = False

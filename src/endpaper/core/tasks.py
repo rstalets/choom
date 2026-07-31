@@ -233,10 +233,16 @@ def render_task_line(
 
 
 def filter_tasks(tasks: Iterable[Task], f: TaskFilter) -> list[Task]:
-    """Conjunctive filter. Sorts oldest-first, undated last, stable within a date."""
+    """Conjunctive filter. Sorts oldest-first, undated last, stable within a date.
+
+    `only_done=True` selects completed tasks only and overrides `include_done`.
+    """
     results: list[Task] = []
     for task in tasks:
-        if not f.include_done and task.done:
+        if f.only_done:
+            if not task.done:
+                continue
+        elif not f.include_done and task.done:
             continue
         if f.type is not None and task.type.lower() != f.type.lower():
             continue

@@ -15,12 +15,7 @@ async def _toggle_via_tui(workspace) -> None:  # type: ignore[no-untyped-def]
     app = EndpaperApp(workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
-        await pilot.press("left")
-        await pilot.pause()
-        await pilot.press("j", "j")
-        await pilot.pause()
-        await pilot.press("right")
-        await pilot.pause()
+        assert app.active == "tasks"
         list_view = app.screen.query_one("#meeting-list", ListView)
         assert isinstance(list_view.highlighted_child, TaskRow)
         await pilot.press("space")

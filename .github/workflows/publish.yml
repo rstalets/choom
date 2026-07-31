@@ -37,6 +37,8 @@ jobs:
         uses: astral-sh/setup-uv@v6
 
       - name: Build
+        env:
+          HATCH_BUILD_HOOKS_ENABLE: "1"
         run: uv build --no-sources
 
       - name: Publish

@@ -28,7 +28,14 @@ dev = [
 
 [tool.hatch.version]
 source = "vcs"
-fallback-version = "0.0.1"
+fallback-version = "0.0.0"
+
+# enable-by-default = false so `pip install -e .` (an editable/dev install) does not stamp a
+# dev-version _version.py, which would defeat the 0.0.0-from-a-checkout guarantee (FR-043). Real
+# builds opt in with HATCH_BUILD_HOOKS_ENABLE=1 (see publish.yml, release-dry-run.yml).
+[tool.hatch.build.hooks.vcs]
+version-file = "src/endpaper/_version.py"
+enable-by-default = false
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/endpaper"]

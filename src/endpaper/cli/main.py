@@ -113,6 +113,9 @@ def _build_parser() -> argparse.ArgumentParser:
     task_list_parser = task_subparsers.add_parser("list", help="list tasks")
     task_list_parser.add_argument("--json", action="store_true")
     task_list_parser.add_argument("--all", action="store_true", help="include completed tasks")
+    task_list_parser.add_argument(
+        "--done", action="store_true", help="completed tasks only; wins over --all"
+    )
     task_list_parser.add_argument("--type")
     task_list_parser.add_argument("--tag", action="append", default=[])
 
@@ -261,6 +264,7 @@ def _cmd_task_list(namespace: argparse.Namespace) -> int:
         type=namespace.type,
         tags=tuple(namespace.tag),
         include_done=namespace.all,
+        only_done=namespace.done,
     )
     filtered = filter_tasks(tasks, task_filter)
 

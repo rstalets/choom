@@ -70,7 +70,7 @@ endpaper
 
 ![Meetings list and rendered preview](docs/screenshots/meetings.png)
 
-`/` opens a combined filter/command bar — type to filter the list live, or type `meeting.standup <description>` and hit `enter` to create one without leaving the screen. Arrow keys move, `enter` opens the selected meeting in a rendered markdown preview, `e` drops into a raw editor, `ctrl+o`/`ctrl+x` save, `esc` backs out.
+`tab`/`shift+tab` cycle the top bar between Tasks, Notes, and Meetings. `/` opens a permanent command bar — type `filter <term>` (or `f <term>`) to narrow the list live, or `meeting.standup <description>` and hit `enter` to create one, landing straight in the editor. Arrow keys move, `enter` opens the selected meeting in a rendered markdown preview, `e` drops into a raw editor from either the list or the preview, `ctrl+o`/`ctrl+x` save, `esc` backs out. `/help` lists every command and key binding without leaving the screen.
 
 ![Raw markdown editor with line numbers and frontmatter](docs/screenshots/edit-meeting.png)
 
@@ -90,9 +90,9 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter s
 
 ## Features (v0.0.1)
 
-- **Meeting notes** — `/meeting.standup Q3 planning #platform` creates a dated, frontmatter-tagged file and drops you straight into it. Browse with `/meetings`, filter live, open with `enter`.
-- **General notes** — `/note` opens (or creates) today's daily note; `/note.research vendor landscape #procurement` creates a typed note. Browse with `/notes`.
-- **Tasks** — `/task.followup send the vendor comparison #procurement` appends a checkbox line to `tasks.md`. `/tasks` lists open items; `space` toggles done. The file stays hand-editable plain markdown — no database.
+- **Meeting notes** — `/meeting.standup Q3 planning #platform` creates a dated, frontmatter-tagged file and drops you straight into the editor. Browse with `/meetings` or `tab`; the left pane lists months, most-recent-first; `/filter <term>` (or `/f <term>`) narrows across every month; open with `enter`.
+- **General notes** — `/note` opens (or creates) today's daily note; `/note.research vendor landscape #procurement` creates a typed note. Browse with `/notes` or `tab`.
+- **Tasks** — `/task.followup send the vendor comparison #procurement` appends a checkbox line to `tasks.md`. `/tasks` or `tab` opens on **To-Do**; `space` toggles a task done, moving it to the **Done** category in the left pane. The file stays hand-editable plain markdown — no database.
 - **Workspace init** — `endpaper init` sets up a workspace (config, `AGENTS.md`, `meetings/`, `notes/daily/`, `tasks.md`) in the current directory. Multi-user shared workspaces are planned but not in v0.0.1 — see [Roadmap](#roadmap).
 - **View and edit** — every note or meeting opens in a rendered markdown preview (`enter`), switches to a raw editor (`e`) with line numbers and soft wrap, and saves with `ctrl+o` (stay) or `ctrl+x` (save and return). `esc` discards, but only prompts when there's something to lose. `ctrl+s` is also bound as a save alias, but `ctrl+o` is the canonical key: some terminals treat `ctrl+s` as the legacy XOFF flow-control signal and swallow it before it ever reaches endpaper. If saves with `ctrl+s` seem to do nothing, run `stty -ixon` in that shell (or use `ctrl+o` instead).
 - **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `endpaper find`, `read`, `write`, `append`, `--json` on every read command, meaningful exit codes, nothing that opens an editor or blocks on input.
