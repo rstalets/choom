@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from endpaper.core.documents import _read_document
+from endpaper.core.meetings import scan_meetings
 from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
+from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import ListScreen
-from endpaper.tui.preview_screen import PreviewScreen
 from endpaper.tui.status_bar import StatusBar
 
 
@@ -29,19 +31,20 @@ async def test_command_bar_creates_meeting_with_inline_tags_anywhere(
         await pilot.press("enter")
         await pilot.pause()
 
-        assert isinstance(app.screen, PreviewScreen)
-        meeting = app.screen.meeting
+        assert isinstance(app.screen, EditScreen)
+        meeting = _read_document(app.screen.file.path)
+        assert meeting is not None
         assert meeting.title == "Q3 planning"
         assert meeting.tags == ("platform", "legal")
         assert meeting.type == "standup"
         assert "#" not in meeting.title
 
 
-async def test_retyped_leading_slash_still_creates_untyped_meeting(
-    tmp_workspace: Workspace,
-) -> None:
-    # Users naturally retype the '/' that opened the bar even though it isn't
-    # inserted automatically -- this must not be misread as a filter.
+async def test_retyped_leading_slash_is_an_unknown_command(tmp_workspace: Workspace) -> None:
+    # The '/' that opens the bar is a separate widget now (research R3): the
+    # Input's value never contains it. A user who retypes '/' anyway gets a
+    # literal '/' in the command text, which matches no verb -- an error, not
+    # the old `_normalize()` workaround that silently stripped it.
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
@@ -51,9 +54,11 @@ async def test_retyped_leading_slash_still_creates_untyped_meeting(
         await pilot.press("enter")
         await pilot.pause()
 
-        assert isinstance(app.screen, PreviewScreen)
-        assert app.screen.meeting.title == "board"
-        assert app.screen.meeting.type == ""
+        assert isinstance(app.screen, ListScreen)
+        status = app.screen.query_one(StatusBar)
+        assert "unknown command" in str(status.content)
+        meetings, _ = scan_meetings(tmp_workspace)
+        assert meetings == []
 
 
 async def test_dotted_command_with_no_description_shows_error_not_silence(
@@ -71,6 +76,7 @@ async def test_dotted_command_with_no_description_shows_error_not_silence(
         await pilot.pause()
 
         assert isinstance(app.screen, ListScreen)
-        assert len(app.meetings) == 0
+        meetings, _ = scan_meetings(tmp_workspace)
+        assert meetings == []
         status = app.screen.query_one(StatusBar)
         assert "empty" in str(status.content)

@@ -3,39 +3,27 @@ from __future__ import annotations
 from textual import on
 from textual.app import ComposeResult
 from textual.binding import Binding
+from textual.containers import Horizontal
 from textual.message import Message
 from textual.widgets import Input, Static
 
-VERBS = {"meeting", "meetings", "note", "notes", "task", "tasks", "init"}
-
-
-def _normalize(text: str) -> str:
-    """Tolerate a literal leading '/' in the typed text.
-
-    The bar is opened by pressing '/', which is not inserted into the input --
-    but users naturally retype it anyway (the footer hint reads "/ filter or
-    command", and it's the universal command-prefix convention), so a leading
-    '/' must not be treated as part of the query/verb.
-    """
-    return text[1:] if text.startswith("/") else text
+from endpaper.tui.commands import resolve_verb
 
 
 def resolve_mode(text: str) -> tuple[str, str]:
-    """Return (mode, first_token). mode is 'filter' or 'command'.
-
-    A leading space is an escape hatch that forces filter mode (research.md R4).
+    """Return (mode, first_token). `text` never includes the leading `/` -- that is
+    a separate widget (research R3). mode is "filter" once `filter`/`f` is a
+    complete token (a trailing space follows it); otherwise "command".
     """
-    if text.startswith(" "):
-        return "filter", ""
-    text = _normalize(text)
     stripped = text.lstrip()
     if not stripped:
         return "filter", ""
     first_token = stripped.split(None, 1)[0]
+    verb_complete = len(stripped) > len(first_token)
     stem = first_token.split(".", 1)[0].lower()
-    if stem in VERBS:
-        return "command", first_token
-    return "filter", ""
+    if stem in ("filter", "f") and verb_complete:
+        return "filter", first_token
+    return "command", first_token
 
 
 class CommandBar(Static):
@@ -67,19 +55,21 @@ class CommandBar(Static):
             self.name = name
             super().__init__()
 
+    class HelpRequested(Message):
+        pass
+
     class BarError(Message):
         def __init__(self, message: str) -> None:
             self.message = message
             super().__init__()
 
-    class ClearRequested(Message):
-        pass
-
     class Closed(Message):
         pass
 
     def compose(self) -> ComposeResult:
-        yield Input(placeholder="/ filter or command", id="bar-input")
+        with Horizontal(id="bar-row"):
+            yield Static("/", id="bar-prefix")
+            yield Input(placeholder="filter or command", id="bar-input")
 
     def open(self) -> None:
         self.display = True
@@ -94,37 +84,43 @@ class CommandBar(Static):
 
     def action_cancel(self) -> None:
         self.query_one(Input).value = ""
-        self.post_message(self.ClearRequested())
+        self.post_message(self.FilterChanged(""))
         self.close()
 
     @on(Input.Changed, "#bar-input")
     def _on_changed(self, event: Input.Changed) -> None:
-        mode, verb = resolve_mode(event.value)
-        self.post_message(self.ModeChanged(mode, verb))
-        if mode == "filter":
-            # A leading space is the explicit escape hatch for a literal filter
-            # (e.g. the literal word "meetings"); anywhere else, a leading '/' is
-            # the retyped activation key, not part of the query.
-            query = event.value[1:] if event.value.startswith(" ") else _normalize(event.value)
-            self.post_message(self.FilterChanged(query))
+        mode, first_token = resolve_mode(event.value)
+        self.post_message(self.ModeChanged(mode, first_token))
+        if mode == "filter" and first_token:
+            stripped = event.value.lstrip()
+            term = stripped[len(first_token) :].lstrip()
+            self.post_message(self.FilterChanged(term))
 
     @on(Input.Submitted, "#bar-input")
     def _on_submitted(self, event: Input.Submitted) -> None:
-        mode, verb_token = resolve_mode(event.value)
-        if mode == "command":
-            self._run_command(event.value, verb_token)
+        mode, first_token = resolve_mode(event.value)
+        if mode == "command" and first_token:
+            self._run_command(event.value, first_token)
         self.close()
 
-    def _run_command(self, text: str, verb_token: str) -> None:
-        text = _normalize(text)
-        rest = text[len(verb_token) :].lstrip()
-        stem, _, type_part = verb_token.partition(".")
-        stem = stem.lower()
-        if stem == "meeting":
+    def _run_command(self, text: str, first_token: str) -> None:
+        stripped = text.lstrip()
+        rest = stripped[len(first_token) :].lstrip()
+        stem, _, type_part = first_token.partition(".")
+        verb = resolve_verb(stem.lower())
+        if verb is None:
+            self.post_message(
+                self.BarError(
+                    f"unknown command: '{first_token}'. Press / then 'help' for the list."
+                )
+            )
+            return
+
+        if verb.name == "meeting":
             self.post_message(self.CreateRequested("meeting", rest, type_part))
-        elif stem == "meetings":
+        elif verb.name == "meetings":
             self.post_message(self.CollectionRequested("meetings"))
-        elif stem == "note":
+        elif verb.name == "note":
             if not rest:
                 if type_part:
                     self.post_message(self.BarError(f"note.{type_part} needs a description"))
@@ -132,13 +128,17 @@ class CommandBar(Static):
                     self.post_message(self.DailyRequested())
             else:
                 self.post_message(self.CreateRequested("note", rest, type_part))
-        elif stem == "notes":
+        elif verb.name == "notes":
             self.post_message(self.CollectionRequested("notes"))
-        elif stem == "task":
+        elif verb.name == "task":
             if not rest:
                 self.post_message(self.BarError("task needs a description"))
             else:
                 self.post_message(self.CreateRequested("task", rest, type_part))
-        elif stem == "tasks":
+        elif verb.name == "tasks":
             self.post_message(self.CollectionRequested("tasks"))
+        elif verb.name == "help":
+            self.post_message(self.HelpRequested())
+        elif verb.name == "filter":
+            pass  # already live-applied; enter just confirms and closes
         # "init" is a registered verb for future features; no TUI action this feature.

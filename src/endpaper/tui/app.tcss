@@ -2,12 +2,18 @@ Screen {
     layout: vertical;
 }
 
+CollectionBar {
+    dock: top;
+    height: 1;
+    background: $panel;
+}
+
 #body {
     height: 1fr;
     layout: horizontal;
 }
 
-#menu-pane {
+#scope-pane {
     width: 14;
     border-right: solid $accent;
 }
@@ -22,7 +28,7 @@ Screen {
     padding: 0 1;
 }
 
-#collection-menu {
+#scope-list {
     height: 1fr;
 }
 
@@ -38,6 +44,15 @@ Screen {
 CommandBar {
     height: 1;
     display: none;
+}
+
+CommandBar #bar-row {
+    height: 1;
+}
+
+CommandBar #bar-prefix {
+    width: 1;
+    color: $accent;
 }
 
 CommandBar Input {
@@ -77,4 +92,22 @@ StatusBar {
 
 DiscardDialog {
     align: center middle;
+}
+
+HelpScreen {
+    align: center middle;
+    background: $background 60%;
+}
+
+#help-pane {
+    dock: bottom;
+    height: 60%;
+    width: 100%;
+    background: $panel;
+    border-top: thick $accent;
+    padding: 1 2;
+}
+
+#help-body {
+    height: 1fr;
 }

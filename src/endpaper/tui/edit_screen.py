@@ -1,17 +1,38 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
-from textual.app import ComposeResult
+from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Vertical
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.widgets import TextArea
 
-from endpaper.core.editing import save_buffer
+from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.models import EditableFile
 from endpaper.tui.discard_dialog import DiscardDialog
 from endpaper.tui.status_bar import EDIT_HELP, StatusBar
+
+
+def open_editor(app: App[None], path: Path) -> bool:
+    """Push the editor for `path` -- the one route into `EditScreen`, used by list
+    `e`, preview `e`, and every create path (research R10). Returns False and
+    reports the reason in the caller's status bar if the file cannot be read,
+    leaving the caller's screen in place rather than raising."""
+    try:
+        file = load_for_edit(path)
+    except OSError as exc:
+        try:
+            status = app.screen.query_one(StatusBar)
+        except NoMatches:
+            pass
+        else:
+            status.update(f"⚠ could not open {path.name}: {exc}")
+        return False
+    app.push_screen(EditScreen(file))
+    return True
 
 
 class EditScreen(Screen[None]):

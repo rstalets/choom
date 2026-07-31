@@ -8,6 +8,12 @@ from endpaper.tui.app import EndpaperApp
 from endpaper.tui.list_screen import ListView, MeetingRow
 
 
+async def _to_meetings(pilot) -> None:  # type: ignore[no-untyped-def]
+    await pilot.pause()
+    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+    await pilot.pause()
+
+
 async def test_meetings_listed_date_descending(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "oldest", now=datetime(2026, 7, 20, 9, 0, 0))
     create_meeting(tmp_workspace, "middle", now=datetime(2026, 7, 25, 9, 0, 0))
@@ -15,7 +21,7 @@ async def test_meetings_listed_date_descending(tmp_workspace: Workspace) -> None
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         list_view = app.screen.query_one("#meeting-list", ListView)
         titles = [row.meeting.title for row in list_view.children if isinstance(row, MeetingRow)]
         assert titles == ["newest", "middle", "oldest"]
@@ -27,15 +33,16 @@ async def test_filter_narrows_visible_rows_live(tmp_workspace: Workspace) -> Non
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         await pilot.press("/")
         await pilot.pause()
-        for ch in "vendor":
-            await pilot.press(ch)
+        for ch in "filter vendor":
+            await pilot.press("space" if ch == " " else ch)
         await pilot.pause()
 
-        assert len(app.visible_meetings) == 1
-        assert app.visible_meetings[0].title == "vendor renewal"
+        visible = app.visible_documents()
+        assert len(visible) == 1
+        assert visible[0].title == "vendor renewal"
 
 
 async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspace) -> None:
@@ -44,7 +51,7 @@ async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspac
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         list_view = app.screen.query_one("#meeting-list", ListView)
 
         await pilot.press("j")
@@ -62,7 +69,7 @@ async def test_list_reflects_meeting_created_while_in_preview(tmp_workspace: Wor
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
 
         await pilot.press("/")
         await pilot.pause()
@@ -91,7 +98,7 @@ async def test_selection_preserved_across_preview_when_nothing_created(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         list_view = app.screen.query_one("#meeting-list", ListView)
 
         await pilot.press("j")
@@ -117,7 +124,7 @@ async def test_single_meeting_row_is_visually_highlighted(tmp_workspace: Workspa
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         list_view = app.screen.query_one("#meeting-list", ListView)
         assert list_view.highlighted_child is not None
         assert list_view.highlighted_child.highlighted is True
@@ -136,7 +143,7 @@ async def test_top_row_highlighted_after_refocusing_list_without_moving_cursor(
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
+        await _to_meetings(pilot)
         await pilot.press("left")
         await pilot.pause()
         await pilot.press("right")

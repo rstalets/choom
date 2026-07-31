@@ -190,6 +190,41 @@ def test_list_type_and_tag_combine_conjunctively_with_all(
     assert lines[0].split("\t")[0] == "t_0002"
 
 
+def test_list_done_shows_completed_only(tmp_path: Path, monkeypatch, capsys) -> None:
+    _init_with_seed(tmp_path, monkeypatch)
+    capsys.readouterr()
+
+    exit_code = main(["task", "list", "--done"])
+    assert exit_code == 0
+    lines = capsys.readouterr().out.splitlines()
+    ids = {line.split("\t")[0] for line in lines}
+    assert ids == {"t_0003", "t_0004"}
+
+
+def test_list_done_json_matches_the_table_output(tmp_path: Path, monkeypatch, capsys) -> None:
+    _init_with_seed(tmp_path, monkeypatch)
+    capsys.readouterr()
+
+    exit_code = main(["task", "list", "--done", "--json"])
+    assert exit_code == 0
+    import json
+
+    rows = json.loads(capsys.readouterr().out)
+    assert {row["id"] for row in rows} == {"t_0003", "t_0004"}
+    assert all(row["done"] is True for row in rows)
+
+
+def test_list_done_wins_over_all(tmp_path: Path, monkeypatch, capsys) -> None:
+    _init_with_seed(tmp_path, monkeypatch)
+    capsys.readouterr()
+
+    exit_code = main(["task", "list", "--done", "--all"])
+    assert exit_code == 0
+    lines = capsys.readouterr().out.splitlines()
+    ids = {line.split("\t")[0] for line in lines}
+    assert ids == {"t_0003", "t_0004"}
+
+
 def test_list_on_missing_tasks_file_lists_nothing_exits_0(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:

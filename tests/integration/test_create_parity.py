@@ -7,7 +7,7 @@ from pathlib import Path
 from endpaper.cli.main import main
 from endpaper.core.workspace import init_workspace
 from endpaper.tui.app import EndpaperApp
-from endpaper.tui.preview_screen import PreviewScreen
+from endpaper.tui.edit_screen import EditScreen
 
 _MASKED_FIELDS = re.compile(r"^(id|created|updated):.*$", re.MULTILINE)
 
@@ -26,8 +26,8 @@ async def _create_via_tui(workspace) -> Path:  # type: ignore[no-untyped-def]
             await pilot.press("space" if ch == " " else ch)
         await pilot.press("enter")
         await pilot.pause()
-        assert isinstance(app.screen, PreviewScreen)
-        return app.screen.meeting.path
+        assert isinstance(app.screen, EditScreen)
+        return app.screen.file.path
 
 
 def test_cli_and_tui_create_identical_except_id_and_timestamps(

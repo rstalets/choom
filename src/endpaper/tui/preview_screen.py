@@ -9,7 +9,6 @@ from textual.screen import Screen
 from textual.widgets import Markdown
 
 from endpaper.core.documents import _read_document
-from endpaper.core.editing import load_for_edit
 from endpaper.core.models import Document
 from endpaper.tui.rendering import render_preview_markdown
 from endpaper.tui.status_bar import PREVIEW_HELP, StatusBar
@@ -59,10 +58,9 @@ class PreviewScreen(Screen[None]):
         )
 
     def action_edit(self) -> None:
-        from endpaper.tui.edit_screen import EditScreen
+        from endpaper.tui.edit_screen import open_editor
 
-        file = load_for_edit(self.path)
-        self.app.push_screen(EditScreen(file))
+        open_editor(self.app, self.path)
 
     def action_close_preview(self) -> None:
         self.app.pop_screen()

@@ -18,6 +18,8 @@ _CREATED = re.compile(r"^created: (.+)$", re.MULTILINE)
 
 async def _open_edit(app: EndpaperApp, pilot) -> None:  # type: ignore[no-untyped-def]
     await pilot.pause()
+    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+    await pilot.pause()
     await pilot.press("enter")
     await pilot.pause()
     assert isinstance(app.screen, PreviewScreen)
@@ -105,6 +107,8 @@ async def test_title_change_appears_in_list_row_with_no_other_row_moved(
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
+        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+        await pilot.pause()
         list_view = app.screen.query_one("#meeting-list", ListView)
         list_view.index = 1  # "second meeting" (newest-first: third, second, first)
 
@@ -127,8 +131,11 @@ async def test_title_change_appears_in_list_row_with_no_other_row_moved(
 
 
 async def test_updated_advances_while_created_stays_fixed(tmp_workspace: Workspace) -> None:
+    # A fixed past time within the current month: month-scoping still finds it,
+    # and it is guaranteed to differ from the real "now" the save stamps in.
+    now = datetime.now()
     meeting = create_meeting(
-        tmp_workspace, "Q3 planning", type="standup", now=datetime(2026, 1, 1, 9, 0, 0)
+        tmp_workspace, "Q3 planning", type="standup", now=now.replace(day=1, hour=0, minute=0)
     )
     original_created = meeting.created
 
@@ -201,12 +208,14 @@ async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
+        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+        await pilot.pause()
         await pilot.press("/")
         await pilot.pause()
-        for ch in "vendor":
-            await pilot.press(ch)
+        for ch in "filter vendor":
+            await pilot.press("space" if ch == " " else ch)
         await pilot.pause()
-        assert len(app.visible_documents) == 1
+        assert len(app.visible_documents()) == 1
 
         await pilot.press("enter")  # closes the filter bar, applying the filter
         await pilot.pause()
@@ -230,7 +239,7 @@ async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining
         list_view = app.screen.query_one("#meeting-list", ListView)
         # the edited document no longer matches "vendor" -- it must not remain
         # selected, and the list must not be left with nothing highlighted
-        assert len(app.visible_documents) == 0 or (
+        assert len(app.visible_documents()) == 0 or (
             isinstance(list_view.highlighted_child, DocumentRow)
             and list_view.highlighted_child.document.title != "totally different title"
         )

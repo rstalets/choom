@@ -12,6 +12,8 @@ from endpaper.tui.preview_screen import PreviewScreen
 
 async def _open_edit(app: EndpaperApp, pilot) -> None:  # type: ignore[no-untyped-def]
     await pilot.pause()
+    await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+    await pilot.pause()
     await pilot.press("enter")
     await pilot.pause()
     await pilot.press("e")

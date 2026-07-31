@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+from endpaper.core.documents import _read_document
 from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
-from endpaper.tui.preview_screen import PreviewScreen
+from endpaper.tui.edit_screen import EditScreen
 
 
 async def _type(pilot, text: str) -> None:
@@ -20,8 +21,8 @@ async def test_dotted_note_command_creates_typed_note(tmp_workspace: Workspace) 
         await pilot.press("enter")
         await pilot.pause()
 
-        assert isinstance(app.screen, PreviewScreen)
-        document = app.screen.document
+        assert isinstance(app.screen, EditScreen)
+        document = _read_document(app.screen.file.path)
         assert document is not None
         assert document.title == "vendor landscape"
         assert document.type == "research"
@@ -41,8 +42,8 @@ async def test_bare_note_with_description_creates_untyped_note_not_daily(
         await pilot.press("enter")
         await pilot.pause()
 
-        assert isinstance(app.screen, PreviewScreen)
-        document = app.screen.document
+        assert isinstance(app.screen, EditScreen)
+        document = _read_document(app.screen.file.path)
         assert document is not None
         assert document.title == "vendor landscape"
         assert document.type == ""

@@ -1,17 +1,54 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
+from typing import Literal
 
 from textual.app import App
 from textual.binding import Binding
 
-from endpaper.core.documents import _read_document, match_document
+from endpaper.core.documents import (
+    _read_document,
+    list_months,
+    match_document,
+    scan_month,
+    scan_unfiled,
+)
 from endpaper.core.errors import EndpaperError, UsageError
-from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.models import DailyNote, Document, ScanWarning, Task, TaskFilter, Workspace
-from endpaper.core.notes import create_note, open_daily_note, scan_notes
+from endpaper.core.meetings import MEETINGS, create_meeting
+from endpaper.core.models import (
+    Collection,
+    DailyNote,
+    Document,
+    MonthListing,
+    ScanWarning,
+    Task,
+    TaskFilter,
+    Workspace,
+    YearMonth,
+)
+from endpaper.core.notes import NOTES, create_note, open_daily_note
 from endpaper.core.tasks import add_task, filter_tasks, load_tasks, match_task, set_task_state
+
+DOCUMENT_COLLECTIONS: dict[str, Collection] = {"meetings": MEETINGS, "notes": NOTES}
+ScopeSelection = YearMonth | Literal["unfiled"]
+
+
+def _current_month() -> YearMonth:
+    today = date.today()
+    return YearMonth(today.year, today.month)
+
+
+def _month_of(path: Path) -> YearMonth | None:
+    """The YearMonth implied by a document's path, or None if it is unfiled."""
+    try:
+        month = int(path.parent.name)
+        year = int(path.parent.parent.name)
+    except ValueError:
+        return None
+    if not (1 <= month <= 12):
+        return None
+    return YearMonth(year, month)
 
 
 class EndpaperApp(App[None]):
@@ -23,95 +60,201 @@ class EndpaperApp(App[None]):
     def __init__(self, workspace: Workspace) -> None:
         super().__init__()
         self.workspace = workspace
-        self.documents: dict[str, list[Document]] = {"meetings": [], "notes": []}
-        self.warnings: dict[str, list[ScanWarning]] = {"meetings": [], "notes": [], "tasks": []}
-        self.active: str = "meetings"
-        self.visible_documents: list[Document] = []
+        self.active: str = "tasks"
+
+        # Notes/Meetings: which month (or "unfiled") the scope pane shows.
+        self.month_scope: dict[str, YearMonth] = {}
+        self.scope_selection: dict[str, ScopeSelection] = {}
+
+        # Tasks: which category the scope pane shows.
+        self.task_category: str = "todo"
+
+        self.month_cache: dict[tuple[str, YearMonth], list[Document]] = {}
+        self.month_warnings: dict[tuple[str, YearMonth], list[ScanWarning]] = {}
+        self.unfiled_cache: dict[str, list[Document]] = {}
+        self.unfiled_warnings: dict[str, list[ScanWarning]] = {}
+        self.fully_loaded: set[str] = set()
+
+        self.filter_query: str = ""
+        self.pre_filter_scope: YearMonth | None = None
+        self.filter_loading: bool = False
+
         self.last_create_error: str | None = None
-        self._filter_query: str = ""
-        self.tasks: list[Task] = []
-        self.visible_tasks: list[Task] = []
-        self.show_done: bool = False
         self.last_task_error: str | None = None
-        self._task_filter_query: str = ""
+
+        self.tasks: list[Task] = []
+        self.task_warnings: list[ScanWarning] = []
+
+        for name in DOCUMENT_COLLECTIONS:
+            self._reset_scope(name)
 
     def on_mount(self) -> None:
-        self.documents["meetings"], self.warnings["meetings"] = scan_meetings(self.workspace)
-        self.documents["notes"], self.warnings["notes"] = scan_notes(self.workspace)
-        self.tasks, self.warnings["tasks"] = load_tasks(self.workspace)
-        self.visible_documents = list(self.documents[self.active])
-        self._refresh_visible_tasks()
+        self.tasks, self.task_warnings = load_tasks(self.workspace)
 
         from endpaper.tui.list_screen import ListScreen
 
         self.push_screen(ListScreen())
 
-    # --- feature 001 compatibility aliases: back when there was only one
-    # collection, these were plain attributes. Kept as properties so the
-    # existing meeting-only tests keep working unedited.
-    @property
-    def meetings(self) -> list[Document]:
-        return self.documents["meetings"]
+    # --- scope (month / unfiled / category) -----------------------------------
 
-    @property
-    def visible_meetings(self) -> list[Document]:
-        return self.visible_documents
+    def _reset_scope(self, collection: str) -> None:
+        current = _current_month()
+        self.month_scope[collection] = current
+        self.scope_selection[collection] = current
 
-    def apply_filter(self, query: str) -> None:
-        if self.active == "tasks":
-            self._task_filter_query = query
-            self._refresh_visible_tasks()
+    def list_scope(self, collection: str) -> MonthListing:
+        return list_months(self.workspace, DOCUMENT_COLLECTIONS[collection])
+
+    def select_scope(self, collection: str, selection: ScopeSelection) -> None:
+        self.scope_selection[collection] = selection
+        if isinstance(selection, YearMonth):
+            self.month_scope[collection] = selection
+
+    def _ensure_month_loaded(self, collection: str, month: YearMonth) -> None:
+        key = (collection, month)
+        if key in self.month_cache:
             return
-        self._filter_query = query
-        active_documents = self.documents[self.active]
-        if query:
-            self.visible_documents = [d for d in active_documents if match_document(d, query)]
-        else:
-            self.visible_documents = list(active_documents)
+        documents, warnings = scan_month(self.workspace, DOCUMENT_COLLECTIONS[collection], month)
+        self.month_cache[key] = documents
+        self.month_warnings[key] = warnings
 
-    def refresh_document(self, path: Path) -> None:
-        """Re-parse only the one file that changed, in place, preserving list order.
-        Never rescans the workspace (FR-021, FR-022)."""
-        new_document = _read_document(path)
-        for collection in ("meetings", "notes"):
-            docs = self.documents[collection]
-            index = next((i for i, d in enumerate(docs) if d.path == path), None)
-            if index is None:
-                continue
-            if new_document is not None:
-                docs[index] = new_document
-            else:
-                del docs[index]
-            if collection == self.active:
-                self._sync_visible(path, new_document)
+    def _ensure_unfiled_loaded(self, collection: str) -> None:
+        if collection in self.unfiled_cache:
             return
+        documents, warnings = scan_unfiled(self.workspace, DOCUMENT_COLLECTIONS[collection])
+        self.unfiled_cache[collection] = documents
+        self.unfiled_warnings[collection] = warnings
 
-    def _sync_visible(self, path: Path, new_document: Document | None) -> None:
-        index = next((i for i, d in enumerate(self.visible_documents) if d.path == path), None)
-        if index is None:
-            return
-        still_matches = new_document is not None and (
-            not self._filter_query or match_document(new_document, self._filter_query)
-        )
-        if still_matches:
-            assert new_document is not None
-            self.visible_documents[index] = new_document
-        else:
-            del self.visible_documents[index]
+    def visible_documents(self) -> list[Document]:
+        collection = self.active
+        if collection == "tasks":
+            return []
+        if self.filter_query:
+            return self._filtered_documents(collection)
+        selection = self.scope_selection.get(collection, self.month_scope[collection])
+        if selection == "unfiled":
+            self._ensure_unfiled_loaded(collection)
+            return list(self.unfiled_cache[collection])
+        month = selection if isinstance(selection, YearMonth) else self.month_scope[collection]
+        self._ensure_month_loaded(collection, month)
+        return list(self.month_cache[(collection, month)])
+
+    def _filtered_documents(self, collection: str) -> list[Document]:
+        """A filter reads every month of the collection (at most once per session,
+        via the cache) rather than only the displayed one (FR-032, FR-035)."""
+        for month in self.list_scope(collection).months:
+            self._ensure_month_loaded(collection, month)
+        self._ensure_unfiled_loaded(collection)
+        self.fully_loaded.add(collection)
+
+        pool: list[Document] = []
+        for month in self.list_scope(collection).months:
+            pool.extend(self.month_cache[(collection, month)])
+        pool.extend(self.unfiled_cache[collection])
+
+        matches = [d for d in pool if match_document(d, self.filter_query)]
+        matches.sort(key=lambda d: str(d.path))
+        matches.sort(key=lambda d: d.created, reverse=True)
+        return matches
+
+    def visible_warnings(self) -> list[ScanWarning]:
+        collection = self.active
+        if collection == "tasks":
+            return list(self.task_warnings)
+        if self.filter_query:
+            return []
+        selection = self.scope_selection.get(collection, self.month_scope[collection])
+        if selection == "unfiled":
+            return list(self.unfiled_warnings.get(collection, []))
+        month = selection if isinstance(selection, YearMonth) else self.month_scope[collection]
+        return list(self.month_warnings.get((collection, month), []))
+
+    def visible_tasks(self) -> list[Task]:
+        task_filter = TaskFilter(only_done=self.task_category == "done")
+        tasks = filter_tasks(self.tasks, task_filter)
+        if self.filter_query:
+            tasks = [t for t in tasks if match_task(t, self.filter_query)]
+        return tasks
+
+    def set_filter(self, query: str) -> None:
+        """Apply (or clear) the cross-month filter (FR-029-034). Notes/Meetings
+        capture the pre-filter month so clearing restores it; Tasks has no month
+        scope to restore."""
+        collection = self.active
+        was_active = bool(self.filter_query)
+        now_active = bool(query)
+        if collection != "tasks":
+            if now_active and not was_active:
+                self.pre_filter_scope = self.month_scope[collection]
+            elif not now_active and was_active:
+                restore = self.pre_filter_scope or self.month_scope[collection]
+                self.scope_selection[collection] = restore
+                self.pre_filter_scope = None
+        self.filter_query = query
+
+    # --- collection switching --------------------------------------------------
 
     def switch_collection(self, name: str) -> None:
         self.active = name
+        self.filter_query = ""
+        self.pre_filter_scope = None
         if name == "tasks":
-            self._refresh_visible_tasks()
+            self.task_category = "todo"
         else:
-            self.visible_documents = list(self.documents[self.active])
+            self._reset_scope(name)
 
-    def _refresh_visible_tasks(self) -> None:
-        task_filter = TaskFilter(include_done=self.show_done)
-        filtered = filter_tasks(self.tasks, task_filter)
-        if self._task_filter_query:
-            filtered = [t for t in filtered if match_task(t, self._task_filter_query)]
-        self.visible_tasks = filtered
+    # --- refresh after a save ---------------------------------------------------
+
+    def refresh_document(self, path: Path) -> None:
+        """Re-parse only the one file that changed, in place -- never rescans the
+        workspace (Principle IV)."""
+        new_document = _read_document(path)
+        for collection in DOCUMENT_COLLECTIONS:
+            if collection == "notes":
+                under = self.workspace.notes_dir
+            else:
+                under = self.workspace.meetings_dir
+            try:
+                path.relative_to(under)
+            except ValueError:
+                continue
+            self._refresh_document_in(collection, path, new_document)
+            return
+
+    def _refresh_document_in(
+        self, collection: str, path: Path, new_document: Document | None
+    ) -> None:
+        month = _month_of(path)
+        if month is None:
+            documents = self.unfiled_cache.get(collection)
+            if documents is None:
+                return
+            index = next((i for i, d in enumerate(documents) if d.path == path), None)
+            if index is None:
+                if new_document is not None:
+                    documents.insert(0, new_document)
+                return
+            if new_document is not None:
+                documents[index] = new_document
+            else:
+                del documents[index]
+            return
+
+        key = (collection, month)
+        documents = self.month_cache.get(key)
+        if documents is None:
+            return
+        index = next((i for i, d in enumerate(documents) if d.path == path), None)
+        if index is None:
+            if new_document is not None:
+                documents.insert(0, new_document)
+            return
+        if new_document is not None:
+            documents[index] = new_document
+        else:
+            del documents[index]
+
+    # --- create flows ------------------------------------------------------
 
     def create_meeting_and_track(self, description: str, type: str) -> Document | None:
         try:
@@ -120,11 +263,7 @@ class EndpaperApp(App[None]):
             self.last_create_error = str(exc)
             return None
         self.last_create_error = None
-        self.documents["meetings"].insert(0, meeting)
-        # Land back on the collection just created into, so escaping the preview
-        # shows it -- a create is always followed by "let me see that".
-        self.active = "meetings"
-        self.visible_documents = list(self.documents["meetings"])
+        self._track_created("meetings", meeting)
         return meeting
 
     def create_note_and_track(self, description: str, type: str) -> Document | None:
@@ -134,18 +273,28 @@ class EndpaperApp(App[None]):
             self.last_create_error = str(exc)
             return None
         self.last_create_error = None
-        self.documents["notes"].insert(0, note)
-        self.active = "notes"
-        self.visible_documents = list(self.documents["notes"])
+        self._track_created("notes", note)
         return note
 
     def open_daily_note_and_track(self, *, now: datetime | None = None) -> DailyNote:
         daily = open_daily_note(self.workspace, now=now)
         if daily.created and daily.document is not None:
-            self.documents["notes"].insert(0, daily.document)
-        self.active = "notes"
-        self.visible_documents = list(self.documents["notes"])
+            self._track_created("notes", daily.document)
+        else:
+            self.active = "notes"
+            self.filter_query = ""
+            month = _month_of(daily.path) or _current_month()
+            self.select_scope("notes", month)
         return daily
+
+    def _track_created(self, collection: str, document: Document) -> None:
+        month = _month_of(document.path) or _current_month()
+        key = (collection, month)
+        self.month_cache.setdefault(key, [])
+        self.month_cache[key].insert(0, document)
+        self.active = collection
+        self.filter_query = ""
+        self.select_scope(collection, month)
 
     def add_task_and_track(self, description: str, type: str) -> Task | None:
         try:
@@ -156,8 +305,8 @@ class EndpaperApp(App[None]):
         self.last_create_error = None
         self.tasks.append(task)
         self.active = "tasks"
-        self._task_filter_query = ""
-        self._refresh_visible_tasks()
+        self.task_category = "todo"
+        self.filter_query = ""
         return task
 
     def toggle_task_and_track(self, task_id: str) -> None:
@@ -171,8 +320,3 @@ class EndpaperApp(App[None]):
             return
         self.last_task_error = None
         self.tasks = [updated if t.id == task_id else t for t in self.tasks]
-        self._refresh_visible_tasks()
-
-    def toggle_show_done(self) -> None:
-        self.show_done = not self.show_done
-        self._refresh_visible_tasks()

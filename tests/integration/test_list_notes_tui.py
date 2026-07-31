@@ -48,12 +48,13 @@ async def test_filter_narrows_visible_note_rows_live(tmp_workspace: Workspace) -
 
         await pilot.press("/")
         await pilot.pause()
-        for ch in "vendor":
-            await pilot.press(ch)
+        for ch in "filter vendor":
+            await pilot.press("space" if ch == " " else ch)
         await pilot.pause()
 
-        assert len(app.visible_documents) == 1
-        assert app.visible_documents[0].title == "vendor renewal"
+        visible = app.visible_documents()
+        assert len(visible) == 1
+        assert visible[0].title == "vendor renewal"
 
 
 async def test_enter_opens_rendered_note_preview(tmp_workspace: Workspace) -> None:
@@ -82,6 +83,7 @@ async def test_switching_between_collections_shows_current_content_including_new
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
+        await _switch(pilot, "meetings")
 
         list_view = app.screen.query_one("#meeting-list", ListView)
         titles = [row.document.title for row in list_view.children if isinstance(row, DocumentRow)]

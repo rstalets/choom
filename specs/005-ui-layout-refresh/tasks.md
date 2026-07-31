@@ -55,25 +55,25 @@ the pane skeleton the collection bar and scope pane both need.
 
 ### Core month API
 
-- [ ] T009 Add frozen slotted `YearMonth` and `MonthListing` dataclasses in `src/endpaper/core/models.py` per [data-model.md](./data-model.md)
-- [ ] T010 Implement `list_months(workspace, collection) -> MonthListing` in `src/endpaper/core/documents.py` — glob `<scan_dir>/**/YYYY/MM` directories only, open no files, always include the current month, dedupe across the `daily/` subtree, ignore non-conforming directory names
-- [ ] T011 Implement `scan_month(workspace, collection, month)` in `src/endpaper/core/documents.py`, reusing `_parse_document` so warning behaviour matches `scan_documents` exactly
-- [ ] T012 Implement `scan_unfiled(workspace, collection)` in `src/endpaper/core/documents.py` for `*.md` outside any `YYYY/MM` folder (research R6)
-- [ ] T013 [P] Add `list_meeting_months` and `scan_meeting_month` wrappers in `src/endpaper/core/meetings.py`
-- [ ] T014 [P] Add `list_note_months` and `scan_note_month` wrappers in `src/endpaper/core/notes.py`
+- [X] T009 Add frozen slotted `YearMonth` and `MonthListing` dataclasses in `src/endpaper/core/models.py` per [data-model.md](./data-model.md)
+- [X] T010 Implement `list_months(workspace, collection) -> MonthListing` in `src/endpaper/core/documents.py` — glob `<scan_dir>/**/YYYY/MM` directories only, open no files, always include the current month, dedupe across the `daily/` subtree, ignore non-conforming directory names
+- [X] T011 Implement `scan_month(workspace, collection, month)` in `src/endpaper/core/documents.py`, reusing `_parse_document` so warning behaviour matches `scan_documents` exactly
+- [X] T012 Implement `scan_unfiled(workspace, collection)` in `src/endpaper/core/documents.py` for `*.md` outside any `YYYY/MM` folder (research R6)
+- [X] T013 [P] Add `list_meeting_months` and `scan_meeting_month` wrappers in `src/endpaper/core/meetings.py`
+- [X] T014 [P] Add `list_note_months` and `scan_note_month` wrappers in `src/endpaper/core/notes.py`
 
 ### Core tests and fixtures
 
-- [ ] T015 [P] Unit tests for month discovery — ordering, current month always present, `daily/` dedupe, junk directory names ignored, zero files opened — in `tests/unit/test_list_months.py`
-- [ ] T016 [P] Unit tests for `scan_month` and `scan_unfiled` — ordering identical to `scan_documents` for the same subset, malformed frontmatter yields a warning not an exception — in `tests/unit/test_scan_month.py`
-- [ ] T017 Add a month-spreading option to `tests/fixtures/generate.py` so generated documents land across many months instead of all in `2026/01`
-- [ ] T018 Add a read-counting harness and the scoping assertion (opening a collection reads only the current month's paths) in `tests/performance/test_month_scope.py`
+- [X] T015 [P] Unit tests for month discovery — ordering, current month always present, `daily/` dedupe, junk directory names ignored, zero files opened — in `tests/unit/test_list_months.py`
+- [X] T016 [P] Unit tests for `scan_month` and `scan_unfiled` — ordering identical to `scan_documents` for the same subset, malformed frontmatter yields a warning not an exception — in `tests/unit/test_scan_month.py`
+- [X] T017 Add a month-spreading option to `tests/fixtures/generate.py` so generated documents land across many months instead of all in `2026/01`
+- [X] T018 Add a read-counting harness and the scoping assertion (opening a collection reads only the current month's paths) in `tests/performance/test_month_scope.py`
 
 ### Session state and layout skeleton
 
-- [ ] T019 Replace `documents`/`visible_documents` on `EndpaperApp` with the session state in [data-model.md](./data-model.md) — `active`, `month_scope`, `task_category`, `month_cache`, `month_warnings`, `unfiled_cache`, `fully_loaded`, `filter_query`, `pre_filter_scope` — in `src/endpaper/tui/app.py`
-- [ ] T020 Re-point `refresh_document` at `month_cache` (and `unfiled_cache`), keyed by the month implied by the saved document's path, in `src/endpaper/tui/app.py`
-- [ ] T021 Restructure `ListScreen.compose` in `src/endpaper/tui/list_screen.py` and the pane widths in `src/endpaper/tui/app.tcss`: remove `#collection-menu`, add the scope pane container, return the freed 14 columns to the `2fr`/`3fr` split per [contracts/tui-keys.md](./contracts/tui-keys.md)
+- [X] T019 Replace `documents`/`visible_documents` on `EndpaperApp` with the session state in [data-model.md](./data-model.md) — `active`, `month_scope`, `task_category`, `month_cache`, `month_warnings`, `unfiled_cache`, `fully_loaded`, `filter_query`, `pre_filter_scope` — in `src/endpaper/tui/app.py`
+- [X] T020 Re-point `refresh_document` at `month_cache` (and `unfiled_cache`), keyed by the month implied by the saved document's path, in `src/endpaper/tui/app.py`
+- [X] T021 Restructure `ListScreen.compose` in `src/endpaper/tui/list_screen.py` and the pane widths in `src/endpaper/tui/app.tcss`: remove `#collection-menu`, add the scope pane container, return the freed 14 columns to the `2fr`/`3fr` split per [contracts/tui-keys.md](./contracts/tui-keys.md)
 
 **Checkpoint**: core can list and read one month at a time, the app holds month-scoped session state,
 and the three panes exist without a collection menu.
@@ -91,18 +91,18 @@ refill at each stop with no further keypress.
 
 ### Tests for User Story 1
 
-- [ ] T022 [P] [US1] Integration tests for the bar and Tab navigation — three collections in order with one highlighted, Tab/shift+Tab wrap at both ends, focus lands on the list pane with row 0 highlighted, Tab inert while the command bar is open — in `tests/integration/test_collection_bar_tui.py`
+- [X] T022 [P] [US1] Integration tests for the bar and Tab navigation — three collections in order with one highlighted, Tab/shift+Tab wrap at both ends, focus lands on the list pane with row 0 highlighted, Tab inert while the command bar is open — in `tests/integration/test_collection_bar_tui.py`
 
 ### Implementation for User Story 1
 
-- [ ] T023 [P] [US1] Create the non-focusable `CollectionBar` `Static` rendering `Endpaper >>   Tasks   Notes   Meetings` with the active name styled, in `src/endpaper/tui/collection_bar.py` (research R1)
-- [ ] T024 [US1] Mount `CollectionBar` docked top in `ListScreen.compose` and style it in `src/endpaper/tui/app.tcss`
-- [ ] T025 [US1] Add non-priority `tab`/`shift+tab` bindings and `action_next_collection`/`action_previous_collection` with wrap-around in `src/endpaper/tui/list_screen.py` (research R2)
-- [ ] T026 [US1] Implement `ListScreen.check_action` returning `False` for both collection actions while the command bar is open, in `src/endpaper/tui/list_screen.py`
-- [ ] T027 [US1] On collection switch, refill all three panes and focus the list pane with row 0 highlighted, in `src/endpaper/tui/list_screen.py`
-- [ ] T028 [US1] Default the startup collection to Tasks and update the footer strings for the new bindings (`tab collection`, no Tab-as-focus-traversal) in `src/endpaper/tui/app.py` and `src/endpaper/tui/status_bar.py`
-- [ ] T029 [US1] Rewrite `tests/integration/test_collection_menu_tui.py` against `CollectionBar` and Tab, replacing the `#collection-menu` `ListView` and `CollectionRow` assertions (research R12)
-- [ ] T030 [US1] Update pane expectations in `tests/integration/test_partitioned_layout.py` for the removed menu pane
+- [X] T023 [P] [US1] Create the non-focusable `CollectionBar` `Static` rendering `Endpaper >>   Tasks   Notes   Meetings` with the active name styled, in `src/endpaper/tui/collection_bar.py` (research R1)
+- [X] T024 [US1] Mount `CollectionBar` docked top in `ListScreen.compose` and style it in `src/endpaper/tui/app.tcss`
+- [X] T025 [US1] Add non-priority `tab`/`shift+tab` bindings and `action_next_collection`/`action_previous_collection` with wrap-around in `src/endpaper/tui/list_screen.py` (research R2)
+- [X] T026 [US1] Implement `ListScreen.check_action` returning `False` for both collection actions while the command bar is open, in `src/endpaper/tui/list_screen.py`
+- [X] T027 [US1] On collection switch, refill all three panes and focus the list pane with row 0 highlighted, in `src/endpaper/tui/list_screen.py`
+- [X] T028 [US1] Default the startup collection to Tasks and update the footer strings for the new bindings (`tab collection`, no Tab-as-focus-traversal) in `src/endpaper/tui/app.py` and `src/endpaper/tui/status_bar.py`
+- [X] T029 [US1] Rewrite `tests/integration/test_collection_menu_tui.py` against `CollectionBar` and Tab, replacing the `#collection-menu` `ListView` and `CollectionRow` assertions (research R12)
+- [X] T030 [US1] Update pane expectations in `tests/integration/test_partitioned_layout.py` for the removed menu pane
 
 **Checkpoint**: collection switching is one keystroke and the layout has its top bar. US1 is
 demoable on its own.
@@ -120,22 +120,22 @@ confirm the same holds for that month.
 
 ### Tests for User Story 2
 
-- [ ] T031 [P] [US2] Integration tests for the month pane — current month highlighted on selection, moving months refills the list and preview, empty month shows the empty state, warning counts are per-month, returning to a collection resets to the current month — in `tests/integration/test_month_pane_tui.py`
-- [ ] T032 [P] [US2] Extend `tests/performance/test_month_scope.py` with the adjacent-month case: moving the highlight reads that month's paths and no others
+- [X] T031 [P] [US2] Integration tests for the month pane — current month highlighted on selection, moving months refills the list and preview, empty month shows the empty state, warning counts are per-month, returning to a collection resets to the current month — in `tests/integration/test_month_pane_tui.py`
+- [X] T032 [P] [US2] Extend `tests/performance/test_month_scope.py` with the adjacent-month case: moving the highlight reads that month's paths and no others
 
 ### Implementation for User Story 2
 
-- [ ] T033 [P] [US2] Create `ScopePane` in `src/endpaper/tui/scope_pane.py` with a months mode rendering `YYYY-MM` entries most-recent-first
-- [ ] T034 [US2] Populate the scope pane from `list_months` when Notes or Meetings becomes active, defaulting the highlight to the current month, in `src/endpaper/tui/list_screen.py`
-- [ ] T035 [US2] Fill the list pane from `month_cache`, reading via `scan_month` on a miss, in `src/endpaper/tui/list_screen.py`
-- [ ] T036 [US2] Refill the list pane and preview when the scope-pane highlight moves, without moving focus off the scope pane, in `src/endpaper/tui/list_screen.py`
-- [ ] T037 [US2] Render the **Unfiled** entry after the months when `MonthListing.has_unfiled`, reading via `scan_unfiled` only when selected, in `src/endpaper/tui/scope_pane.py` and `src/endpaper/tui/list_screen.py`
-- [ ] T038 [US2] Move the displayed month to the created document's month and highlight it, on every create path, in `src/endpaper/tui/app.py`
-- [ ] T039 [US2] Scope the status bar's warning count to the displayed month using `month_warnings`, in `src/endpaper/tui/list_screen.py`
-- [ ] T040 [US2] Add per-collection empty-state text naming the month (`No meetings in 2026-07…`) in `src/endpaper/tui/list_screen.py`
-- [ ] T041 [P] [US2] Update `tests/integration/test_list_tui.py` for month-scoped listing
-- [ ] T042 [P] [US2] Update `tests/integration/test_list_notes_tui.py` for month-scoped listing
-- [ ] T043 [US2] Extend `tests/integration/test_unicode_paths.py` to cover the month-scoped read path (spaces and non-ASCII in workspace paths)
+- [X] T033 [P] [US2] Create `ScopePane` in `src/endpaper/tui/scope_pane.py` with a months mode rendering `YYYY-MM` entries most-recent-first
+- [X] T034 [US2] Populate the scope pane from `list_months` when Notes or Meetings becomes active, defaulting the highlight to the current month, in `src/endpaper/tui/list_screen.py`
+- [X] T035 [US2] Fill the list pane from `month_cache`, reading via `scan_month` on a miss, in `src/endpaper/tui/list_screen.py`
+- [X] T036 [US2] Refill the list pane and preview when the scope-pane highlight moves, without moving focus off the scope pane, in `src/endpaper/tui/list_screen.py`
+- [X] T037 [US2] Render the **Unfiled** entry after the months when `MonthListing.has_unfiled`, reading via `scan_unfiled` only when selected, in `src/endpaper/tui/scope_pane.py` and `src/endpaper/tui/list_screen.py`
+- [X] T038 [US2] Move the displayed month to the created document's month and highlight it, on every create path, in `src/endpaper/tui/app.py`
+- [X] T039 [US2] Scope the status bar's warning count to the displayed month using `month_warnings`, in `src/endpaper/tui/list_screen.py`
+- [X] T040 [US2] Add per-collection empty-state text naming the month (`No meetings in 2026-07…`) in `src/endpaper/tui/list_screen.py`
+- [X] T041 [P] [US2] Update `tests/integration/test_list_tui.py` for month-scoped listing
+- [X] T042 [P] [US2] Update `tests/integration/test_list_notes_tui.py` for month-scoped listing
+- [X] T043 [US2] Extend `tests/integration/test_unicode_paths.py` to cover the month-scoped read path (spaces and non-ASCII in workspace paths)
 
 **Checkpoint**: a workspace with years of history opens as fast as an empty one, and the left pane
 navigates months.
@@ -153,19 +153,19 @@ blank throughout.
 
 ### Tests for User Story 3
 
-- [ ] T044 [P] [US3] Unit tests for the `only_done` selection matrix (open-only, all, done-only, `only_done` overriding `include_done`) in `tests/unit/test_task_filter_only_done.py`
-- [ ] T045 [P] [US3] Integration tests for the category pane — To-Do default and focus, toggling moves a task between categories, preview blank, create returns to To-Do — in `tests/integration/test_task_category_tui.py`
-- [ ] T046 [P] [US3] Extend `tests/integration/test_task_cli.py` for `task list --done`, including `--json` output and `--done` winning over `--all`
+- [X] T044 [P] [US3] Unit tests for the `only_done` selection matrix (open-only, all, done-only, `only_done` overriding `include_done`) in `tests/unit/test_task_filter_only_done.py`
+- [X] T045 [P] [US3] Integration tests for the category pane — To-Do default and focus, toggling moves a task between categories, preview blank, create returns to To-Do — in `tests/integration/test_task_category_tui.py`
+- [X] T046 [P] [US3] Extend `tests/integration/test_task_cli.py` for `task list --done`, including `--json` output and `--done` winning over `--all`
 
 ### Implementation for User Story 3
 
-- [ ] T047 [US3] Add `only_done: bool = False` to `TaskFilter` in `src/endpaper/core/models.py`
-- [ ] T048 [US3] Honour `only_done` in `filter_tasks` in `src/endpaper/core/tasks.py`, leaving both existing branches untouched
-- [ ] T049 [US3] Add `--done` to `task list` in `src/endpaper/cli/main.py`, documented as taking precedence over `--all` rather than erroring (research R8)
-- [ ] T050 [US3] Add the categories mode to `ScopePane` in `src/endpaper/tui/scope_pane.py`
-- [ ] T051 [US3] Drive `task_category` from the scope pane and keep the preview pane blank for Tasks, in `src/endpaper/tui/list_screen.py`
-- [ ] T052 [US3] Remove the `a` show-all binding and its footer text from `src/endpaper/tui/list_screen.py` and `src/endpaper/tui/status_bar.py`
-- [ ] T053 [US3] Rewrite the show-all assertions in `tests/integration/test_task_tui.py` against the Done category
+- [X] T047 [US3] Add `only_done: bool = False` to `TaskFilter` in `src/endpaper/core/models.py`
+- [X] T048 [US3] Honour `only_done` in `filter_tasks` in `src/endpaper/core/tasks.py`, leaving both existing branches untouched
+- [X] T049 [US3] Add `--done` to `task list` in `src/endpaper/cli/main.py`, documented as taking precedence over `--all` rather than erroring (research R8)
+- [X] T050 [US3] Add the categories mode to `ScopePane` in `src/endpaper/tui/scope_pane.py`
+- [X] T051 [US3] Drive `task_category` from the scope pane and keep the preview pane blank for Tasks, in `src/endpaper/tui/list_screen.py`
+- [X] T052 [US3] Remove the `a` show-all binding and its footer text from `src/endpaper/tui/list_screen.py` and `src/endpaper/tui/status_bar.py`
+- [X] T053 [US3] Rewrite the show-all assertions in `tests/integration/test_task_tui.py` against the Done category
 
 **Checkpoint**: task state is a visible place rather than a remembered mode, in both front-ends.
 
@@ -181,19 +181,19 @@ markdown; separately create a document and confirm the editor opens with no read
 
 ### Tests for User Story 4
 
-- [ ] T054 [P] [US4] Integration tests for `e` from the list — editor opens on the raw markdown, save-and-exit returns to the list with the row updated, `e` is a no-op on tasks and on the empty state — in `tests/integration/test_edit_from_list_tui.py`
-- [ ] T055 [P] [US4] Integration tests that create paths open the editor directly (note, meeting, daily note) and that exiting lands on the list in the new document's month, in `tests/integration/test_create_opens_editor_tui.py`
-- [ ] T056 [P] [US4] Parity test that `e`-from-list and `e`-from-preview produce an `EditScreen` with identical bindings and buffer for the same document, in `tests/integration/test_edit_from_list_tui.py`
+- [X] T054 [P] [US4] Integration tests for `e` from the list — editor opens on the raw markdown, save-and-exit returns to the list with the row updated, `e` is a no-op on tasks and on the empty state — in `tests/integration/test_edit_from_list_tui.py`
+- [X] T055 [P] [US4] Integration tests that create paths open the editor directly (note, meeting, daily note) and that exiting lands on the list in the new document's month, in `tests/integration/test_create_opens_editor_tui.py`
+- [X] T056 [P] [US4] Parity test that `e`-from-list and `e`-from-preview produce an `EditScreen` with identical bindings and buffer for the same document, in `tests/integration/test_edit_from_list_tui.py`
 
 ### Implementation for User Story 4
 
-- [ ] T057 [US4] Add `open_editor(app, path) -> bool` to `src/endpaper/tui/edit_screen.py` — the single route into the editor — handling `load_for_edit`'s `OSError` as a status-bar message that leaves the caller's screen in place (research R10)
-- [ ] T058 [US4] Route `PreviewScreen.action_edit` through `open_editor` in `src/endpaper/tui/preview_screen.py`
-- [ ] T059 [US4] Add the `e` binding and `action_edit` (documents only, no-op on tasks and empty state) in `src/endpaper/tui/list_screen.py`
-- [ ] T060 [US4] Route the note and meeting create handlers through `open_editor` instead of pushing `PreviewScreen`, in `src/endpaper/tui/list_screen.py`
-- [ ] T061 [US4] Route the daily-note handler through `open_editor`, whether or not the note already existed, in `src/endpaper/tui/list_screen.py`
-- [ ] T062 [US4] Add `e edit` to the list footer in `src/endpaper/tui/status_bar.py`
-- [ ] T063 [P] [US4] Update the post-create screen assertions in `tests/integration/test_create_tui.py`, `tests/integration/test_create_note_tui.py`, and `tests/integration/test_daily_note_tui.py` to expect `EditScreen`
+- [X] T057 [US4] Add `open_editor(app, path) -> bool` to `src/endpaper/tui/edit_screen.py` — the single route into the editor — handling `load_for_edit`'s `OSError` as a status-bar message that leaves the caller's screen in place (research R10)
+- [X] T058 [US4] Route `PreviewScreen.action_edit` through `open_editor` in `src/endpaper/tui/preview_screen.py`
+- [X] T059 [US4] Add the `e` binding and `action_edit` (documents only, no-op on tasks and empty state) in `src/endpaper/tui/list_screen.py`
+- [X] T060 [US4] Route the note and meeting create handlers through `open_editor` instead of pushing `PreviewScreen`, in `src/endpaper/tui/list_screen.py`
+- [X] T061 [US4] Route the daily-note handler through `open_editor`, whether or not the note already existed, in `src/endpaper/tui/list_screen.py`
+- [X] T062 [US4] Add `e edit` to the list footer in `src/endpaper/tui/status_bar.py`
+- [X] T063 [P] [US4] Update the post-create screen assertions in `tests/integration/test_create_tui.py`, `tests/integration/test_create_note_tui.py`, and `tests/integration/test_daily_note_tui.py` to expect `EditScreen`
 
 **Checkpoint**: every route into the editor goes through one function, and creating a document means
 typing into it.
