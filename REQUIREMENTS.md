@@ -347,7 +347,9 @@ updated: 2026-07-28T09:41:00
 
 ## 5. Explicitly out of scope for v0.0.1
 
-- AI invocation from inside endpaper (`/claude` markers, SDK integration)
+AI invocation from inside endpaper and configuration beyond workspace paths shipped in v0.0.2
+(`/ai <prompt>`, `endpaper config assistant`) — see [CHANGELOG.md](CHANGELOG.md).
+
 - Webcam or image capture (`/pic`)
 - Embeddings, vector search, semantic retrieval
 - Tasks created inside a note or meeting (`/task` while editing)
@@ -355,7 +357,6 @@ updated: 2026-07-28T09:41:00
 - Syntax highlighting in the editor
 - Conflict resolution for simultaneous edits — OneDrive's own conflict-copy behaviour is the answer
 - MCP server
-- Any configuration beyond workspace paths
 
 ---
 

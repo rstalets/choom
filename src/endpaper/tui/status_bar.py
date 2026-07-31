@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import random
+
 from textual.widgets import Static
 
 from endpaper import __version__
@@ -13,6 +15,55 @@ TASK_LIST_HELP = (
 )
 PREVIEW_HELP = "e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
 EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
+
+#: Shown in the status bar while `/ai` is in flight (contracts/editor-commands.md). One
+#: phrase is picked per request and held for its whole duration -- no cycling, no timer.
+BREADCRUMBS: tuple[str, ...] = (
+    "Circling back",
+    "Double-clicking",
+    "Taking it offline",
+    "Leveraging synergies",
+    "Boiling the ocean",
+    "Peeling the onion",
+    "Running it up the flagpole",
+    "Socialising the doc",
+    "Moving the needle",
+    "Unpacking that",
+    "Actioning",
+    "Aligning stakeholders",
+    "Workshopping",
+    "Whiteboarding",
+    "Ideating",
+    "Operationalising",
+    "Sharpening the pencil",
+    "Putting a pin in it",
+    "Closing the loop",
+    "Touching base",
+    "Gut-checking",
+    "Blue-skying",
+    "Right-sizing",
+    "Sunsetting",
+    "Herding cats",
+)
+
+_CANCEL_HINT = "— ctrl+c to cancel"
+
+
+def pick_breadcrumb() -> str:
+    return random.choice(BREADCRUMBS)
+
+
+def in_flight_status(breadcrumb: str, width: int) -> str:
+    """Status bar text for the in-flight `/ai` state.
+
+    Falls back to a bare ellipsis when `width` cannot hold the breadcrumb -- it is
+    dropped whole rather than truncated, so the cancel hint is always intact and never
+    reads as a bug (Principle V).
+    """
+    full = f"{breadcrumb}… {_CANCEL_HINT}"
+    if width and len(full) > width:
+        return f"⋯ {_CANCEL_HINT}"
+    return full
 
 
 def collection_indicator(active: str) -> str:

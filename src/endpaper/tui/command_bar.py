@@ -55,6 +55,11 @@ class CommandBar(Static):
             self.name = name
             super().__init__()
 
+    class ConfigRequested(Message):
+        def __init__(self, argument: str) -> None:
+            self.argument = argument
+            super().__init__()
+
     class HelpRequested(Message):
         pass
 
@@ -139,6 +144,11 @@ class CommandBar(Static):
             self.post_message(self.CollectionRequested("tasks"))
         elif verb.name == "help":
             self.post_message(self.HelpRequested())
+        elif verb.name == "config":
+            if not rest:
+                self.post_message(self.BarError("config needs a setting name"))
+            else:
+                self.post_message(self.ConfigRequested(rest))
         elif verb.name == "filter":
             pass  # already live-applied; enter just confirms and closes
         # "init" is a registered verb for future features; no TUI action this feature.

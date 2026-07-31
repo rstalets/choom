@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from datetime import date
 from pathlib import Path
@@ -14,6 +15,8 @@ from endpaper.cli.output import (
     print_tasks_table,
     relative_path,
 )
+from endpaper.core.assistants import resolve_assistant
+from endpaper.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from endpaper.core.documents import filter_documents
 from endpaper.core.errors import EndpaperError, UsageError, WorkspaceError
 from endpaper.core.meetings import create_meeting, scan_meetings
@@ -31,7 +34,13 @@ def _build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"endpaper {__version__}")
 
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser("init", help="create a workspace in the current directory")
+    init_parser = subparsers.add_parser("init", help="create a workspace in the current directory")
+    init_parser.add_argument(
+        "--assistant",
+        choices=LEGAL_ASSISTANT_VALUES,
+        default=None,
+        help="record which AI assistant /ai calls",
+    )
 
     meeting_parser = subparsers.add_parser("meeting", help="create or list meetings")
     meeting_subparsers = meeting_parser.add_subparsers(dest="meeting_command", required=True)
@@ -125,6 +134,17 @@ def _build_parser() -> argparse.ArgumentParser:
     task_undone_parser = task_subparsers.add_parser("undone", help="mark a task incomplete")
     task_undone_parser.add_argument("id")
 
+    config_parser = subparsers.add_parser("config", help="get or set workspace settings")
+    config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
+
+    config_assistant_parser = config_subparsers.add_parser(
+        "assistant", help="get or set which AI assistant /ai calls"
+    )
+    config_assistant_parser.add_argument(
+        "value", nargs="?", default=None, choices=LEGAL_ASSISTANT_VALUES
+    )
+    config_assistant_parser.add_argument("--json", action="store_true")
+
     return parser
 
 
@@ -151,8 +171,8 @@ _GUIDANCE_ADVICE = {
 }
 
 
-def _cmd_init() -> int:
-    result = init_workspace(Path.cwd())
+def _cmd_init(namespace: argparse.Namespace) -> int:
+    result = init_workspace(Path.cwd(), assistant=namespace.assistant)
     print(str(result.workspace.root))
     for name in result.skipped:
         print(
@@ -287,9 +307,40 @@ def _cmd_task_undone(namespace: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
+    workspace = find_workspace(Path.cwd())
+
+    if namespace.value is not None:
+        set_assistant(workspace, namespace.value)
+        return 0
+
+    configured = get_assistant(workspace)
+    resolved = resolve_assistant(configured)
+    resolved_name = resolved.profile.name if resolved.profile is not None else None
+
+    if namespace.json:
+        print(
+            json.dumps(
+                {
+                    "configured": configured,
+                    "resolved": resolved_name,
+                    "source": resolved.source,
+                    "available": list(resolved.available),
+                },
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(f"configured\t{configured or '-'}")
+        print(f"resolved\t{resolved_name or '-'}")
+        print(f"source\t{resolved.source}")
+        print(f"available\t{','.join(resolved.available) or '-'}")
+    return 0
+
+
 def _dispatch(namespace: argparse.Namespace) -> int:
     if namespace.command == "init":
-        return _cmd_init()
+        return _cmd_init(namespace)
     if namespace.command == "meeting":
         if namespace.meeting_command == "new":
             return _cmd_meeting_new(namespace)
@@ -308,6 +359,8 @@ def _dispatch(namespace: argparse.Namespace) -> int:
         if namespace.task_command == "undone":
             return _cmd_task_undone(namespace)
         return _cmd_task_list(namespace)
+    if namespace.command == "config":
+        return _cmd_config_assistant(namespace)
     raise UsageError(f"unknown command: {namespace.command}")
 
 

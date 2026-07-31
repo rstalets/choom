@@ -6,6 +6,7 @@ from textual.containers import Vertical
 from textual.screen import ModalScreen
 from textual.widgets import Static
 
+from endpaper.core.editor_commands import EDITOR_COMMANDS
 from endpaper.tui.commands import VERB_TABLE
 
 KEY_BINDINGS_HELP = """\
@@ -26,6 +27,12 @@ def _render_body() -> str:
         token = f"/{verb.name} {verb.argument}".rstrip()
         alias = f"(/{verb.alias})" if verb.alias else ""
         lines.append(f"  {token:<24}{alias:<6}{verb.description}")
+    lines.append("")
+    lines.append("In-editor commands")
+    lines.append("")
+    for command in EDITOR_COMMANDS:
+        token = f"/{command.name} {command.argument}".rstrip()
+        lines.append(f"  {token:<24}{command.description}")
     lines.append("")
     lines.append("Keys")
     lines.append("")

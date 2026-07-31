@@ -89,3 +89,30 @@ def test_task_list_json_has_exactly_seven_keys_id_and_created_nullable(
     bare = next(r for r in records if r["text"] == "bare task")
     assert bare["id"] is not None  # backfilled by load_tasks
     assert bare["created"] is None
+
+
+EXPECTED_CONFIG_ASSISTANT_KEYS = {"configured", "resolved", "source", "available"}
+
+
+def test_config_assistant_json_has_exactly_four_keys_and_available_is_never_null(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+
+    main(["config", "assistant", "--json"])
+    record = json.loads(capsys.readouterr().out)
+    assert set(record.keys()) == EXPECTED_CONFIG_ASSISTANT_KEYS
+    assert record["configured"] is None
+    assert record["available"] == [] or isinstance(record["available"], list)
+    assert record["available"] is not None
+
+    main(["config", "assistant", "claude"])
+    capsys.readouterr()
+    main(["config", "assistant", "--json"])
+    record = json.loads(capsys.readouterr().out)
+    assert set(record.keys()) == EXPECTED_CONFIG_ASSISTANT_KEYS
+    assert record["configured"] == "claude"
+    assert record["resolved"] == "claude"
+    assert record["source"] == "configured"

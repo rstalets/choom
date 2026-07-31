@@ -38,6 +38,7 @@ def test_existing_verbs_unchanged() -> None:
         "notes",
         "tasks",
         "init",
+        "config",
     }
 
 

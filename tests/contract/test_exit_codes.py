@@ -93,6 +93,27 @@ def test_task_no_workspace_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:
     assert main(["task", "done", "t_a1b2"]) == 3
 
 
+def test_config_assistant_success_exits_0(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    assert main(["config", "assistant", "claude"]) == 0
+    capsys.readouterr()
+    assert main(["config", "assistant"]) == 0
+
+
+def test_config_assistant_bad_value_exits_2(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    assert main(["config", "assistant", "gpt"]) == 2
+
+
+def test_config_assistant_no_workspace_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    assert main(["config", "assistant"]) == 3
+
+
 def test_not_found_error_maps_to_exit_code_1(monkeypatch, capsys) -> None:
     # No command in this feature raises NotFoundError yet -- there is no "not found"
     # surface until `endpaper find`/`read` (out of scope here). This verifies main()'s
