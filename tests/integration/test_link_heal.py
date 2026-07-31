@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import os
+import time
+
 from endpaper.core.editing import load_for_edit, save_buffer
-from endpaper.core.links import relative_destination
+from endpaper.core.links import check_links, heal_links, relative_destination
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note
@@ -106,6 +109,73 @@ def test_code_fence_around_link_syntax_is_never_rewritten(tmp_workspace: Workspa
     assert "```\n[example](#meeting_deadbeef)\n```" in result.saved_text
     assert "`[example](#meeting_deadbeef)`" in result.saved_text
     assert result.warnings == ()  # never resolved as a link, so never reported dead
+
+
+def test_heal_dry_run_reports_exactly_what_a_real_run_then_changes(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    original = note.path.read_text(encoding="utf-8")
+    note.path.write_text(
+        original + f"\n[stale](wrong.md#{meeting.id})\n[dead](#meeting_00000000_deadbeef)\n",
+        encoding="utf-8",
+    )
+
+    dry_reports = heal_links(tmp_workspace, dry_run=True)
+    before = note.path.read_bytes()
+
+    real_reports = heal_links(tmp_workspace)
+    after = note.path.read_bytes()
+
+    assert before != after  # the real run did change something
+    dry_shape = {(r.file, r.line, r.target_id, r.status) for r in dry_reports}
+    real_shape = {(r.file, r.line, r.target_id, r.status) for r in real_reports}
+    assert dry_shape == real_shape
+
+
+def test_dead_links_survive_heal_byte_identical_beside_repaired_ones(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    original = note.path.read_text(encoding="utf-8")
+    note.path.write_text(
+        original + f"\n[stale](wrong.md#{meeting.id})\n[dead](#meeting_00000000_deadbeef)\n",
+        encoding="utf-8",
+    )
+
+    heal_links(tmp_workspace)
+    text = note.path.read_text(encoding="utf-8")
+    assert "[dead](#meeting_00000000_deadbeef)" in text
+    assert "wrong.md" not in text
+
+
+def test_heal_on_a_clean_workspace_writes_nothing_and_moves_no_updated(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    before_mtime = os.stat(meeting.path).st_mtime_ns
+    before_bytes = meeting.path.read_bytes()
+    time.sleep(0.01)
+
+    reports = heal_links(tmp_workspace)
+
+    assert reports == ()
+    assert os.stat(meeting.path).st_mtime_ns == before_mtime
+    assert meeting.path.read_bytes() == before_bytes
+
+
+def test_check_never_writes(tmp_workspace: Workspace) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    original = note.path.read_text(encoding="utf-8")
+    note.path.write_text(original + f"\n[stale](wrong.md#{meeting.id})\n", encoding="utf-8")
+    before = note.path.read_bytes()
+
+    reports = check_links(tmp_workspace)
+    assert len(reports) == 1
+    assert note.path.read_bytes() == before
 
 
 def test_no_workspace_means_no_healing(tmp_workspace: Workspace) -> None:

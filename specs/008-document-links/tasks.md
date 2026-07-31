@@ -53,10 +53,10 @@ they are not independently *startable*.
 
 **Purpose**: Establish the reference point and the one new file everything else lands in
 
-- [ ] T001 Confirm the baseline is green before changing anything: `uv run pytest -q` (expect 407
+- [X] T001 Confirm the baseline is green before changing anything: `uv run pytest -q` (expect 407
       passed), `uv run ruff check .`, `uv run ruff format --check .`, `uv run mypy`. Record the count;
       every later phase is measured against it.
-- [ ] T002 Create `src/endpaper/core/links.py` with a module docstring stating it holds the link
+- [X] T002 Create `src/endpaper/core/links.py` with a module docstring stating it holds the link
       primitive (scanner, resolver, path derivation, healer, inbound scan) and why those live
       together — see [plan.md](plan.md#project-structure) Structure Decision.
 
@@ -69,11 +69,11 @@ they are not independently *startable*.
 **⚠️ CRITICAL**: US2 onward cannot begin until this phase is complete. US1 does not depend on it and
 may run concurrently.
 
-- [ ] T003 Add link types to `src/endpaper/core/models.py`: `Link`, `LinkTarget`, `LinkReport`
+- [X] T003 Add link types to `src/endpaper/core/models.py`: `Link`, `LinkTarget`, `LinkReport`
       dataclasses (`frozen=True, slots=True`) and the `LinkStatus` / `LinkDirection` `Literal`
       aliases; extend `ScanWarningReason` with `"link_dead"` and `"link_ambiguous"`. Field lists are
       fixed in [data-model.md](data-model.md#entities). One file, so not parallelisable.
-- [ ] T004 Re-export the new names from `src/endpaper/core/__init__.py` and extend
+- [X] T004 Re-export the new names from `src/endpaper/core/__init__.py` and extend
       `tests/unit/test_core_imports.py` to guard them.
 
 **Checkpoint**: Types exist; US2–US7 can begin.
@@ -91,22 +91,22 @@ lists, reads, and resolves, and that no file is rewritten.
 
 ### Tests for User Story 1
 
-- [ ] T005 [P] [US1] Extend `tests/unit/test_collection.py` to assert new meeting, note, daily-note,
+- [X] T005 [P] [US1] Extend `tests/unit/test_collection.py` to assert new meeting, note, daily-note,
       and task ids carry the `meeting_` / `note_` / `task_` prefixes (US1 AC1–3).
-- [ ] T006 [P] [US1] Extend `tests/integration/test_no_migration.py`: a workspace whose frontmatter
+- [X] T006 [P] [US1] Extend `tests/integration/test_no_migration.py`: a workspace whose frontmatter
       and task lines carry old-scheme ids (`m_…`, `n_…`, `t_…`) still lists, reads, and resolves, and
       `tasks.md` is byte-identical before and after a read (US1 AC4, FR-013, SC-007).
 
 ### Implementation for User Story 1
 
-- [ ] T007 [P] [US1] Change `MEETINGS = Collection("m_", …)` to `"meeting_"` in
+- [X] T007 [P] [US1] Change `MEETINGS = Collection("m_", …)` to `"meeting_"` in
       `src/endpaper/core/meetings.py`.
-- [ ] T008 [P] [US1] Change `NOTES = Collection("n_", …)` to `"note_"` in
+- [X] T008 [P] [US1] Change `NOTES = Collection("n_", …)` to `"note_"` in
       `src/endpaper/core/notes.py`.
-- [ ] T009 [US1] Update both id builders in `src/endpaper/core/text.py`: `new_meeting_id` to pass
+- [X] T009 [US1] Update both id builders in `src/endpaper/core/text.py`: `new_meeting_id` to pass
       `"meeting_"`, and `new_task_id` to build `f"task_{secrets.token_hex(2)}"`. Same file, so after
       T007/T008 rather than beside them.
-- [ ] T010 [US1] Update literal example ids across the **16 test modules** that carry them —
+- [X] T010 [US1] Update literal example ids across the **16 test modules** that carry them —
       `tests/contract/test_exit_codes.py`; `tests/integration/{test_cli_tui_parity,
       test_collection_separation,test_external_edits,test_task_cli,test_task_handedit,
       test_malformed}.py`; `tests/performance/test_task_scan.py`;
@@ -115,11 +115,11 @@ lists, reads, and resolves, and that no file is rewritten.
       (`id: m_1`) and generated ones (`f"id:t_{i:04x}"`). **Leave the deliberately-malformed
       `<!-- id:` fixture in `test_malformed.py` alone** — it carries no prefix and is testing the
       broken-comment path.
-- [ ] T011 [US1] Update the prefix sentence and the frontmatter/task examples in
+- [X] T011 [US1] Update the prefix sentence and the frontmatter/task examples in
       `src/endpaper/core/templates/AGENTS.md.tmpl` so it states the current prefixes and no longer
       states the old ones (US1 AC5). Content additions to this file are T058; this task is only the
       prefix correction.
-- [ ] T012 [P] [US1] Update literal example ids in `REQUIREMENTS.md` (§3.3, §4.6) and `CHANGELOG.md`.
+- [X] T012 [P] [US1] Update literal example ids in `REQUIREMENTS.md` (§3.3, §4.6) and `CHANGELOG.md`.
 
 **Checkpoint**: New ids are prefixed, old ids still resolve, nothing was migrated. Independently
 shippable.
@@ -136,47 +136,47 @@ correct relative path appeared; move the target, save again, confirm the path wa
 
 ### Tests for User Story 2
 
-- [ ] T013 [P] [US2] Create `tests/unit/test_link_scan.py` — **the highest-risk code in the
+- [X] T013 [P] [US2] Create `tests/unit/test_link_scan.py` — **the highest-risk code in the
       feature**. Cover ``` and `~~~` fences (closed, unclosed to EOF, and with info strings), inline
       code spans including equal-length multi-backtick runs, images, URL-scheme destinations,
       reference-style links, two links on one line, unclosed links, and angle-bracket destinations.
       A masking bug here silently rewrites a user's prose. Cases enumerated in
       [research.md](research.md#measurements).
-- [ ] T014 [P] [US2] Create `tests/unit/test_link_paths.py` — table-driven `relative_destination`
+- [X] T014 [P] [US2] Create `tests/unit/test_link_paths.py` — table-driven `relative_destination`
       from every layout depth (collection `YYYY/MM`, `notes/daily/YYYY/MM`, root `tasks.md`, and a
       document outside the dated layout), forward slashes on every platform, and angle-bracket
       escaping for paths with spaces or parens (SC-005, FR-008).
-- [ ] T015 [P] [US2] Create `tests/unit/test_link_resolve.py` — id-before-path ordering, old-prefix
+- [X] T015 [P] [US2] Create `tests/unit/test_link_resolve.py` — id-before-path ordering, old-prefix
       ids resolving unchanged, duplicate ids resolving deterministically with a `link_ambiguous`
       warning, and dead links returning a status rather than raising (FR-006, FR-013, R11).
-- [ ] T016 [P] [US2] Create `tests/integration/test_link_heal.py` — save-time repair end to end: a
+- [X] T016 [P] [US2] Create `tests/integration/test_link_heal.py` — save-time repair end to end: a
       fragment-only link gains a path, a path-only link gains a fragment, a stale path is corrected,
       a dead link beside a stale one is left byte-identical, and link text plus surrounding prose are
       unchanged (US2 AC1–8, SC-001, SC-002).
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Implement `find_links(text, *, source, in_tasks_field=False)` in
+- [X] T017 [US2] Implement `find_links(text, *, source, in_tasks_field=False)` in
       `src/endpaper/core/links.py`: the inline-link regex plus the fenced-block and code-span mask.
       Returns `Link` records carrying `start`/`end` offsets. Never raises. Grammar and exclusions are
       fixed in [contracts/link-format.md](contracts/link-format.md#grammar).
-- [ ] T018 [US2] Implement `relative_destination(source, target)` in
+- [X] T018 [US2] Implement `relative_destination(source, target)` in
       `src/endpaper/core/links.py` using `os.path.relpath` with `os.sep` replaced by `/`, plus the
       angle-bracket wrapper for destinations containing a space, paren, or angle bracket (R3, R4).
-- [ ] T019 [US2] Implement `resolve_id` and `resolve_link` in `src/endpaper/core/links.py` — id
+- [X] T019 [US2] Implement `resolve_id` and `resolve_link` in `src/endpaper/core/links.py` — id
       first, path second; deterministic duplicate handling with a warning; documents only at this
       stage (tasks as targets arrive in T044).
-- [ ] T020 [US2] Implement `heal_text(workspace, text, *, source)` in
+- [X] T020 [US2] Implement `heal_text(workspace, text, *, source)` in
       `src/endpaper/core/links.py` as a byte-level splice of destinations only, returning `text`
       unchanged when nothing is stale so callers can skip a write entirely (FR-026, FR-022).
-- [ ] T021 [US2] Add the keyword-only `workspace: Workspace | None = None` parameter to
+- [X] T021 [US2] Add the keyword-only `workspace: Workspace | None = None` parameter to
       `save_buffer` in `src/endpaper/core/editing.py`, healing before stamping `updated`, and add
       `warnings: tuple[ScanWarning, ...] = ()` to `SaveResult` in `src/endpaper/core/models.py`. A
       dead link never sets `ok=False`. The default keeps the four existing test call sites compiling
       (R5).
-- [ ] T022 [US2] Pass the workspace from `src/endpaper/tui/edit_screen.py` (`_save`, line ~140) and
+- [X] T022 [US2] Pass the workspace from `src/endpaper/tui/edit_screen.py` (`_save`, line ~140) and
       surface `SaveResult.warnings` in the existing `⚠ …` status-bar form.
-- [ ] T023 [US2] Re-export the links API from `src/endpaper/core/__init__.py`.
+- [X] T023 [US2] Re-export the links API from `src/endpaper/core/__init__.py`.
 
 **Checkpoint**: Links resolve and repair themselves on save. This is the feature's trunk — US3, US4,
 US6, and US7 all build on it.
@@ -192,28 +192,28 @@ meeting and confirm the note is listed with file, line, and link text.
 
 ### Tests for User Story 3
 
-- [ ] T024 [P] [US3] Create `tests/contract/test_links_cli.py` — `links <id>` JSON keys, the
+- [X] T024 [P] [US3] Create `tests/contract/test_links_cli.py` — `links <id>` JSON keys, the
       `--direction` grouping shape, exit code 0 for an empty result and 1 for an unresolvable id,
       stdout/stderr separation, and no prompt or pager
       ([contracts/cli.md](contracts/cli.md#json-schema)).
-- [ ] T025 [P] [US3] Create `tests/integration/test_links.py` — inbound and outbound end to end,
+- [X] T025 [P] [US3] Create `tests/integration/test_links.py` — inbound and outbound end to end,
       including the two negative cases that make the candidate filter correct: an id appearing as
       plain prose is **not** an inbound link, and a record's own frontmatter `id:` is **not** a
       self-link (US3 AC6, AC7).
-- [ ] T026 [P] [US3] Create `tests/performance/test_link_scan.py`, marked
+- [X] T026 [P] [US3] Create `tests/performance/test_link_scan.py`, marked
       `@pytest.mark.performance` — inbound links for one id under 500 ms on a 6,000-document
       workspace (SC-006). This test is the standing justification for having no index; measured at
       155 ms in research R2.
-- [ ] T027 [US3] Implement `inbound_links(workspace, target_id)` and
+- [X] T027 [US3] Implement `inbound_links(workspace, target_id)` and
       `outbound_links(workspace, source)` in `src/endpaper/core/links.py`. Inbound reads each file's
       bytes, substring-tests for the id, and runs `find_links` only on hits — a hit is a *candidate*,
       never a result (FR-030).
-- [ ] T028 [US3] Add the `links` subparser with `<id>`, `--json`, and
+- [X] T028 [US3] Add the `links` subparser with `<id>`, `--json`, and
       `--direction out|in|both` (default `both`) to `src/endpaper/cli/main.py`, reserving `check` and
       `heal` in the id position, plus the `_cmd_links` handler.
-- [ ] T029 [US3] Add `print_links_json` and `print_links_table` to `src/endpaper/cli/output.py` —
+- [X] T029 [US3] Add `print_links_json` and `print_links_table` to `src/endpaper/cli/output.py` —
       tab-separated, no header, no colour on a non-TTY.
-- [ ] T030 [US3] Wire exit codes for `links <id>` in `src/endpaper/cli/main.py`: 0 including an empty
+- [X] T030 [US3] Wire exit codes for `links <id>` in `src/endpaper/cli/main.py`: 0 including an empty
       result, 1 when the id itself resolves to nothing, 2 for a bad `--direction`.
 
 **Checkpoint**: Backlinks work from the command line with nothing persisted.
@@ -230,22 +230,22 @@ reports dead; run `heal --dry-run` then `heal` and confirm the reported set and 
 
 ### Tests for User Story 4
 
-- [ ] T031 [P] [US4] Extend `tests/contract/test_links_cli.py` with `check` and `heal`: the report
+- [X] T031 [P] [US4] Extend `tests/contract/test_links_cli.py` with `check` and `heal`: the report
       schema, exit 1 when anything is stale or dead, exit 0 on a clean workspace, and
       `--dry-run` being non-blocking and write-free.
-- [ ] T032 [P] [US4] Extend `tests/integration/test_link_heal.py`: `--dry-run` reports **exactly**
+- [X] T032 [P] [US4] Extend `tests/integration/test_link_heal.py`: `--dry-run` reports **exactly**
       the set `heal` then changes (the property that makes `heal` safe to run without reading a
       diff); dead links survive byte-identical beside repaired ones; and a workspace with nothing
       stale sees **zero writes and no `updated` movement** (SC-008, US4 AC4, AC5, AC8).
-- [ ] T033 [US4] Implement `check_links(workspace, paths=())` and
+- [X] T033 [US4] Implement `check_links(workspace, paths=())` and
       `heal_links(workspace, paths=(), *, dry_run=False)` in `src/endpaper/core/links.py`, returning
       `LinkReport` tuples. `heal_links` must not open a file for writing when nothing in it is stale.
-- [ ] T034 [US4] Add the `check` and `heal` sub-subcommands with `[<path>…]`, `--json`, and
+- [X] T034 [US4] Add the `check` and `heal` sub-subcommands with `[<path>…]`, `--json`, and
       `--dry-run` to `src/endpaper/cli/main.py`, plus handlers.
-- [ ] T035 [US4] Add `print_link_reports_json` and `print_link_reports_table` to
+- [X] T035 [US4] Add `print_link_reports_json` and `print_link_reports_table` to
       `src/endpaper/cli/output.py`, with `old_path`/`new_path` serialised as `null` where they do not
       apply.
-- [ ] T036 [US4] Wire exit codes for `check` and `heal` in `src/endpaper/cli/main.py` per the table
+- [X] T036 [US4] Wire exit codes for `check` and `heal` in `src/endpaper/cli/main.py` per the table
       in [contracts/cli.md](contracts/cli.md#exit-codes).
 
 **Checkpoint**: A workspace can be audited and repaired non-interactively.

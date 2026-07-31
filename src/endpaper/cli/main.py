@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from datetime import date
 from pathlib import Path
@@ -11,6 +12,10 @@ from endpaper.cli.output import (
     print_documents_json,
     print_documents_table,
     print_error,
+    print_link_reports_json,
+    print_link_reports_table,
+    print_links_json,
+    print_links_table,
     print_tasks_json,
     print_tasks_table,
     relative_path,
@@ -18,9 +23,10 @@ from endpaper.cli.output import (
 from endpaper.core.assistants import resolve_assistant
 from endpaper.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from endpaper.core.documents import filter_documents
-from endpaper.core.errors import EndpaperError, UsageError, WorkspaceError
+from endpaper.core.errors import EndpaperError, NotFoundError, UsageError, WorkspaceError
+from endpaper.core.links import check_links, heal_links, links_for_id
 from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.models import DocumentFilter, TaskFilter
+from endpaper.core.models import DocumentFilter, TaskFilter, Workspace
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
 from endpaper.core.tasks import add_task, filter_tasks, load_tasks, set_task_state
 from endpaper.core.workspace import find_workspace, init_workspace
@@ -144,6 +150,30 @@ def _build_parser() -> argparse.ArgumentParser:
         "value", nargs="?", default=None, choices=LEGAL_ASSISTANT_VALUES
     )
     config_assistant_parser.add_argument("--json", action="store_true")
+
+    links_parser = subparsers.add_parser(
+        "links",
+        help="ask what points at a record, or audit and repair links",
+        description=(
+            "endpaper links <id> [--json] [--direction out|in|both]\n"
+            "endpaper links check [<path>...] [--json]\n"
+            "endpaper links heal  [<path>...] [--json] [--dry-run]\n\n"
+            "'check' and 'heal' are reserved words in the <id> position; every real id "
+            "carries a collection prefix (meeting_/note_/task_), so this is never ambiguous."
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    links_parser.add_argument("target", help="a record id, or 'check'/'heal'")
+    links_parser.add_argument(
+        "paths", nargs="*", help="check/heal only: limit to these workspace-relative paths"
+    )
+    links_parser.add_argument("--json", action="store_true")
+    links_parser.add_argument(
+        "--direction", choices=["out", "in", "both"], default="both", help="links <id> only"
+    )
+    links_parser.add_argument(
+        "--dry-run", action="store_true", help="heal only: report without writing"
+    )
 
     return parser
 
@@ -338,6 +368,66 @@ def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_link_paths(workspace: Workspace, raw_paths: list[str]) -> tuple[Path, ...]:
+    """CLI-supplied path arguments, workspace-relative, to the absolute `Path`s
+    `core.links` expects. Pure string arithmetic -- `os.path.normpath` rather than
+    `Path.resolve()` so a symlinked tmp dir (macOS) does not make the result
+    disagree with `workspace.root`'s own unresolved form."""
+    return tuple(Path(os.path.normpath(workspace.root / raw)) for raw in raw_paths)
+
+
+def _cmd_links_id(workspace: Workspace, namespace: argparse.Namespace) -> int:
+    target, outbound, inbound = links_for_id(
+        workspace, namespace.target, direction=namespace.direction
+    )
+    if target is None:
+        raise NotFoundError(f"no record with id {namespace.target!r}")
+
+    if namespace.json:
+        print_links_json(
+            workspace, namespace.target, outbound, inbound, direction=namespace.direction
+        )
+    else:
+        print_links_table(workspace, outbound, inbound)
+    return 0
+
+
+def _cmd_links_check(workspace: Workspace, namespace: argparse.Namespace) -> int:
+    paths = _resolve_link_paths(workspace, namespace.paths)
+    reports = check_links(workspace, paths)
+
+    if namespace.json:
+        print_link_reports_json(workspace, reports)
+    else:
+        print_link_reports_table(workspace, reports)
+    return 1 if reports else 0
+
+
+def _cmd_links_heal(workspace: Workspace, namespace: argparse.Namespace) -> int:
+    paths = _resolve_link_paths(workspace, namespace.paths)
+    reports = heal_links(workspace, paths, dry_run=namespace.dry_run)
+
+    if namespace.json:
+        print_link_reports_json(workspace, reports)
+    else:
+        print_link_reports_table(workspace, reports)
+
+    if namespace.dry_run:
+        return 1 if reports else 0
+    # A real run fixes every stale link, so only a dead one -- never repaired --
+    # can still be "remaining" by the time this returns (contracts/cli.md).
+    return 1 if any(report.status == "dead" for report in reports) else 0
+
+
+def _cmd_links(namespace: argparse.Namespace) -> int:
+    workspace = find_workspace(Path.cwd())
+    if namespace.target == "check":
+        return _cmd_links_check(workspace, namespace)
+    if namespace.target == "heal":
+        return _cmd_links_heal(workspace, namespace)
+    return _cmd_links_id(workspace, namespace)
+
+
 def _dispatch(namespace: argparse.Namespace) -> int:
     if namespace.command == "init":
         return _cmd_init(namespace)
@@ -361,6 +451,8 @@ def _dispatch(namespace: argparse.Namespace) -> int:
         return _cmd_task_list(namespace)
     if namespace.command == "config":
         return _cmd_config_assistant(namespace)
+    if namespace.command == "links":
+        return _cmd_links(namespace)
     raise UsageError(f"unknown command: {namespace.command}")
 
 

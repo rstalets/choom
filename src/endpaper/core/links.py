@@ -25,6 +25,7 @@ from endpaper.core.meetings import scan_meetings
 from endpaper.core.models import (
     EditableFile,
     Link,
+    LinkDirection,
     LinkReport,
     LinkStatus,
     LinkTarget,
@@ -685,6 +686,56 @@ def inbound_links(workspace: Workspace, target_id: str) -> tuple[Link, ...]:
                 results.append(link)
 
     return tuple(results)
+
+
+def _report_for_link(link: Link, target: LinkTarget | None, status: LinkStatus) -> LinkReport:
+    new_path = None
+    if status == "stale" and target is not None and not link.in_tasks_field:
+        new_path = relative_destination(link.source, target.path)
+    return LinkReport(
+        file=link.source,
+        line=link.line,
+        text=link.text,
+        target_id=link.target_id,
+        old_path=link.path,
+        new_path=new_path,
+        status=status,
+    )
+
+
+def links_for_id(
+    workspace: Workspace, target_id: str, *, direction: LinkDirection = "both"
+) -> tuple[LinkTarget | None, tuple[LinkReport, ...], tuple[LinkReport, ...]]:
+    """The building block behind `endpaper links <id>`.
+
+    Returns `(target, outbound_reports, inbound_reports)`. `target` is None
+    when `target_id` itself does not resolve -- the caller should treat that
+    as "not found" (exit 1); an empty pair of report tuples for an id that
+    *does* resolve is a normal, successful result (exit 0). Either report
+    tuple is empty when `direction` excludes it.
+
+    Never raises.
+    """
+    target, _warnings = resolve_id(workspace, target_id)
+    if target is None:
+        return None, (), ()
+
+    outbound: tuple[LinkReport, ...] = ()
+    if direction in ("out", "both"):
+        outbound = tuple(
+            _report_for_link(link, resolve_link(workspace, link)[0], status)
+            for link, status in outbound_for_target(workspace, target)
+        )
+
+    inbound: tuple[LinkReport, ...] = ()
+    if direction in ("in", "both"):
+        inbound_reports = []
+        for link in inbound_links(workspace, target_id):
+            link_target, status = resolve_link(workspace, link)
+            inbound_reports.append(_report_for_link(link, link_target, status))
+        inbound = tuple(inbound_reports)
+
+    return target, outbound, inbound
 
 
 # --- Search, for /link ---------------------------------------------------------
