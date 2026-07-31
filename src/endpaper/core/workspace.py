@@ -5,7 +5,8 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 
-from endpaper.core.errors import WorkspaceError
+from endpaper.core.config import LEGAL_ASSISTANT_VALUES
+from endpaper.core.errors import UsageError, WorkspaceError
 from endpaper.core.models import InitResult, Workspace
 
 SUPPORTED_SCHEMA = 1
@@ -57,7 +58,20 @@ def _write_guidance_file(target: Path, name: str) -> bool:
     return True
 
 
-def init_workspace(target: Path) -> InitResult:
+def init_workspace(target: Path, *, assistant: str | None = None) -> InitResult:
+    """Create a workspace. When `assistant` is given, record it in the config (FR-027).
+
+    Unchanged in every other respect. Never prompts.
+
+    Raises:
+        WorkspaceError: the directory is already a workspace.
+        UsageError: `assistant` is not claude, copilot, or none. Nothing is created.
+    """
+    if assistant is not None and assistant not in LEGAL_ASSISTANT_VALUES:
+        raise UsageError(
+            f"assistant must be one of {', '.join(LEGAL_ASSISTANT_VALUES)}; got {assistant!r}"
+        )
+
     target = target.resolve()
     endpaper_dir = target / ".endpaper"
     if endpaper_dir.exists():
@@ -77,10 +91,10 @@ def init_workspace(target: Path) -> InitResult:
 
     endpaper_dir.mkdir(parents=True, exist_ok=True)
     now = datetime.now().replace(microsecond=0).isoformat()
-    (endpaper_dir / "config.toml").write_text(
-        f'[workspace]\nschema = {SUPPORTED_SCHEMA}\ncreated = "{now}"\n',
-        encoding="utf-8",
-    )
+    config_text = f'[workspace]\nschema = {SUPPORTED_SCHEMA}\ncreated = "{now}"\n'
+    if assistant is not None:
+        config_text += f'\n[assistant]\nname = "{assistant}"\n'
+    (endpaper_dir / "config.toml").write_text(config_text, encoding="utf-8")
 
     return InitResult(
         workspace=Workspace(root=target), written=tuple(written), skipped=tuple(skipped)

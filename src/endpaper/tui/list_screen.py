@@ -401,6 +401,10 @@ class ListScreen(Screen[None]):
     async def _on_collection_requested(self, message: CommandBar.CollectionRequested) -> None:
         await self._activate_collection(message.name)
 
+    @on(CommandBar.ConfigRequested)
+    def _on_config_requested(self, message: CommandBar.ConfigRequested) -> None:
+        self._pending_error = self.app.handle_config_command(message.argument)  # type: ignore[attr-defined]
+
     @on(CommandBar.HelpRequested)
     def _on_help_requested(self, message: CommandBar.HelpRequested) -> None:
         self.app.push_screen(HelpScreen())

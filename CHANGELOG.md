@@ -4,6 +4,59 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Local AI assistant invocation (v0.0.2)
+
+**TUI, user-visible**
+
+Typing `/ai <prompt>` on its own line in the editor and pressing `enter` saves the document,
+hands the prompt to whichever AI assistant CLI you already have installed (Claude Code or
+GitHub Copilot), and drops the reply where the command was. While it runs, the command line
+shows `⋯`, the status bar reads a randomly chosen corporate-jargon breadcrumb plus
+`ctrl+c to cancel`, and the editor is read-only. `ctrl+c` cancels immediately, restoring the
+`/ai <prompt>` line exactly as typed; the same restoration happens on a non-zero exit, an empty
+reply, or no assistant being resolvable, each with a status-bar message naming the problem. A
+save failure is reported and the assistant is never invoked. `/ai` is listed in the help pane
+(`/help`) alongside the command-bar verbs.
+
+With exactly one supported assistant on `PATH` and nothing configured, `/ai` works with zero
+setup. With two installed, or none, the status bar names `/config assistant` as the way to
+choose. A workspace with neither assistant installed keeps every other feature unchanged —
+`assistants.py` is the only module that imports `subprocess` for this feature, and nothing else
+in `core` depends on it.
+
+Each assistant is invoked with a read-only permission flag (`--allowedTools "Read"` for Claude
+Code CLI, `--allow-tool "read"` for Copilot CLI) so it can actually read the document
+`compose_prompt` points it at — neither CLI auto-approves tool calls, including a plain file
+read, in non-interactive `-p` mode by default. Nothing beyond `Read` is granted.
+
+**New configuration surface**
+
+- `endpaper config assistant [<value>] [--json]` — get or set which assistant `/ai` calls.
+  `<value>` is one of `claude`, `copilot`, `none`. With no value, prints the configured value,
+  the resolved one, its source, and the assistants detected on this machine (`--json`: exactly
+  those four keys, `available` never `null`). Exit codes: `0` success, `2` an unrecognised
+  value (nothing written), `3` outside a workspace.
+- `endpaper init --assistant <claude|copilot|none>` — record the choice as part of workspace
+  creation. Still never prompts.
+- `/config assistant [<value>]` — the TUI command-bar peer, on the list screen. Effective for
+  the next `/ai` immediately, no restart.
+- Stored as `[assistant].name` in `.endpaper/config.toml`. Absent means "detect": exactly one
+  assistant found is used automatically; the schema version is unchanged (no bump).
+
+**Public API**
+
+- `endpaper.core.editor_commands`: new module — `EDITOR_COMMANDS`, `parse_line()`, the in-editor
+  command grammar (a second, separate command surface from the command bar's `VERB_TABLE`).
+- `endpaper.core.assistants`: new module — `PROFILES`, `available_assistants()`,
+  `resolve_assistant()`, `compose_prompt()`, `start_request()`, `AssistantRequest`.
+- `endpaper.core.config`: new module — `get_assistant()` / `set_assistant()`, a line-targeted
+  edit of `config.toml` that preserves comments, key order, and unknown keys.
+- `endpaper.core.models`: new `EditorCommand`, `ParsedCommand`, `AssistantProfile`,
+  `ResolvedAssistant`, `AssistantReply`.
+- `endpaper.core.errors`: new `AssistantError` (exit_code 1).
+- `endpaper.core.workspace.init_workspace()`: new keyword-only `assistant: str | None = None`.
+- `tui/commands.py::VERB_TABLE`: gains `config`.
+
 ### UI layout refresh
 
 **TUI, user-visible**

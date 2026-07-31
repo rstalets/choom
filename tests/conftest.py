@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+import os
 import secrets
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -12,6 +13,61 @@ from endpaper.cli.main import main
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.workspace import init_workspace
+
+#: The fixed reply `stub_assistant`'s "reply" mode prints, so integration tests can
+#: assert on insertion, ordering, and line endings without duplicating the text.
+STUB_REPLY_TEXT = "line one\nline two\nline three"
+
+_STUB_SOURCE = """\
+#!/usr/bin/env python3
+import os
+import sys
+import time
+
+mode = os.environ.get("ENDPAPER_STUB_MODE", "echo")
+
+if mode == "echo":
+    for arg in sys.argv[1:]:
+        print(arg)
+    sys.exit(0)
+elif mode == "reply":
+    print("line one\\nline two\\nline three")
+    sys.exit(0)
+elif mode == "reply_with_slash":
+    print("/ai nested attempt\\nstill here")
+    sys.exit(0)
+elif mode == "empty":
+    sys.exit(0)
+elif mode == "fail":
+    print("stub failure", file=sys.stderr)
+    sys.exit(1)
+elif mode == "sleep":
+    time.sleep(3600)
+else:
+    sys.exit(0)
+"""
+
+
+@pytest.fixture
+def stub_assistant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], None]:
+    """Install a fake `claude` on PATH. Returns a setter for its mode.
+
+    A small Python script written to `tmp_path`, made executable, and named as the
+    `claude` profile's binary, so `shutil.which` finds it for real -- detection and
+    invocation are exercised for real rather than mocked.
+    """
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    script = bindir / ("claude.cmd" if os.name == "nt" else "claude")
+    script.write_text(_STUB_SOURCE, encoding="utf-8")
+    script.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("ENDPAPER_STUB_MODE", "echo")
+
+    def _set_mode(mode: str) -> None:
+        monkeypatch.setenv("ENDPAPER_STUB_MODE", mode)
+
+    return _set_mode
 
 
 @pytest.fixture
