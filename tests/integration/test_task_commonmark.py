@@ -1,36 +1,22 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 from markdown_it import MarkdownIt
 from mdit_py_plugins.tasklists import tasklists_plugin
 
-from endpaper.cli.main import main
 
-
-def test_generated_tasks_file_parses_as_commonmark_task_list(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    main(["init"])
-    capsys.readouterr()
-
-    main(
-        [
-            "task",
-            "add",
-            "send the vendor comparison",
-            "--type",
-            "followup",
-            "--tag",
-            "procurement",
-        ]
+def test_generated_tasks_file_parses_as_commonmark_task_list(cli) -> None:
+    cli(
+        "task",
+        "add",
+        "send the vendor comparison",
+        "--type",
+        "followup",
+        "--tag",
+        "procurement",
     )
-    capsys.readouterr()
-    main(["task", "add", "book the room"])
-    capsys.readouterr()
+    cli("task", "add", "book the room")
 
-    text = (tmp_path / "tasks.md").read_text(encoding="utf-8")
+    text = cli.read("tasks.md")
 
     md = MarkdownIt("commonmark").use(tasklists_plugin)
     tokens = md.parse(text)

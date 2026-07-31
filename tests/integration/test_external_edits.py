@@ -8,6 +8,7 @@ from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
+from tests.helpers import to_collection
 
 
 def _rewrite_externally(path: Path) -> None:
@@ -40,9 +41,7 @@ async def test_externally_modified_document_opens_edits_and_saves_indistinguisha
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
-        await pilot.pause()
-        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
-        await pilot.pause()
+        await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
         await pilot.press("e")

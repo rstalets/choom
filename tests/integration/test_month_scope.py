@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -9,7 +9,8 @@ import pytest
 
 from endpaper.core.documents import scan_month
 from endpaper.core.meetings import MEETINGS
-from endpaper.core.models import YearMonth
+from endpaper.core.models import Collection, Workspace, YearMonth
+from endpaper.core.notes import NOTES
 from tests.fixtures.generate import generate, generate_notes
 
 
@@ -28,42 +29,35 @@ def _counting_read_text(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[Path]]
     yield read_paths
 
 
+@pytest.mark.parametrize(
+    ("descriptor", "make_workspace", "dir_attr"),
+    [
+        (MEETINGS, generate, "meetings_dir"),
+        (NOTES, generate_notes, "notes_dir"),
+    ],
+    ids=["meetings", "notes"],
+)
 def test_opening_collection_reads_only_current_month(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    descriptor: Collection,
+    make_workspace: Callable[..., Workspace],
+    dir_attr: str,
 ) -> None:
     now = datetime.now()
-    workspace = generate(tmp_path, 400, spread_months=12, now=now, current_month_count=5)
+    workspace = make_workspace(tmp_path, 400, spread_months=12, now=now, current_month_count=5)
 
     current_month = YearMonth(now.year, now.month)
-    expected_dir = workspace.meetings_dir / f"{now:%Y}" / f"{now:%m}"
+    expected_dir = getattr(workspace, dir_attr) / f"{now:%Y}" / f"{now:%m}"
 
     with _counting_read_text(monkeypatch) as read_paths:
-        documents, warnings = scan_month(workspace, MEETINGS, current_month)
+        documents, warnings = scan_month(workspace, descriptor, current_month)
 
     assert warnings == []
     assert len(documents) == 5
     assert read_paths, "expected scan_month to read at least one file"
     assert all(p.parent == expected_dir for p in read_paths)
     assert len(read_paths) == len(documents)
-
-
-def test_notes_month_scope_also_reads_only_the_current_month(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    from endpaper.core.notes import NOTES
-
-    now = datetime.now()
-    workspace = generate_notes(tmp_path, 400, spread_months=12, now=now, current_month_count=5)
-
-    current_month = YearMonth(now.year, now.month)
-    expected_dir = workspace.notes_dir / f"{now:%Y}" / f"{now:%m}"
-
-    with _counting_read_text(monkeypatch) as read_paths:
-        documents, warnings = scan_month(workspace, NOTES, current_month)
-
-    assert warnings == []
-    assert len(documents) == 5
-    assert all(p.parent == expected_dir for p in read_paths)
 
 
 def test_filter_reads_each_month_at_most_once_per_session(

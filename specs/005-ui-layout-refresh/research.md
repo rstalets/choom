@@ -417,3 +417,8 @@ Not research so much as scope reality, recorded here so `/speckit-tasks` can pla
 The `tests/contract/` suite must keep passing untouched apart from the new `--done` flag: it pins
 the CLI's exit codes, `--json` schema, non-blocking behaviour, and no-ANSI-on-non-TTY guarantees,
 none of which this feature may change.
+
+> Historical record, accurate as written for 005. Several of the files named above were later
+> consolidated by the issue #29 test refactor: `test_list_notes_tui.py` merged into
+> `test_list_tui.py`, `test_create_note_tui.py` into `test_create_tui.py`, and
+> `test_command_bar_visibility.py` into `test_chrome_tui.py`.

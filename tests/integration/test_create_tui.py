@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from endpaper.core.documents import _read_document
 from endpaper.core.meetings import scan_meetings
 from endpaper.core.models import Workspace
@@ -7,37 +9,51 @@ from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import ListScreen
 from endpaper.tui.status_bar import StatusBar
+from tests.helpers import type_command, type_literally
 
 
-async def _type(pilot, text: str) -> None:
-    for ch in text:
-        if ch == " ":
-            await pilot.press("space")
-        elif ch == "/":
-            await pilot.press("slash")
-        else:
-            await pilot.press(ch)
-
-
-async def test_command_bar_creates_meeting_with_inline_tags_anywhere(
+@pytest.mark.parametrize(
+    ("command_text", "dir_attr", "title", "doc_type", "tags"),
+    [
+        pytest.param(
+            "meeting.standup Q3 #platform planning #legal",
+            "meetings_dir",
+            "Q3 planning",
+            "standup",
+            ("platform", "legal"),
+            id="meeting",
+        ),
+        pytest.param(
+            "note.research vendor landscape #procurement",
+            "notes_dir",
+            "vendor landscape",
+            "research",
+            ("procurement",),
+            id="note",
+        ),
+    ],
+)
+async def test_dotted_command_creates_typed_document_with_tags(
     tmp_workspace: Workspace,
+    command_text: str,
+    dir_attr: str,
+    title: str,
+    doc_type: str,
+    tags: tuple[str, ...],
 ) -> None:
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        await pilot.press("/")
-        await pilot.pause()
-        await _type(pilot, "meeting.standup Q3 #platform planning #legal")
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, command_text)
 
         assert isinstance(app.screen, EditScreen)
-        meeting = _read_document(app.screen.file.path)
-        assert meeting is not None
-        assert meeting.title == "Q3 planning"
-        assert meeting.tags == ("platform", "legal")
-        assert meeting.type == "standup"
-        assert "#" not in meeting.title
+        document = _read_document(app.screen.file.path)
+        assert document is not None
+        assert document.title == title
+        assert document.tags == tags
+        assert document.type == doc_type
+        assert "#" not in document.title
+        assert document.path.is_relative_to(getattr(tmp_workspace, dir_attr))
 
 
 async def test_retyped_leading_slash_is_an_unknown_command(tmp_workspace: Workspace) -> None:
@@ -50,7 +66,7 @@ async def test_retyped_leading_slash_is_an_unknown_command(tmp_workspace: Worksp
         await pilot.pause()
         await pilot.press("/")
         await pilot.pause()
-        await _type(pilot, "/meeting board")
+        await type_literally(pilot, "/meeting board")
         await pilot.press("enter")
         await pilot.pause()
 
@@ -69,14 +85,29 @@ async def test_dotted_command_with_no_description_shows_error_not_silence(
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
-        await pilot.press("/")
-        await pilot.pause()
-        await _type(pilot, "meeting.board")
-        await pilot.press("enter")
-        await pilot.pause()
+        await type_command(app, pilot, "meeting.board")
 
         assert isinstance(app.screen, ListScreen)
         meetings, _ = scan_meetings(tmp_workspace)
         assert meetings == []
         status = app.screen.query_one(StatusBar)
         assert "empty" in str(status.content)
+
+
+async def test_bare_note_with_description_creates_untyped_note_not_daily(
+    tmp_workspace: Workspace,
+) -> None:
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await type_command(app, pilot, "note vendor landscape")
+
+        assert isinstance(app.screen, EditScreen)
+        document = _read_document(app.screen.file.path)
+        assert document is not None
+        assert document.title == "vendor landscape"
+        assert document.type == ""
+
+        # The daily note must not exist -- a description means a note, never
+        # the daily note (spec Assumptions, R5).
+        assert list(tmp_workspace.daily_dir.glob("*.md")) == []

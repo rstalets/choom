@@ -34,9 +34,15 @@ async def type_command(app: Any, pilot: Any, text: str, *, submit: bool = True) 
 
     Equivalent to typing for any test that asserts on the *outcome*. Use
     `type_literally` when the test is about what happens *while* typing.
+
+    The cursor is moved to the end explicitly: Textual's `Input` only snaps
+    `cursor_position` to the end of the value on the first assignment after
+    mount, so without this a following `backspace` would delete from wherever
+    the cursor happened to be rather than from the end of `text`.
     """
     bar = await open_bar(app, pilot)
     bar.value = text
+    bar.cursor_position = len(text)
     await pilot.pause()
     if submit:
         await pilot.press("enter")

@@ -47,7 +47,7 @@ python -m endpaper          # in a workspace created with `endpaper init`
 4. Press `shift+tab` → Meetings.
 5. Press `/`, type `fil`, press `tab` → **nothing switches**; the keystroke belongs to the bar.
 
-Automated: `tests/integration/test_collection_bar_tui.py`
+Automated: `tests/integration/test_chrome_tui.py`
 
 ---
 
@@ -66,11 +66,11 @@ cd /tmp/ep-months && python -m endpaper
 The read-scoping claim is not eyeballed — it is asserted by counting opened paths:
 
 ```bash
-pytest tests/performance/test_month_scope.py -v
+pytest tests/integration/test_month_scope.py -v
 ```
 
 Automated: `tests/unit/test_list_months.py`, `tests/unit/test_scan_month.py`,
-`tests/integration/test_month_pane_tui.py`, `tests/performance/test_month_scope.py`
+`tests/integration/test_month_pane_tui.py`, `tests/integration/test_month_scope.py`
 
 ---
 
@@ -133,7 +133,7 @@ endpaper --version        # endpaper 0.0.0
 The test asserts the two agree — never a literal version, which would have to be edited at every
 release and would then be the drift it exists to catch.
 
-Automated: `tests/integration/test_help_pane_tui.py`, `tests/integration/test_version_indicator.py`
+Automated: `tests/integration/test_help_pane_tui.py`, `tests/integration/test_chrome_tui.py`
 
 ---
 
@@ -223,28 +223,32 @@ making the highlighted collection ambiguous.
 
 | FR | Covered by |
 |---|---|
-| FR-001–FR-002 | `test_collection_bar_tui.py::test_bar_lists_three_collections_with_one_active` |
-| FR-003–FR-005 | `test_collection_bar_tui.py::test_tab_wraps_and_focuses_list` |
-| FR-006 | `test_partitioned_layout.py` (updated) |
-| FR-007 | `test_collection_bar_tui.py::test_tab_inert_while_command_bar_open` |
-| FR-008 | `test_list_tui.py` (updated) |
+| FR-001–FR-002 | `test_chrome_tui.py::test_collection_bar_lists_three_and_tab_cycles_with_wraparound` |
+| FR-003–FR-005 | `test_chrome_tui.py::test_collection_bar_lists_three_and_tab_cycles_with_wraparound` |
+| FR-006 | `test_partitioned_layout.py` |
+| FR-007 | `test_chrome_tui.py::test_tab_inert_while_command_bar_open` |
+| FR-008 | `test_list_tui.py` |
 | FR-009–FR-011 | `test_month_pane_tui.py` |
-| FR-012 | `test_month_scope.py::test_opening_collection_reads_only_current_month` |
+| FR-012 | `integration/test_month_scope.py::test_opening_collection_reads_only_current_month` |
 | FR-013–FR-014 | `test_list_months.py`, `test_month_pane_tui.py` |
 | FR-015 | `test_create_opens_editor_tui.py::test_create_moves_scope_to_new_month` |
 | FR-016 | `test_month_pane_tui.py::test_warning_count_is_per_month` |
-| FR-017–FR-021 | `test_task_category_tui.py`, `test_task_filter_only_done.py` |
+| FR-017–FR-021 | `test_task_category_tui.py`, `test_task_tui.py`, `test_task_filter_only_done.py` |
 | FR-022–FR-026 | `test_edit_from_list_tui.py`, `test_create_opens_editor_tui.py` |
-| FR-027–FR-028 | `test_command_bar_prefix.py` |
+| FR-027–FR-028 | `test_chrome_tui.py::test_command_bar_prefix_undeletable_and_input_not_clipped` |
 | FR-029–FR-031 | `test_command_parsing.py`, `test_filter_verb_tui.py` |
 | FR-032–FR-034 | `test_cross_month_filter_tui.py` |
-| FR-035–FR-036 | `test_month_scope.py::test_filter_reads_each_month_once` |
+| FR-035–FR-036 | `integration/test_month_scope.py::test_filter_reads_each_month_at_most_once_per_session` |
 | FR-037 | `test_command_parsing.py::test_existing_verbs_unchanged` |
 | FR-038–FR-041 | `test_help_pane_tui.py` |
-| FR-042 | `test_version_indicator.py`, `test_version_parity.py` |
+| FR-042 | `test_chrome_tui.py::test_version_indicator_renders_on_list_preview_and_edit_screens`, `contract/test_version_parity.py` |
 | FR-043 | `test_version_fallback.py`, plus the dry-run workflow's install-and-assert step |
-| FR-044–FR-046 | `test_list_tui.py`, `test_partitioned_layout.py` (updated) |
+| FR-044–FR-046 | `test_list_tui.py`, `test_partitioned_layout.py` |
 
-Every functional requirement has at least one test (Principle VI). The `tests/contract/` suite must
-pass unmodified apart from the new `--done` flag — it pins the CLI guarantees this feature is not
-allowed to disturb.
+This table is a convenience index, not a coverage rule: since the constitution's v1.1.0 amendment,
+Principle VI requires coverage of every user-facing *behaviour*, chosen by the author for what could
+plausibly break it — not one test per functional requirement. Several rows above therefore share a
+test, and that is now the intended shape rather than a gap.
+
+The `tests/contract/` suite still pins the CLI guarantees this feature is not allowed to disturb:
+`test_exit_codes.py`, `test_no_ansi.py`, `test_streams.py` and `test_non_blocking.py` pass unmodified.

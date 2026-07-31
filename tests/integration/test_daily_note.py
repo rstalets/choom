@@ -2,9 +2,7 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime
-from pathlib import Path
 
-from endpaper.cli.main import main
 from endpaper.core.models import Workspace
 from endpaper.core.notes import open_daily_note
 from tests.conftest import daily_note_path
@@ -119,24 +117,16 @@ def test_no_other_workspace_file_is_modified(
         assert p.stat().st_mtime_ns == mtime
 
 
-def test_cli_note_today_is_idempotent_and_prints_same_relative_path(
-    tmp_path: Path, monkeypatch, capsys
-) -> None:
-    monkeypatch.chdir(tmp_path)
-    main(["init"])
-    capsys.readouterr()
+def test_cli_note_today_is_idempotent_and_prints_same_relative_path(cli) -> None:
+    first = cli("note", "today")
+    assert first.exit_code == 0
+    assert first.out.startswith("notes/daily/")
 
-    exit_code = main(["note", "today"])
-    assert exit_code == 0
-    first_out = capsys.readouterr().out.strip()
-    assert first_out.startswith("notes/daily/")
+    second = cli("note", "today")
+    assert second.exit_code == 0
+    assert second.out == first.out
 
-    exit_code = main(["note", "today"])
-    assert exit_code == 0
-    second_out = capsys.readouterr().out.strip()
-    assert second_out == first_out
-
-    files = list((tmp_path / "notes" / "daily").rglob("*.md"))
+    files = list((cli.root / "notes" / "daily").rglob("*.md"))
     assert len(files) == 1
 
 

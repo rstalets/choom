@@ -1,0 +1,144 @@
+"""App chrome: the command bar, the collection bar, and the version indicator.
+
+These are all "does the app's surrounding chrome render and behave correctly"
+tests, as opposed to tests of a specific collection's behaviour -- hence one
+file. Sequential, independent assertions share a single `run_test()` session
+where doing so doesn't change what's being asserted, to save on app boots.
+"""
+
+from __future__ import annotations
+
+from textual.widgets import Input
+
+import endpaper
+from endpaper.core.meetings import create_meeting
+from endpaper.core.models import Workspace
+from endpaper.tui.app import EndpaperApp
+from endpaper.tui.collection_bar import COLLECTIONS, CollectionBar
+from endpaper.tui.command_bar import CommandBar
+from endpaper.tui.list_screen import ListView
+from endpaper.tui.status_bar import StatusBar, render_version
+from tests.helpers import type_literally
+
+
+async def test_command_bar_prefix_undeletable_and_input_not_clipped(
+    tmp_workspace: Workspace,
+) -> None:
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+
+        await pilot.press("/")
+        await pilot.pause()
+        bar = app.screen.query_one(CommandBar)
+        assert bar.display is True
+        prefix = bar.query_one("#bar-prefix")
+        assert str(prefix.content) == "/"  # type: ignore[attr-defined]
+
+        input_widget = bar.query_one(Input)
+        # The input's rendered box must not exceed the one-row command bar it lives
+        # in -- Input defaults to a 3-row bordered box, which previously clipped the
+        # text row out of view, leaving only a border line visible.
+        assert input_widget.region.height == bar.region.height == 1
+
+        # The prefix is a separate widget -- no editing key on the Input can
+        # touch it (FR-027, FR-028).
+        for _ in range(5):
+            await pilot.press("backspace")
+        await pilot.pause()
+
+        assert str(prefix.content) == "/"  # type: ignore[attr-defined]
+        assert bar.display is True
+        assert input_widget.value == ""
+
+        # Typed text after the prefix must never include the slash itself. This
+        # is one of the tests guarding `type_command`'s single-assignment
+        # shortcut, so it types keystroke-by-keystroke rather than taking it.
+        await type_literally(pilot, "filter")
+        await pilot.pause()
+        assert input_widget.value == "filter"
+
+        # And it must actually render on screen rather than being clipped out
+        # of view (the failure mode the region-height assertion above guards).
+        svg = app.export_screenshot()
+        assert "filter" in svg
+
+
+async def test_collection_bar_lists_three_and_tab_cycles_with_wraparound(
+    tmp_workspace: Workspace,
+) -> None:
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        assert COLLECTIONS == ("tasks", "notes", "meetings")
+        assert app.active == "tasks"
+
+        bar = app.screen.query_one(CollectionBar)
+        rendered = str(bar.content)
+        assert "Tasks" in rendered
+        assert "Notes" in rendered
+        assert "Meetings" in rendered
+        # exactly one collection is styled as active
+        assert rendered.count("[reverse]") == 1
+
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.active == "notes"
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        assert list_view.has_focus
+        assert list_view.index == 0
+
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.active == "meetings"
+
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.active == "tasks"  # wrapped past Meetings back to Tasks
+
+        await pilot.press("shift+tab")
+        await pilot.pause()
+        assert app.active == "meetings"  # wraps the other way too
+
+
+async def test_tab_inert_while_command_bar_open(tmp_workspace: Workspace) -> None:
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        assert app.active == "tasks"
+
+        await pilot.press("/")
+        await pilot.pause()
+        await type_literally(pilot, "fil")
+        await pilot.pause()
+
+        await pilot.press("tab")
+        await pilot.pause()
+
+        assert app.active == "tasks"  # unchanged -- the keystroke belonged to the bar
+        assert app.screen.query_one(CommandBar).display is True
+
+
+async def test_version_indicator_renders_on_list_preview_and_edit_screens(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning")
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        status = app.screen.query_one(StatusBar)
+        assert render_version() in str(status.content)
+        assert f"v{endpaper.__version__}" in str(status.content)
+
+        await pilot.press("tab", "tab")  # tasks -> notes -> meetings
+        await pilot.pause()
+        await pilot.press("enter")
+        await pilot.pause()
+        status = app.screen.query_one(StatusBar)
+        assert render_version() in str(status.content)
+
+        await pilot.press("e")
+        await pilot.pause()
+        status = app.screen.query_one(StatusBar)
+        assert render_version() in str(status.content)
