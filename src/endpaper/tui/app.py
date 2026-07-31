@@ -7,6 +7,8 @@ from typing import Literal
 from textual.app import App
 from textual.binding import Binding
 
+from endpaper.core.assistants import resolve_assistant
+from endpaper.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from endpaper.core.documents import (
     _read_document,
     list_months,
@@ -313,6 +315,34 @@ class EndpaperApp(App[None]):
             self.task_category = "todo"
             self.filter_query = ""
         return task
+
+    # --- /config command bar verb ------------------------------------------
+
+    def handle_config_command(self, argument: str) -> str | None:
+        """Handle `/config <setting> [<value>]` from the command bar (research
+        R11). Returns a status-bar message, or None on a silent successful
+        write -- reading or a bad value always reports something, matching
+        the CLI peer's behaviour (FR-025-029)."""
+        setting_name, _, value = argument.partition(" ")
+        if setting_name != "assistant":
+            return f"unknown setting: {setting_name!r}"
+
+        if not value:
+            configured = get_assistant(self.workspace)
+            resolved = resolve_assistant(configured)
+            resolved_name = resolved.profile.name if resolved.profile is not None else "none"
+            accepted = ", ".join(LEGAL_ASSISTANT_VALUES)
+            return (
+                f"assistant: {configured or 'unset'} (resolved: {resolved_name}); "
+                f"accepted: {accepted}"
+            )
+
+        if value not in LEGAL_ASSISTANT_VALUES:
+            accepted = ", ".join(LEGAL_ASSISTANT_VALUES)
+            return f"assistant must be one of {accepted}; got {value!r}"
+
+        set_assistant(self.workspace, value)
+        return None
 
     def toggle_task_and_track(self, task_id: str) -> None:
         current = next((t for t in self.tasks if t.id == task_id), None)

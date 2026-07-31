@@ -96,6 +96,7 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter s
 - **Workspace init** — `endpaper init` sets up a workspace (config, `AGENTS.md`, `meetings/`, `notes/daily/`, `tasks.md`) in the current directory. Multi-user shared workspaces are planned but not in v0.0.1 — see [Roadmap](#roadmap).
 - **View and edit** — every note or meeting opens in a rendered markdown preview (`enter`), switches to a raw editor (`e`) with line numbers and soft wrap, and saves with `ctrl+o` (stay) or `ctrl+x` (save and return). `esc` discards, but only prompts when there's something to lose. `ctrl+s` is also bound as a save alias, but `ctrl+o` is the canonical key: some terminals treat `ctrl+s` as the legacy XOFF flow-control signal and swallow it before it ever reaches endpaper. If saves with `ctrl+s` seem to do nothing, run `stty -ixon` in that shell (or use `ctrl+o` instead).
 - **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `endpaper find`, `read`, `write`, `append`, `--json` on every read command, meaningful exit codes, nothing that opens an editor or blocks on input.
+- **`/ai` in the editor** — type `/ai <prompt>` on its own line and press `enter`: the document saves, your already-installed Claude Code CLI or GitHub Copilot CLI runs the prompt, and the reply lands where the command was. The line shows `⋯` and the status bar names a random breadcrumb plus `ctrl+c to cancel` while it works; every failure — cancelled, no reply, the assistant errored — restores the line exactly as typed. Which assistant to call is detected automatically when only one is installed, or set explicitly with `endpaper config assistant <claude|copilot|none>` (CLI) or `/config assistant <value>` (TUI command bar) — a workspace with neither tool installed keeps every other feature unchanged.
 - **No index, no database** — the markdown files are the only state. endpaper globs and parses the workspace in memory on launch; nothing to corrupt, nothing to reindex.
 - **`AGENTS.md`** — generated at `init`, under ~60 lines, so an assistant landing in the workspace is productive immediately.
 
@@ -109,7 +110,6 @@ Planned for a future release, tracked in [REQUIREMENTS.md §6](REQUIREMENTS.md#6
 
 Considered and explicitly out of scope for v0.0.1 (see [REQUIREMENTS.md §5](REQUIREMENTS.md#5-explicitly-out-of-scope-for-v001)):
 
-- AI invocation from inside endpaper (`/claude` markers, SDK integration)
 - Webcam or image capture (`/pic`)
 - Embeddings, vector search, semantic retrieval
 - Tasks created inline from inside a note or meeting

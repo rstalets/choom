@@ -18,6 +18,9 @@ def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
 
 def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> None:
     assert _run(["init"], tmp_path).returncode == 0
+    assert _run(["config", "assistant"], tmp_path).returncode == 0
+    assert _run(["config", "assistant", "claude"], tmp_path).returncode == 0
+    assert _run(["config", "assistant", "--json"], tmp_path).returncode == 0
     assert _run(["meeting", "new", "Q3 planning"], tmp_path).returncode == 0
     assert _run(["meeting", "list", "--json"], tmp_path).returncode == 0
     assert _run(["meeting", "list"], tmp_path).returncode == 0
@@ -34,3 +37,11 @@ def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> 
     assert _run(["task", "undone", task_id], tmp_path).returncode == 0
     assert _run(["--version"], tmp_path).returncode == 0
     assert _run(["--help"], tmp_path).returncode == 0
+
+
+def test_init_with_assistant_flag_terminates_promptly_with_stdin_closed(tmp_path: Path) -> None:
+    result = _run(["init", "--assistant", "copilot"], tmp_path)
+    assert result.returncode == 0
+    assert (tmp_path / ".endpaper" / "config.toml").read_text(encoding="utf-8").count(
+        'name = "copilot"'
+    ) == 1

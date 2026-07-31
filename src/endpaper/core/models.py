@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
@@ -151,3 +152,40 @@ class TaskFilter:
     tags: tuple[str, ...] = ()
     include_done: bool = False
     only_done: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class EditorCommand:
+    name: str
+    argument: str
+    description: str
+    requires_argument: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ParsedCommand:
+    command: EditorCommand
+    argument: str
+
+
+@dataclass(frozen=True, slots=True)
+class AssistantProfile:
+    name: str
+    display_name: str
+    binary: str
+    build_args: Callable[[str], list[str]]
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedAssistant:
+    profile: AssistantProfile | None
+    source: str  # configured | detected | none | unset | ambiguous
+    available: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class AssistantReply:
+    ok: bool
+    text: str
+    message: str
+    cancelled: bool

@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from textual.widgets import Input
+from textual.widgets import Input, TextArea
 
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import DocumentRow, ListView, TaskRow
@@ -90,3 +90,19 @@ def row_titles(app: Any) -> list[str]:
 def task_rows(app: Any) -> list[TaskRow]:
     """The task rows currently listed, in display order."""
     return [r for r in list_view(app).children if isinstance(r, TaskRow)]
+
+
+async def submit_editor_line(pilot: Any, editor: TextArea, line_text: str) -> int:
+    """Put `line_text` on a new last line of the editor's buffer, place the
+    cursor at its end, and press Enter -- exercising the same `_on_key` path a
+    real keystroke would, without typing one character at a time. Reuses an
+    already-blank trailing line rather than adding a redundant one, the way a
+    user placing their cursor there and typing would. Returns the new line's
+    index."""
+    text = editor.text
+    editor.text = text + line_text if text.endswith("\n") else text + "\n" + line_text
+    line_index = editor.document.line_count - 1
+    editor.cursor_location = (line_index, len(line_text))
+    await pilot.press("enter")
+    await pilot.pause()
+    return line_index

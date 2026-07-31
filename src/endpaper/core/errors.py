@@ -19,3 +19,9 @@ class UsageError(EndpaperError):
 
 class WorkspaceError(EndpaperError):
     exit_code = 3
+
+
+class AssistantError(EndpaperError):
+    """An assistant could not be resolved or run."""
+
+    exit_code = 1

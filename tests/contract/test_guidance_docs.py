@@ -54,7 +54,7 @@ def test_agents_md_stays_within_line_budget(tmp_workspace: Workspace) -> None:
     # substitution -- see workspace.py's `_write_guidance_file`), so the
     # generated copy and the source template share one line budget.
     text = (tmp_workspace.root / "AGENTS.md").read_text(encoding="utf-8")
-    assert len(text.splitlines()) <= 62
+    assert len(text.splitlines()) <= 63
 
 
 def test_agents_md_documents_the_conventions_an_assistant_needs(
