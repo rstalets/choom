@@ -165,6 +165,36 @@ arithmetic live apart from the code that splices new destinations in, which is w
 guarantee gets quietly broken. The module is expected to land around 300 lines, well inside what one
 file should hold.
 
+## Requirements Traceability
+
+Where each of the spec's 54 functional requirements and 12 success criteria is designed. Every row
+resolves to an artifact that specifies the behaviour — this table is the check that the design covers
+the spec, and the input `/speckit-tasks` uses to decide what work exists.
+
+| Spec area | Requirements | Designed in |
+|---|---|---|
+| Link format | FR-001 – FR-010 | [contracts/link-format.md](contracts/link-format.md) → Grammar, Escaping; research R1 (scanner), R4 (escaping) |
+| Identifiers | FR-011 – FR-014 | [contracts/link-format.md](contracts/link-format.md) → Ids; research R6 |
+| Task links | FR-015 – FR-020 | [contracts/link-format.md](contracts/link-format.md) → The task line; [contracts/core-api.md](contracts/core-api.md) → `core.tasks`; research R7 |
+| Frontmatter unchanged | FR-021 | [data-model.md](data-model.md) → On-disk representation |
+| Self-healing | FR-022 – FR-026 | [contracts/link-format.md](contracts/link-format.md) → Repair; [contracts/core-api.md](contracts/core-api.md) → `heal_text`, `save_buffer`; research R5 |
+| Backlinks | FR-027 – FR-031 | [contracts/core-api.md](contracts/core-api.md) → `inbound_links`; research R2 |
+| Commands | FR-032 – FR-041 | [contracts/cli.md](contracts/cli.md) → Commands, JSON schema, Exit codes; research R8 |
+| In-editor authoring | FR-042 – FR-046 | [contracts/tui.md](contracts/tui.md) → `/link` in the editor; research R11 |
+| Preview surface | FR-047 – FR-051 | [contracts/tui.md](contracts/tui.md) → The Links section; research R10 |
+| Documentation | FR-052 – FR-054 | research R9 (`AGENTS.md` budget); [quickstart.md](quickstart.md) → Scenario 8 |
+| Success criteria | SC-001 – SC-012 | [quickstart.md](quickstart.md) → Scenarios 1–8, one block per story; SC-006 additionally measured in research R2 |
+
+Three requirements are worth calling out because their design is a constraint rather than a feature,
+and they are the ones most likely to be dropped as "documentation tidying":
+
+- **FR-021** (no new frontmatter key) is satisfied by *not* doing something. The six-key contract is
+  why document links live in the body next to the prose that explains them.
+- **FR-052** (`AGENTS.md` content) collides with the ≤ 60-line platform constraint. See research R9 —
+  it is a required task with a line-count check, not a nice-to-have.
+- **FR-054** (changelog) covers four separate public-API changes: the id prefix, the task line
+  format, the new commands, and the new JSON schema.
+
 ## Complexity Tracking
 
 > **Fill ONLY if Constitution Check has violations that must be justified**
