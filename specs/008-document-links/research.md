@@ -219,10 +219,11 @@ so `m_20260728_a1b2c3d4` and `meeting_20260728_a1b2c3d4` coexist without ambigui
 compatibility branch.
 
 The real work is the surrounding material — literal example ids appear in `AGENTS.md.tmpl`,
-`REQUIREMENTS.md`, `CHANGELOG.md`, and **10 test modules**: `tests/contract/test_exit_codes.py`,
-`tests/integration/{test_cli_tui_parity,test_external_edits,test_task_cli,test_task_handedit}.py`,
-`tests/unit/{test_collection,test_frontmatter,test_stamp_updated,test_task_id,test_task_parse,
-test_task_render}.py`.
+`REQUIREMENTS.md`, `CHANGELOG.md`, and **16 test modules** (enumerated in `tasks.md` T010):
+one contract, five integration, one performance, and nine unit. An initial narrower grep found 11
+and this document previously said 10; the corrected sweep covers fixture ids such as `id: m_1` and
+generated ones such as `f"id:t_{i:04x}"`, which the first pass missed. The deliberately-malformed
+`<!-- id:` fixture in `tests/integration/test_malformed.py` carries no prefix and is unaffected.
 
 **Alternatives considered**: accepting both prefixes at creation time behind a setting — rejected,
 Principle III forbids a knob that could be a default; a migration command that rewrites ids in place
