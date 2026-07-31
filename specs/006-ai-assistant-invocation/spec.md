@@ -113,9 +113,9 @@ recoverable.
    told the reply was empty and the original `/ai <prompt>` line is restored.
 7. **Given** the editor is not waiting on a reply, **When** the user presses `ctrl+c`, **Then**
    existing behaviour is unchanged.
-8. **Given** the document on disk was modified by something else while the request was in flight,
-   **When** the reply arrives, **Then** the user is warned that the file changed and is not left to
-   discover afterwards that those changes were overwritten.
+8. **Given** the assistant modified the open document on disk while the request was in flight,
+   **When** the reply is inserted and the user saves, **Then** the buffer wins and the save
+   completes without error, the same way any other external edit to an open document behaves today.
 9. **Given** an assistant that would normally wait for input, **When** it is invoked, **Then**
    endpaper never sits waiting on a prompt the user cannot see; the request either completes,
    fails with a message, or remains cancellable.
@@ -175,9 +175,10 @@ effect and reported back; verify without invoking any assistant.
   Claude Code CLI is not available — the error names the configured assistant and the fact that it
   could not be found, rather than reporting a generic failure.
 - **Assistant edits the file itself**: the assistant is capable of writing to the workspace. If it
-  modifies the open document while endpaper holds a buffer, the buffer would overwrite its edits on
-  the next save. The request instructs the assistant to reply rather than edit, and the user is
-  warned if the file on disk changed while the request was in flight.
+  modifies the open document while endpaper holds a buffer, the next save overwrites its edits —
+  the same outcome any external edit to an open document already has today. The request instructs
+  the assistant to reply rather than edit (FR-010); endpaper adds no conflict detection on top of
+  that (FR-018).
 - **Very long or never-returning request**: there is no time limit. The cancel affordance stays on
   screen for the entire wait so the user is never without a way out.
 - **No network**: `/ai` fails with a clear message. Every other endpaper operation continues to work
@@ -238,8 +239,10 @@ effect and reported back; verify without invoking any assistant.
   wrong, return control to the user, and leave the document as it was saved in FR-008.
 - **FR-017**: A failed or cancelled request MUST NEVER remove, truncate, or reorder any line the
   user wrote.
-- **FR-018**: The system MUST detect that the document changed on disk while the request was in
-  flight and warn the user rather than silently overwriting those changes.
+- **FR-018**: endpaper MUST NOT introduce conflict detection or resolution for a document changed
+  on disk while a request is in flight. The editor's buffer stays authoritative and the next save
+  wins, exactly as it already does for externally modified files. The only mitigation is the
+  instruction required by FR-010.
 
 **Assistant support** (issue #19 item 2)
 
@@ -260,6 +263,8 @@ effect and reported back; verify without invoking any assistant.
   configured and MUST NOT fall back to detection.
 - **FR-025**: Users MUST be able to set the assistant from the TUI with `/config assistant
   <claude|copilot|none>`, taking effect immediately and creating the setting if it does not exist.
+  `config` is a command-bar verb, not an in-editor command: it acts on the workspace rather than on
+  a document, so it joins the existing `/` verb list rather than the surface FR-001 introduces.
 - **FR-026**: Users MUST be able to set and read the assistant from the CLI, non-interactively,
   with the read form available as structured output (Constitution II).
 - **FR-027**: `endpaper init` MUST accept the assistant choice as an argument and record it during
@@ -363,6 +368,11 @@ be confirmed before planning:
 - Auto-detection means "is this assistant available to run on this machine". Detecting more than one
   is reported rather than resolved by a precedence order, so endpaper never silently picks the
   assistant the user did not mean.
+- **A document changed on disk mid-request is not a conflict endpaper resolves** (FR-018). Its
+  established behaviour is that an externally modified file opens, edits, and saves like any other,
+  with the buffer winning; `REQUIREMENTS.md` §5 already names OneDrive's conflict-copy behaviour as
+  the answer to simultaneous edits and puts conflict resolution out of scope. This feature does not
+  change that, and does not add a detect-and-warn path that exists nowhere else in the product.
 - `ctrl+c` is used as the cancel key per issue #19. Constitution V reserves `ctrl+c`; it is accepted
   here only for the duration of an in-flight request, where the editor is locked and cancelling is
   the only action available, and it returns to its reserved meaning as soon as control returns.
@@ -377,3 +387,10 @@ be confirmed before planning:
 - Requires that the user has separately installed and authenticated their assistant. endpaper does
   not install, update, or authenticate assistants.
 - Moves two items out of `REQUIREMENTS.md` §5's v0.0.1 out-of-scope list, as noted in the Overview.
+- Three existing tests are pinned to surfaces this feature extends, and will need updating rather
+  than merely adding to. Named here so planning does not treat them as unexpected breakage:
+  `tests/unit/test_command_parsing.py` asserts the exact set of command-bar verbs, which FR-025's
+  `config` joins; `tests/contract/test_non_blocking.py` enumerates every command that must terminate
+  with stdin closed, which FR-026 and FR-027 add to; and `tests/unit/test_footer_bindings.py`
+  requires every shown binding to appear in its screen's footer, which is the rule FR-011's cancel
+  affordance has to satisfy.

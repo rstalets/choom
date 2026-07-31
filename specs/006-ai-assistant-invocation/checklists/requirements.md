@@ -90,3 +90,31 @@ assistant available), and FR-030 (configuration predating the feature) without a
 scenarios. Scenarios were added to User Stories 1, 2, and 3 to cover each. FR-020's extensibility
 claim is verified by SC-005 (identical behaviour across assistants) rather than by a scenario, since
 it is a property of the design rather than an observable event.
+
+### Re-validated against the test suite retrofit (#29), 2026-07-30
+
+The suite was rebuilt for the constitution's risk-based coverage rule after this spec's first draft.
+Re-reading the spec against the merged suite changed one requirement and clarified another:
+
+1. **FR-018 reversed.** It used to require detecting that the document changed on disk mid-request
+   and warning the user. `tests/integration/test_external_edits.py` pins the opposite as endpaper's
+   established behaviour: an externally modified file opens, edits, and saves like any other, buffer
+   wins, no warning anywhere. `REQUIREMENTS.md` §5 also lists conflict resolution for simultaneous
+   edits as out of scope, with OneDrive's conflict-copy behaviour named as the answer. The old
+   FR-018 was scope this spec invented — it is not in issue #19 and exists nowhere in the product.
+   FR-018 now states the boundary explicitly, User Story 2's scenario 8 asserts the buffer-wins
+   outcome instead of a warning, and the reasoning is recorded in Assumptions. FR-010's instruction
+   to the assistant to reply rather than edit remains the only mitigation, which is the right size
+   for the risk.
+2. **FR-025 pinned to a surface.** `tests/unit/test_command_parsing.py::test_existing_verbs_unchanged`
+   asserts the command-bar verb table is exactly nine verbs, which makes "which surface does
+   `/config` live on" a question with a testable answer rather than a planning guess. FR-025 now
+   says `config` is a command-bar verb — it acts on the workspace, not on a document — while `/ai`
+   is the in-editor surface FR-001 introduces.
+
+Three pinned tests that this feature must update rather than merely extend are now named in the
+spec's Dependencies, so planning does not read them as unexpected breakage. Nothing else in the
+spec needed to change: the retrofit's parametrized CLI/TUI parity tests match FR-026's requirement
+for a command-line peer, `tests/contract/test_non_blocking.py` is exactly the gate FR-027's
+no-prompt rule has to pass, and `tests/integration/test_save_failure.py` already establishes the
+buffer-intact-on-failed-save behaviour FR-008 depends on.
