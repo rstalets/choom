@@ -13,7 +13,7 @@ from endpaper.core.models import Document, Task, YearMonth
 from endpaper.tui.collection_bar import COLLECTIONS, CollectionBar
 from endpaper.tui.command_bar import CommandBar
 from endpaper.tui.help_screen import HelpScreen
-from endpaper.tui.rendering import render_preview_markdown
+from endpaper.tui.rendering import render_preview_markdown, render_task_markdown
 from endpaper.tui.scope_pane import CategoryRow, MonthRow, ScopePane, UnfiledRow
 from endpaper.tui.status_bar import LIST_HELP, TASK_LIST_HELP, StatusBar, collection_indicator
 
@@ -194,6 +194,8 @@ class ListScreen(Screen[None]):
         highlighted = list_view.highlighted_child
         if isinstance(highlighted, DocumentRow):
             preview.update(render_preview_markdown(highlighted.document.path, highlighted.document))
+        elif isinstance(highlighted, TaskRow):
+            preview.update(render_task_markdown(highlighted.record))
         else:
             preview.update("")
 
@@ -270,10 +272,19 @@ class ListScreen(Screen[None]):
         self.query_one(CommandBar).open()
 
     def action_edit(self) -> None:
-        if self.app.active == "tasks":  # type: ignore[attr-defined]
-            return
         list_view = self.query_one("#meeting-list", ListView)
         highlighted = list_view.highlighted_child
+
+        if self.app.active == "tasks":  # type: ignore[attr-defined]
+            if not isinstance(highlighted, TaskRow) or highlighted.record.id is None:
+                return
+            from endpaper.tui.edit_screen import open_task_editor
+
+            task = highlighted.record
+            self._pending_select_id = task.id
+            open_task_editor(self.app, task)
+            return
+
         if not isinstance(highlighted, DocumentRow):
             return
         from endpaper.tui.edit_screen import open_editor

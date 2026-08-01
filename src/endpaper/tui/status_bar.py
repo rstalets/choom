@@ -12,7 +12,8 @@ LIST_HELP = (
     "enter open   e edit   ctrl+q quit"
 )
 TASK_LIST_HELP = (
-    "tab collection   / filter or command   ↑↓/jk move   h/l pane   space toggle   ctrl+q quit"
+    "tab collection   / filter or command   ↑↓/jk move   h/l pane   e edit   "
+    "space toggle   ctrl+q quit"
 )
 PREVIEW_HELP = "e edit   l links   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
 #: Swapped in for PREVIEW_HELP while the Links section has focus, the same way

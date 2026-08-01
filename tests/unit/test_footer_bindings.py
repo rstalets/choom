@@ -66,3 +66,10 @@ def test_links_section_help_advertises_move_open_and_close() -> None:
 @pytest.mark.parametrize("help_text", [PREVIEW_HELP, LINKS_SECTION_HELP])
 def test_footer_strings_fit_80_columns(help_text: str) -> None:
     assert len(help_text) <= 80
+
+
+def test_task_list_footer_names_e_for_editing_a_tasks_body() -> None:
+    # `e` on a task row went from a no-op to opening the body editor (007) --
+    # it must be spelled out in the tasks footer, not merely covered by the
+    # weak substring check every other binding gets above (FR-024).
+    assert "e edit" in TASK_LIST_HELP

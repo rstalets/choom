@@ -117,6 +117,67 @@ def test_users_own_comment_is_bare_and_gains_metadata_comment_after_it(
     assert tasks_again[0].id == tasks[0].id
 
 
+def test_body_bearing_fixtures_survive_a_full_read_and_toggle_cycle(
+    tmp_workspace: Workspace,
+) -> None:
+    """SC-004: irregular indentation, a fenced code block, a nested checkbox,
+    and non-ASCII text all survive a read/render/toggle cycle with no line
+    lost or reordered -- and the nested checkbox becomes its own task rather
+    than being swallowed into the preceding one's body."""
+    original = (
+        "- [ ] one <!-- id:t_0001 -->\n"
+        "\n"
+        "   three-space indent, not two\n"
+        "\n"
+        "- [ ] fenced <!-- id:t_0002 -->\n"
+        "\n"
+        "  ```python\n"
+        "  def f():\n"
+        "      return 1\n"
+        "  ```\n"
+        "\n"
+        "- [ ] nested <!-- id:t_0003 -->\n"
+        "\n"
+        "  some detail\n"
+        "  - [ ] a nested checklist item\n"
+        "\n"
+        "- [ ] unicode <!-- id:t_0004 -->\n"
+        "\n"
+        "  Café review — 日本語のメモ 🎉\n"
+    )
+    write_tasks(tmp_workspace, original)
+
+    tasks, warnings = load_tasks(tmp_workspace)
+    assert warnings == []
+    assert len(tasks) == 5  # the nested checkbox is its own task
+
+    by_id = {t.id: t for t in tasks}
+    assert by_id["t_0001"].body == "three-space indent, not two"
+    assert by_id["t_0002"].body == "```python\ndef f():\n    return 1\n```"
+    assert by_id["t_0003"].body == "some detail"
+    nested = next(t for t in tasks if t.text == "a nested checklist item")
+    assert nested.body == ""
+    assert by_id["t_0004"].body == "Café review — 日本語のメモ 🎉"
+
+    set_task_state(tmp_workspace, "t_0001", done=True)
+
+    tasks_after, warnings_after = load_tasks(tmp_workspace)
+    assert warnings_after == []
+    assert len(tasks_after) == 5
+    by_id_after = {t.id: t for t in tasks_after}
+    assert by_id_after["t_0001"].done is True
+    assert by_id_after["t_0001"].body == "three-space indent, not two"
+    assert by_id_after["t_0002"].body == "```python\ndef f():\n    return 1\n```"
+    assert by_id_after["t_0004"].body == "Café review — 日本語のメモ 🎉"
+
+    # Every line is still in the file, untouched, aside from the one checkbox.
+    text_after = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    assert "   three-space indent, not two" in text_after
+    assert "```python\n  def f():\n      return 1\n  ```" in text_after
+    assert "  - [ ] a nested checklist item" in text_after
+    assert "Café review — 日本語のメモ 🎉" in text_after
+
+
 def test_read_only_file_degrades_gracefully(cli) -> None:
     tasks_path = cli.root / "tasks.md"
     tasks_path.write_text(

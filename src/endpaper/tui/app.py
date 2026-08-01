@@ -207,6 +207,17 @@ class EndpaperApp(App[None]):
 
     # --- refresh after a save ---------------------------------------------------
 
+    def reload_tasks(self) -> None:
+        """Re-read tasks.md after a task-body save.
+
+        A body write can shift the line of every task after it, and `load_tasks`
+        is the only code that knows how to recompute the spans a splice just
+        moved -- patching one task in place is not cheaper than re-parsing the
+        one file (research R7). `ListScreen.on_screen_resume` re-selects by id
+        once this returns.
+        """
+        self.tasks, self.task_warnings = load_tasks(self.workspace)
+
     def refresh_document(self, path: Path) -> None:
         """Re-parse only the one file that changed, in place -- never rescans the
         workspace (Principle IV)."""

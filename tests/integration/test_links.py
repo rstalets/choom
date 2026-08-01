@@ -117,7 +117,7 @@ async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Wor
 
         line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
 
-        expected_dest = relative_destination(screen.file.path, meeting.path)
+        expected_dest = relative_destination(screen.target.display_path, meeting.path)
         expected = f"[Q3 planning]({expected_dest}#{meeting.id})"
         assert editor.get_line(line_index).plain == expected
 

@@ -183,6 +183,60 @@ which the new `.github/workflows/tests.yml` uses. That workflow is also the firs
 tests on push and pull request at all; previously they ran only at release time or on manual
 dispatch.
 
+### Task content editing
+
+**TUI, user-visible**
+
+Every task can now carry an optional markdown body — details, a running log, whatever a single
+checkbox line couldn't hold. Highlighting a task renders its body in the preview pane, the same
+way notes and meetings already do; a task with no body clears the pane rather than showing the
+previous task's content. Pressing **`e`** on a highlighted task now opens the editor scoped to
+that task's body alone (previously a no-op) — empty for a task with none, pre-filled for one that
+has one. `ctrl+o`/`ctrl+x` save, `esc` discards with the existing confirm-only-if-dirty rule.
+Saving without changing anything writes nothing to disk. Toggling a task done (`space`) leaves its
+body untouched.
+
+**Format decision**: a body is stored as indented continuation lines directly beneath its task's
+checkbox line in `tasks.md` — no sidecar file, no second store. A blank line separates the
+checkbox line from the body so the file stays valid CommonMark (a body run on without one reads as
+a lazy continuation of the task's own paragraph). The body's own indentation is dedented for
+display and editing, and re-applied on write using whatever prefix was originally observed (two
+spaces for a body written fresh). A checkbox line indented under a task — including one pasted
+into a body by accident — is still read as its own task, exactly as before; this is what keeps an
+existing vault's task list unchanged and is the one deliberate limit on what a body can contain
+(no nested checklist inside a body).
+
+**Command-line surface**
+
+- `endpaper task show <id> [--json]` — print one task and its body. Human form is the same
+  columns `task list` prints, then the body verbatim after a blank line; a task with no body
+  prints the summary line alone. `--json` emits one object, identical in shape to a `task list
+  --json` entry. Exit codes: `0` found (including no body), `1` unknown id, `2` ambiguous id
+  (names the conflicting line numbers), `3` no workspace or unreadable file.
+- `endpaper task list --json` gains a `"body"` key on every entry — the dedented body text, `""`
+  when a task has none. Every key the command emitted before keeps its name and meaning. The
+  human-readable `task list` table is unchanged: still one line per task, since a multi-line body
+  would break its column layout.
+
+**Public API**
+
+- `endpaper.core.models.Task`: new `body: str = ""` field. Every existing construction site keeps
+  working; a task without a body stays indistinguishable from one before this feature.
+- `endpaper.core.models`: new internal `TaskBodySpan` (`start`, `end`, `indent`); `ParsedTasks`
+  gains `bodies: tuple[TaskBodySpan, ...] = ()`, positionally aligned with `tasks`.
+- `endpaper.core.tasks`: new `get_task(workspace, task_id) -> Task` and
+  `set_task_body(workspace, task_id, body) -> Task`. `parse_tasks()` keeps its existing contract
+  (never raises, `"".join(result.lines) == text`) and now also populates bodies.
+- `endpaper.tui.rendering.render_task_markdown(task) -> str`: the task preview pane's renderer,
+  mirroring `render_preview_markdown` for documents.
+- `endpaper.tui.edit_screen`: `EditScreen` is generalised from "a file" to an `EditTarget` (buffer
+  text, a `save(text) -> SaveResult` callable, a display path, an `/ai` line offset, and a
+  `stamps_frontmatter` flag) so it can edit a task's body without ever seeing a whole file. New
+  `open_task_editor(app, task)`. The file-backed path (`open_editor`) behaves exactly as before.
+- **Task line format** — extended, not changed: the checkbox line's shape (marker, metadata
+  comment, field order) is untouched; a body is new indented content beneath it. See
+  `AGENTS.md`/`README.md` for the on-disk shape.
+
 ### 0.0.3
 
 Standalone tasks, the `YYYY/MM/` layout amendment, viewing and editing, and `endpaper init`

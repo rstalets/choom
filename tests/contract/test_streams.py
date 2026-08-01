@@ -73,3 +73,25 @@ def test_task_scan_warnings_go_to_stderr_and_stdout_stays_clean_json(
     assert len(records) == 1
 
     assert captured.err != ""
+
+
+def test_task_show_prints_data_to_stdout_and_errors_to_stderr(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["task", "add", "buy milk"])
+    task_id = capsys.readouterr().out.strip()
+
+    exit_code = main(["task", "show", task_id])
+    assert exit_code == 0
+    captured = capsys.readouterr()
+    assert "buy milk" in captured.out
+    assert captured.err == ""
+
+    exit_code = main(["task", "show", "t_zzzz"])
+    assert exit_code == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err != ""

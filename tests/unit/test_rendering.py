@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 
 from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.rendering import render_preview_markdown
+from endpaper.core.models import Task, Workspace
+from endpaper.tui.rendering import render_preview_markdown, render_task_markdown
 
 
 def test_preview_markdown_strips_frontmatter_and_headings_the_title(
@@ -26,3 +26,52 @@ def test_preview_markdown_strips_frontmatter_and_headings_the_title(
     assert "---" not in rendered
     assert "standup" in rendered
     assert "#platform" in rendered
+
+
+def _task(**overrides: object) -> Task:
+    defaults: dict[str, object] = dict(
+        id="t_a1b2",
+        text="call the vendor",
+        done=False,
+        type="",
+        tags=(),
+        created=None,
+        line=1,
+        body="",
+    )
+    defaults.update(overrides)
+    return Task(**defaults)  # type: ignore[arg-type]
+
+
+def test_heading_is_the_task_text() -> None:
+    rendered = render_task_markdown(_task(text="call the vendor"))
+    assert rendered.startswith("# call the vendor\n")
+
+
+def test_metadata_line_carries_created_type_and_tags() -> None:
+    rendered = render_task_markdown(
+        _task(created=date(2026, 7, 30), type="followup", tags=("procurement",))
+    )
+    assert "*2026-07-30 · followup · #procurement*" in rendered
+
+
+def test_absent_metadata_fields_are_omitted() -> None:
+    rendered = render_task_markdown(_task(created=None, type="", tags=()))
+    assert "*" not in rendered
+
+
+def test_completed_task_is_marked_in_the_metadata_line() -> None:
+    rendered = render_task_markdown(_task(done=True, created=date(2026, 7, 30)))
+    assert "done" in rendered.split("\n\n")[1]
+
+
+def test_task_with_no_body_renders_heading_and_metadata_only() -> None:
+    rendered = render_task_markdown(_task(created=date(2026, 7, 30), body=""))
+    assert rendered == "# call the vendor\n\n*2026-07-30*\n"
+
+
+def test_body_is_appended_after_the_metadata_line() -> None:
+    rendered = render_task_markdown(
+        _task(created=date(2026, 7, 30), body="Need the Q3 comparison.\n\n- called")
+    )
+    assert rendered == ("# call the vendor\n\n*2026-07-30*\n\nNeed the Q3 comparison.\n\n- called")

@@ -69,6 +69,35 @@ def test_task_add_empty_description_exits_2(tmp_path: Path, monkeypatch, capsys)
     assert main(["task", "add", "#onlytags"]) == 2
 
 
+def test_task_show_success_exits_0_including_a_task_with_no_body(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["task", "add", "buy milk"])
+    task_id = capsys.readouterr().out.strip()
+
+    assert main(["task", "show", task_id]) == 0
+
+
+def test_task_show_unknown_id_exits_1(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    assert main(["task", "show", "t_zzzz"]) == 1
+
+
+def test_task_show_ambiguous_id_exits_2(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    (tmp_path / "tasks.md").write_text(
+        "- [ ] first <!-- id:t_dupe -->\n- [ ] second <!-- id:t_dupe -->\n", encoding="utf-8"
+    )
+    capsys.readouterr()
+    assert main(["task", "show", "t_dupe"]) == 2
+
+
 def test_task_done_unknown_id_exits_1(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     main(["init"])

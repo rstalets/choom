@@ -55,21 +55,28 @@ async def test_toggling_moves_a_task_between_categories(tmp_workspace: Workspace
         assert done_rows[0].record.done is True
 
 
-async def test_preview_pane_stays_blank_for_tasks(tmp_workspace: Workspace) -> None:
+async def test_preview_pane_renders_the_highlighted_task(tmp_workspace: Workspace) -> None:
+    # This feature (007) gives tasks a preview -- see test_task_body_tui.py for
+    # the body-rendering contract itself. This test guards the category-pane
+    # interaction: moving within the task list keeps the preview in sync with
+    # whichever task row is highlighted, and never carries over stale content.
     from textual.widgets import Markdown
 
     add_task(tmp_workspace, "buy milk")
+    add_task(tmp_workspace, "call the vendor")
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         preview = app.screen.query_one("#preview", Markdown)
-        assert str(preview._markdown or "") == ""  # type: ignore[attr-defined]
+        assert "buy milk" in str(preview._markdown or "")  # type: ignore[attr-defined]
 
         await pilot.press("j")
         await pilot.pause()
         preview = app.screen.query_one("#preview", Markdown)
-        assert str(preview._markdown or "") == ""  # type: ignore[attr-defined]
+        rendered = str(preview._markdown or "")  # type: ignore[attr-defined]
+        assert "call the vendor" in rendered
+        assert "buy milk" not in rendered
 
 
 async def test_done_category_lists_only_completed_and_survives_collection_switch(

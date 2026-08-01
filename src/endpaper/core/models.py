@@ -140,6 +140,18 @@ class Task:
     created: date | None
     line: int
     links: tuple[str, ...] = ()
+    body: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class TaskBodySpan:
+    """A task's body location within `ParsedTasks.lines`, positionally aligned
+    with `ParsedTasks.tasks`. Internal to the parser and the writer -- never
+    exposed by the CLI or the TUI."""
+
+    start: int
+    end: int
+    indent: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +160,7 @@ class ParsedTasks:
     warnings: tuple[ScanWarning, ...]
     lines: tuple[str, ...]
     needs_id: tuple[int, ...]
+    bodies: tuple[TaskBodySpan, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

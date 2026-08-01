@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 
 from textual import events, on, work
@@ -21,8 +22,16 @@ from endpaper.core.assistants import (
 from endpaper.core.config import get_assistant
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.editor_commands import parse_line
+from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
 from endpaper.core.links import find_link_targets, format_link
-from endpaper.core.models import AssistantReply, EditableFile, ParsedCommand, ResolvedAssistant
+from endpaper.core.models import (
+    AssistantReply,
+    ParsedCommand,
+    ResolvedAssistant,
+    SaveResult,
+    Task,
+)
+from endpaper.core.tasks import parse_tasks, set_task_body
 from endpaper.tui.discard_dialog import DiscardDialog
 from endpaper.tui.status_bar import (
     EDIT_HELP,
@@ -36,11 +45,26 @@ from endpaper.tui.status_bar import (
 _PLACEHOLDER = "⋯"
 
 
+@dataclass(frozen=True, slots=True)
+class EditTarget:
+    """What `EditScreen` edits: the buffer's starting text, how to save it, the
+    path shown to the user and handed to `/ai`, the line offset that positions
+    an `/ai` prompt within that file, and whether the target has frontmatter to
+    stamp (research R5). A file and a task's body are its two implementations
+    -- `EditScreen` itself knows neither one, only this shape."""
+
+    text: str
+    display_path: Path
+    save: Callable[[str], SaveResult]
+    ai_line_offset: int
+    stamps_frontmatter: bool
+
+
 def open_editor(app: App[None], path: Path) -> bool:
-    """Push the editor for `path` -- the one route into `EditScreen`, used by list
-    `e`, preview `e`, and every create path (research R10). Returns False and
-    reports the reason in the caller's status bar if the file cannot be read,
-    leaving the caller's screen in place rather than raising."""
+    """Push the editor for `path` -- the one route into `EditScreen` for a whole
+    file, used by list `e`, preview `e`, and every create path (research R10).
+    Returns False and reports the reason in the caller's status bar if the file
+    cannot be read, leaving the caller's screen in place rather than raising."""
     try:
         file = load_for_edit(path)
     except OSError as exc:
@@ -51,8 +75,69 @@ def open_editor(app: App[None], path: Path) -> bool:
         else:
             status.update(f"⚠ could not open {path.name}: {exc}")
         return False
-    app.push_screen(EditScreen(file))
+
+    def _save(text: str) -> SaveResult:
+        workspace = app.workspace  # type: ignore[attr-defined]
+        result = save_buffer(file.path, text, file, workspace=workspace)
+        if result.ok:
+            app.refresh_document(file.path)  # type: ignore[attr-defined]
+        return result
+
+    target = EditTarget(
+        text=file.text,
+        display_path=path,
+        save=_save,
+        ai_line_offset=0,
+        stamps_frontmatter=True,
+    )
+    app.push_screen(EditScreen(target))
     return True
+
+
+def _task_ai_line_offset(app: App[None], task_id: str) -> int:
+    """0-based index, within the *current* tasks.md, of the task's body span --
+    used so an `/ai` prompt composed from inside the body points at the right
+    line of the file (research R5). Best-effort: falls back to 0 if the task
+    cannot be located, which only understates a positional reference inside an
+    `/ai` prompt and never affects the save path itself."""
+    workspace = app.workspace  # type: ignore[attr-defined]
+    try:
+        text = workspace.tasks_file.read_text(encoding="utf-8")
+    except OSError:
+        return 0
+    parsed = parse_tasks(text)
+    for index, task in enumerate(parsed.tasks):
+        if task.id == task_id:
+            return parsed.bodies[index].start
+    return 0
+
+
+def open_task_editor(app: App[None], task: Task) -> None:
+    """Push the editor scoped to `task`'s body (research R5). Never fails to
+    open: the buffer is the dedented body text already held in memory, so
+    there is no file read on the way in -- only the save can fail, and that is
+    reported in the status bar without discarding what the user typed
+    (FR-023)."""
+    assert task.id is not None
+    task_id = task.id
+    workspace = app.workspace  # type: ignore[attr-defined]
+
+    def _save(text: str) -> SaveResult:
+        try:
+            set_task_body(workspace, task_id, text)
+        except (NotFoundError, UsageError, WorkspaceError) as exc:
+            return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
+        app.reload_tasks()  # type: ignore[attr-defined]
+        return SaveResult(ok=True, saved_text=text, stamped=False, message="")
+
+    target = EditTarget(
+        text=task.body,
+        display_path=workspace.tasks_file,
+        save=_save,
+        ai_line_offset=_task_ai_line_offset(app, task_id),
+        stamps_frontmatter=False,
+    )
+    app.push_screen(EditScreen(target))
 
 
 def _resolution_message(resolved: ResolvedAssistant) -> str:
@@ -105,10 +190,10 @@ class EditScreen(Screen[None]):
         Binding("ctrl+c", "cancel_request", "Cancel", show=False, priority=True),
     ]
 
-    def __init__(self, file: EditableFile) -> None:
+    def __init__(self, target: EditTarget) -> None:
         super().__init__()
-        self.file = file
-        self.original_text = file.text
+        self.target = target
+        self.original_text = target.text
         self._request: AssistantRequest | None = None
         self._breadcrumb: str | None = None
 
@@ -117,7 +202,7 @@ class EditScreen(Screen[None]):
         return self.query_one("#editor", TextArea).text != self.original_text
 
     def compose(self) -> ComposeResult:
-        yield EditorTextArea(self.file.text, show_line_numbers=True, id="editor")
+        yield EditorTextArea(self.target.text, show_line_numbers=True, id="editor")
         with Vertical(id="bottom-bar"):
             yield StatusBar(EDIT_HELP, id="status-bar")
 
@@ -145,8 +230,7 @@ class EditScreen(Screen[None]):
 
     def _save(self) -> bool:
         editor = self.query_one("#editor", TextArea)
-        workspace = self.app.workspace  # type: ignore[attr-defined]
-        result = save_buffer(self.file.path, editor.text, self.file, workspace=workspace)
+        result = self.target.save(editor.text)
         if not result.ok:
             self._render_status(result.message)
             return False
@@ -162,9 +246,7 @@ class EditScreen(Screen[None]):
             editor.cursor_location = cursor
 
         self.original_text = result.saved_text
-        self.file = replace(self.file, text=result.saved_text)
-        self.app.refresh_document(self.file.path)  # type: ignore[attr-defined]
-        if not result.stamped:
+        if self.target.stamps_frontmatter and not result.stamped:
             self._render_status("frontmatter's updated: field could not be found; saved as typed")
         elif result.warnings:
             self._render_status("; ".join(w.message for w in result.warnings))
@@ -222,7 +304,7 @@ class EditScreen(Screen[None]):
         target = matches[0]
         editor = self.query_one("#editor", EditorTextArea)
         original_line = editor.get_line(line_index).plain
-        link_text = format_link(self.file.path, target, target.title)
+        link_text = format_link(self.target.display_path, target, target.title)
         editor.replace(
             link_text,
             (line_index, 0),
@@ -248,7 +330,9 @@ class EditScreen(Screen[None]):
             self._render_status(_resolution_message(resolved))
             return
 
-        prompt = compose_prompt(parsed.argument, self.file.path, line_index + 1)
+        prompt = compose_prompt(
+            parsed.argument, self.target.display_path, self.target.ai_line_offset + line_index + 1
+        )
         request = start_request(
             resolved.profile,
             prompt,

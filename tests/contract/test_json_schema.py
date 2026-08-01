@@ -6,7 +6,7 @@ from pathlib import Path
 from endpaper.cli.main import main
 
 EXPECTED_KEYS = {"id", "path", "title", "type", "tags", "created", "updated"}
-EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line"}
+EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line", "body"}
 
 
 def test_json_schema_has_exactly_seven_keys_and_no_nulls(
@@ -89,6 +89,44 @@ def test_task_list_json_has_exactly_seven_keys_id_and_created_nullable(
     bare = next(r for r in records if r["text"] == "bare task")
     assert bare["id"] is not None  # backfilled by load_tasks
     assert bare["created"] is None
+
+
+def test_task_list_json_carries_body_for_every_entry(tmp_path: Path, monkeypatch, capsys) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["task", "add", "buy milk"])
+    task_id = capsys.readouterr().out.strip()
+    tasks_path = tmp_path / "tasks.md"
+    tasks_path.write_text(
+        tasks_path.read_text(encoding="utf-8") + "\n  a detail line\n", encoding="utf-8"
+    )
+
+    main(["task", "list", "--json"])
+    records = json.loads(capsys.readouterr().out)
+
+    assert len(records) == 1
+    assert records[0]["id"] == task_id
+    assert records[0]["body"] == "a detail line"
+
+
+def test_task_show_json_matches_the_shape_of_a_list_entry(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["task", "add", "buy milk"])
+    task_id = capsys.readouterr().out.strip()
+
+    main(["task", "list", "--json"])
+    list_record = json.loads(capsys.readouterr().out)[0]
+
+    main(["task", "show", task_id, "--json"])
+    show_record = json.loads(capsys.readouterr().out)
+
+    assert show_record == list_record
+    assert show_record["body"] == ""
 
 
 EXPECTED_CONFIG_ASSISTANT_KEYS = {"configured", "resolved", "source", "available"}

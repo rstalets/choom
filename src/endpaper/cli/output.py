@@ -77,21 +77,38 @@ def print_tasks_table(tasks: Iterable[Task]) -> None:
         print_task_line(task)
 
 
+def _task_record(task: Task) -> dict[str, object]:
+    return {
+        "id": task.id,
+        "text": task.text,
+        "done": task.done,
+        "type": task.type,
+        "tags": list(task.tags),
+        "links": list(task.links),
+        "created": task.created.isoformat() if task.created else None,
+        "line": task.line,
+        "body": task.body,
+    }
+
+
 def print_tasks_json(tasks: Iterable[Task]) -> None:
-    records = [
-        {
-            "id": task.id,
-            "text": task.text,
-            "done": task.done,
-            "type": task.type,
-            "tags": list(task.tags),
-            "links": list(task.links),
-            "created": task.created.isoformat() if task.created else None,
-            "line": task.line,
-        }
-        for task in tasks
-    ]
-    print(json.dumps(records, ensure_ascii=False))
+    print(json.dumps([_task_record(task) for task in tasks], ensure_ascii=False))
+
+
+def print_task_show(task: Task) -> None:
+    """Human form of `task show`: the same columns `task list` prints for one
+    task, then its body verbatim after a blank line. A task with no body prints
+    the summary line alone (contracts/cli.md)."""
+    print_task_line(task)
+    if task.body:
+        print()
+        print(task.body)
+
+
+def print_task_show_json(task: Task) -> None:
+    """JSON form of `task show`: one object, identical in shape to an entry of
+    `task list --json`."""
+    print(json.dumps(_task_record(task), ensure_ascii=False))
 
 
 def _link_report_line(workspace: Workspace, report: LinkReport) -> str:

@@ -43,7 +43,7 @@ async def test_reply_replaces_the_command_line(
 
         # The document was saved before invocation (FR-008): the file on disk
         # holds the /ai line even though the buffer has since moved on.
-        saved = screen.file.path.read_text(encoding="utf-8")
+        saved = screen.target.display_path.read_text(encoding="utf-8")
         assert "/ai summarise the bullets above" in saved
 
         status = screen.query_one(StatusBar)
@@ -128,7 +128,7 @@ async def test_non_zero_exit_shows_a_message_and_restores_the_line(
         # the saved document (from FR-008's pre-invocation save) is untouched
         # beyond the /ai line itself -- frontmatter content survives, and the
         # command line appears exactly once, at the end.
-        saved = screen.file.path.read_text(encoding="utf-8")
+        saved = screen.target.display_path.read_text(encoding="utf-8")
         assert title_line in saved
         assert saved.count("/ai broken") == 1
         assert saved.endswith("/ai broken\n")

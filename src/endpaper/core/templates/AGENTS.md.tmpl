@@ -1,6 +1,6 @@
 # endpaper workspace
 
-Plain Markdown files with YAML frontmatter, no database; every command below is non-interactive and produces stable, parseable output.
+Plain Markdown files with YAML frontmatter, no database, non-interactive commands, stable output.
 
 ## Layout
 
@@ -27,17 +27,17 @@ updated: 2026-07-28T09:14:00
 ---
 ```
 
-**Links**: an ordinary markdown link, `[text](path#id)` -- `#id` is authoritative and never
-changes; the path is computed by endpaper and repaired on save. Write links with no path, e.g.
-`[Q3 planning](#meeting_20260728_a1b2c3d4)`.
+**Links**: an ordinary markdown link, `[text](path#id)` -- `#id` is authoritative and never changes;
+the path is computed and repaired on save, so `[Q3 planning](#meeting_20260728_a1b2c3d4)` is enough.
 
 ## Tasks
 
-One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment (invisible in
-any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on the next scan:
+One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment; `[ ]` open, `[x]` done. An optional body is indented lines beneath it, one blank line first:
 
 ```
 - [ ] send the vendor comparison <!-- id:task_a1b2 tags:procurement links:meeting_20260728_a1b2c3d4 -->
+
+  Need the Q3 comparison before the renewal meeting.
 ```
 
 ## Commands
@@ -48,13 +48,13 @@ endpaper meeting list --json --type standup --tag platform --since 2026-07-01
 endpaper note today                       # note new/note list take the same flags as meeting new/list
 endpaper task add "send the vendor comparison" --type followup --tag procurement
 endpaper task list --json --all --type followup --tag procurement  # --done: completed only
+endpaper task show task_a1b2 [--json]                      # print one task and its body
 endpaper task done task_a1b2                               # endpaper task undone task_a1b2
 endpaper links <id> [--json] [--direction out|in|both]     # what it points at / is pointed at by
 endpaper links check [<path>...] [--json]                  # report stale/dead links
 endpaper links heal  [<path>...] [--json] [--dry-run]      # repair stale links; dead ones untouched
-endpaper config assistant [<value>] [--json]                # get/set the /ai assistant
+endpaper config assistant [<value>] [--json]               # get/set the /ai assistant
 ```
 
 `--tag` is repeatable, the supported way to attach tags -- an unquoted `#tag` is eaten by the shell.
-
 Exit codes: `0` success · `1` not found · `2` usage error · `3` workspace error; diagnostics to stderr, data to stdout, never interleaved.

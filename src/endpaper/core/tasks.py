@@ -9,7 +9,7 @@ from pathlib import Path
 from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.documents import _TOKEN_PATTERN, _validate_token
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
-from endpaper.core.models import ParsedTasks, ScanWarning, Task, TaskFilter, Workspace
+from endpaper.core.models import ParsedTasks, ScanWarning, Task, TaskBodySpan, TaskFilter, Workspace
 from endpaper.core.text import _split_terminator, new_task_id, parse_tags
 
 _TASK_LINE = re.compile(
@@ -73,16 +73,141 @@ def _classify_body(body: str) -> tuple[str, dict[str, str]]:
     return "task", fields
 
 
+def _is_checkbox_line(content: str) -> bool:
+    return _TASK_LINE.match(content) is not None
+
+
+def _line_indent(content: str) -> str:
+    stripped = content.lstrip(" \t")
+    return content[: len(content) - len(stripped)]
+
+
+def _common_indent(lines: Sequence[str]) -> str:
+    """Longest common leading-whitespace prefix across `lines`' non-blank content.
+
+    Returns "" when there are no non-blank lines, or when the non-blank lines
+    share no common prefix at all -- e.g. one starts with a space and another
+    with a tab. That empty result is the signal a caller uses to skip dedenting
+    rather than strip a prefix that was never really there (research R2).
+    """
+    prefixes: list[str] = []
+    for line in lines:
+        content, _terminator = _split_terminator(line)
+        if content.strip() == "":
+            continue
+        prefixes.append(_line_indent(content))
+
+    if not prefixes:
+        return ""
+
+    common = prefixes[0]
+    for prefix in prefixes[1:]:
+        limit = min(len(common), len(prefix))
+        matched = 0
+        while matched < limit and common[matched] == prefix[matched]:
+            matched += 1
+        common = common[:matched]
+        if not common:
+            break
+    return common
+
+
+def _body_span(lines: Sequence[str], task_index: int) -> TaskBodySpan:
+    """Compute the body span for the task whose checkbox line is `lines[task_index]`.
+
+    The span starts on the line after the checkbox line and runs through the last
+    indented, non-blank line before a terminator: a checkbox line at any indent, or a
+    non-blank line with no leading whitespace (research R1). Blank lines are kept when
+    more indented content follows and dropped when they only trail. Never raises and
+    never looks past the end of `lines`.
+    """
+    n = len(lines)
+    start = task_index + 1
+    committed_end = start
+    idx = start
+
+    while idx < n:
+        content, _terminator = _split_terminator(lines[idx])
+        if content.strip() == "":
+            idx += 1
+            continue
+        if _is_checkbox_line(content) or not content[0].isspace():
+            break
+        idx += 1
+        committed_end = idx
+
+    indent = _common_indent(lines[start:committed_end]) or "  "
+    return TaskBodySpan(start=start, end=committed_end, indent=indent)
+
+
+def _dedent_body(lines: Sequence[str], span: TaskBodySpan) -> str:
+    """Render a span's lines as the body text handed to editors and the CLI.
+
+    The longest common leading-whitespace prefix is stripped; when the span's lines
+    share none (mixed tabs and spaces at column zero), nothing is stripped and the
+    original depth is preserved verbatim rather than guessed at (research R2). Leading
+    and trailing blank lines are dropped so the round-trip through `set_task_body` is
+    stable (research R4). Returns "" for an empty span.
+    """
+    span_lines = lines[span.start : span.end]
+    raw_common = _common_indent(span_lines)
+
+    body_lines: list[str] = []
+    for line in span_lines:
+        content, _terminator = _split_terminator(line)
+        if raw_common and content.startswith(raw_common):
+            content = content[len(raw_common) :]
+        body_lines.append(content)
+
+    while body_lines and body_lines[0] == "":
+        body_lines.pop(0)
+    while body_lines and body_lines[-1] == "":
+        body_lines.pop()
+
+    return "\n".join(body_lines)
+
+
 def parse_tasks(text: str) -> ParsedTasks:
     """Classify every line of a tasks.md document.
 
     Never raises. Malformed lines become warnings, not exceptions.
-    ``"".join(result.lines) == text`` for any input.
+    ``"".join(result.lines) == text`` for any input. Populates `Task.body` and
+    `ParsedTasks.bodies` (positionally aligned with `tasks`) from each task's
+    indented continuation lines, per contracts/task-file-format.md.
     """
     raw_lines = text.splitlines(keepends=True)
     tasks: list[Task] = []
+    bodies: list[TaskBodySpan] = []
     warnings: list[ScanWarning] = []
     needs_id: list[int] = []
+
+    def _append_task(
+        *,
+        id: str | None,
+        text: str,
+        done: bool,
+        type: str,
+        tags: tuple[str, ...],
+        created: date | None,
+        line: int,
+        idx: int,
+        links: tuple[str, ...] = (),
+    ) -> None:
+        span = _body_span(raw_lines, idx)
+        tasks.append(
+            Task(
+                id=id,
+                text=text,
+                done=done,
+                type=type,
+                tags=tags,
+                links=links,
+                created=created,
+                line=line,
+                body=_dedent_body(raw_lines, span),
+            )
+        )
+        bodies.append(span)
 
     for idx, raw_line in enumerate(raw_lines):
         line_no = idx + 1
@@ -98,16 +223,15 @@ def parse_tasks(text: str) -> ParsedTasks:
         before, body, unterminated = _split_comment(rest)
 
         if body is None and not unterminated:
-            tasks.append(
-                Task(
-                    id=None,
-                    text=rest.rstrip(),
-                    done=done,
-                    type="",
-                    tags=(),
-                    created=None,
-                    line=line_no,
-                )
+            _append_task(
+                id=None,
+                text=rest.rstrip(),
+                done=done,
+                type="",
+                tags=(),
+                created=None,
+                line=line_no,
+                idx=idx,
             )
             needs_id.append(idx)
             continue
@@ -126,16 +250,15 @@ def parse_tasks(text: str) -> ParsedTasks:
         classification, fields = _classify_body(body)
 
         if classification == "bare":
-            tasks.append(
-                Task(
-                    id=None,
-                    text=rest.rstrip(),
-                    done=done,
-                    type="",
-                    tags=(),
-                    created=None,
-                    line=line_no,
-                )
+            _append_task(
+                id=None,
+                text=rest.rstrip(),
+                done=done,
+                type="",
+                tags=(),
+                created=None,
+                line=line_no,
+                idx=idx,
             )
             needs_id.append(idx)
             continue
@@ -174,17 +297,16 @@ def parse_tasks(text: str) -> ParsedTasks:
                     )
                 )
 
-        tasks.append(
-            Task(
-                id=task_id,
-                text=before.rstrip(),
-                done=done,
-                type=task_type,
-                tags=tags,
-                links=links,
-                created=created_value,
-                line=line_no,
-            )
+        _append_task(
+            id=task_id,
+            text=before.rstrip(),
+            done=done,
+            type=task_type,
+            tags=tags,
+            links=links,
+            created=created_value,
+            line=line_no,
+            idx=idx,
         )
 
     return ParsedTasks(
@@ -192,6 +314,7 @@ def parse_tasks(text: str) -> ParsedTasks:
         warnings=tuple(warnings),
         lines=tuple(raw_lines),
         needs_id=tuple(needs_id),
+        bodies=tuple(bodies),
     )
 
 
@@ -435,3 +558,99 @@ def set_task_state(workspace: Workspace, task_id: str, *, done: bool) -> Task:
     _atomic_write(path, lines)
 
     return replace(task, done=done)
+
+
+def get_task(workspace: Workspace, task_id: str) -> Task:
+    """Return one task with its body, located by id.
+
+    Raises:
+        NotFoundError: no task has `task_id`.
+        UsageError: more than one task has `task_id` (names the conflicting lines).
+    """
+    tasks, _warnings = load_tasks(workspace)
+    matches = [t for t in tasks if t.id == task_id]
+
+    if not matches:
+        raise NotFoundError(f"no task with id {task_id!r}")
+    if len(matches) > 1:
+        line_numbers = _format_line_numbers([t.line for t in matches])
+        raise UsageError(
+            f"id {task_id!r} appears on lines {line_numbers}; "
+            "edit tasks.md to give one of them a different id"
+        )
+
+    return matches[0]
+
+
+def set_task_body(workspace: Workspace, task_id: str, body: str) -> Task:
+    """Replace one task's body span and return the task as it now stands.
+
+    Re-reads and re-parses before writing; locates by id, never by a cached line
+    number. Returns without writing at all when `body` already matches what's on
+    disk (research R3) -- the byte-identical no-op save. A non-empty `body` is
+    re-indented by the span's observed prefix, with one blank line written between
+    the checkbox line and the first body line so the file stays valid CommonMark
+    (research R4). An empty `body` removes the span entirely, leaving a lone
+    checkbox line with no residual blank or indented lines. Every line outside the
+    span is byte-identical; the file's line-ending convention and trailing-newline
+    state are preserved.
+
+    Raises:
+        NotFoundError: no task has `task_id`.
+        UsageError: more than one task has `task_id` (names the conflicting lines).
+        WorkspaceError: the file cannot be written.
+    """
+    path = workspace.tasks_file
+    if not path.exists():
+        raise NotFoundError(f"no task with id {task_id!r}")
+
+    text = _read_text(path)
+    parsed = parse_tasks(text)
+    matching_indices = [i for i, t in enumerate(parsed.tasks) if t.id == task_id]
+
+    if not matching_indices:
+        raise NotFoundError(f"no task with id {task_id!r}")
+    if len(matching_indices) > 1:
+        line_numbers = _format_line_numbers([parsed.tasks[i].line for i in matching_indices])
+        raise UsageError(
+            f"id {task_id!r} appears on lines {line_numbers}; "
+            "edit tasks.md to give one of them a different id"
+        )
+
+    index = matching_indices[0]
+    task = parsed.tasks[index]
+    if body == task.body:
+        return task
+
+    span = parsed.bodies[index]
+    lines = list(parsed.lines)
+    checkbox_idx = span.start - 1
+    checkbox_content, checkbox_terminator = _split_terminator(lines[checkbox_idx])
+    tail = lines[span.end :]
+
+    newline = next((t for line in lines if (t := _split_terminator(line)[1])), "\n")
+    original_trailing = bool(lines) and _split_terminator(lines[-1])[1] != ""
+
+    body_block: list[str] = []
+    if body:
+        body_block.append("")
+        body_block.extend(f"{span.indent}{line}" if line else "" for line in body.split("\n"))
+
+    if body_block and not checkbox_terminator:
+        # The checkbox line was the last line of the file with no body -- now
+        # something follows it, so it needs the file's own line ending.
+        checkbox_terminator = newline
+
+    new_block = [checkbox_content + checkbox_terminator]
+    new_block.extend(content + newline for content in body_block)
+
+    if not tail:
+        # What we just wrote is now the end of the file -- restore the file's
+        # own trailing-newline state on its new last line, whichever one that is.
+        last_content, _terminator = _split_terminator(new_block[-1])
+        new_block[-1] = last_content + (newline if original_trailing else "")
+
+    new_lines = lines[:checkbox_idx] + new_block + tail
+    _atomic_write(path, new_lines)
+
+    return replace(task, body=body)

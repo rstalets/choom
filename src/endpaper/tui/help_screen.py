@@ -14,7 +14,7 @@ KEY_BINDINGS_HELP = """\
   ↑↓ / j k                Move the highlight
   h / l                   Focus the scope pane / the list pane
   enter                   Open the highlighted document
-  e                       Edit the highlighted document
+  e                       Edit the highlighted document, or a task's details
   space                   Toggle the highlighted task
   /                       Open the command bar
   ctrl+q                  Quit

@@ -21,7 +21,7 @@ async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> N
         await pilot.pause()
 
         assert isinstance(app.screen, EditScreen)
-        assert app.screen.file.path == meeting.path
+        assert app.screen.target.display_path == meeting.path
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text.startswith("---\n")
         assert "Q3 planning" in editor.text
@@ -50,11 +50,25 @@ async def test_save_and_exit_returns_to_list_with_the_row_updated(
         assert highlighted.document.title == "Q3 planning (revised)"
 
 
-async def test_e_is_a_noop_on_tasks(tmp_workspace: Workspace) -> None:
+async def test_e_opens_the_task_editor_on_a_highlighted_task(tmp_workspace: Workspace) -> None:
     from endpaper.core.tasks import add_task
 
     add_task(tmp_workspace, "buy milk")
 
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        assert app.active == "tasks"
+
+        await pilot.press("e")
+        await pilot.pause()
+
+        assert isinstance(app.screen, EditScreen)
+        editor = app.screen.query_one("#editor", TextArea)
+        assert editor.text == ""
+
+
+async def test_e_is_a_noop_on_the_tasks_empty_state(tmp_workspace: Workspace) -> None:
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
