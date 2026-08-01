@@ -1,6 +1,6 @@
 # Feature Specification: UI Refinements
 
-**Feature Branch**: `010-ui-refinements`
+**Feature Branch**: `011-ui-refinements`
 
 **Created**: 2026-08-01
 
@@ -488,8 +488,9 @@ empty line one blank line below the last content, then type a character and conf
   removal behaviour should be shared rather than written twice.
 - **Issue #47 (workspace in the terminal tab strip)** answers the same "which workspace is this?"
   question from outside the app. Distinct surface, no shared behaviour; both are worth having.
-- **Issue #51 (read from disk on view load)** changes what the preview and list do on resume, which is the
-  same refresh path a delete triggers. Worth sequencing if both are in flight.
+- **Issue #51 (read from disk on view load)**, specified as `010-read-on-load`, changes what the preview
+  and list do on resume — the same refresh path a delete triggers. Both are in flight for v0.0.3 and
+  should be sequenced rather than developed in parallel.
 - **Existing mirror resolution** already has a `dead` outcome for a mirror whose task cannot be found.
   Story 3 depends on that outcome existing and reuses it rather than introducing a new one.
 - **Existing exit-code registry** (`docs/REQUIREMENTS.md` §4.1) covers everything the delete commands
