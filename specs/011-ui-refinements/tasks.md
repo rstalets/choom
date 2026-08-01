@@ -107,19 +107,22 @@ gone from disk (or from `tasks.md`) with neighbours untouched. Decline and nothi
 
 **Depends on**: Phase 2 (core deletion) and Phase 3 (the dialog it raises)
 
-- [ ] T013 [US2] Integration test `tests/integration/test_delete_tui.py`: confirm deletes and declines
+- [X] T013 [US2] Integration test `tests/integration/test_delete_tui.py`: confirm deletes and declines
       does not; highlight moves to the next record, to the previous when last, to the empty state when
       only; a task's body goes with it and neighbouring tasks are byte-identical; a row whose file was
       removed out of process (`delete_file_out_of_process` in `tests/helpers.py`) reports and refreshes.
       Must fail first
-- [ ] T014 [US2] Add the `ctrl+d` binding and `action_delete` to `src/choom/tui/list_screen.py`: no-op
+- [X] T014 [US2] Add the `ctrl+d` binding and `action_delete` to `src/choom/tui/list_screen.py`: no-op
       when nothing is highlighted or the command bar is open, and capture the record id when raising the
       dialog (FR-010, research R11)
-- [ ] T015 [US2] Wire the dialog callback to `core.deletion.delete_by_id` and re-read the list, applying
-      the highlight rules of contracts/tui-chrome §2 (depends on T014)
-- [ ] T016 [US2] Report `NotFoundError`, `UsageError`, and `WorkspaceError` in the status bar and keep the
+- [X] T015 [US2] Wire the dialog callback to `core.deletion.delete_by_id` and re-read the list, applying
+      the highlight rules of contracts/tui-chrome §2 (depends on T014). Implemented via
+      `_pending_select_id`/`_pending_error`, consumed by `on_screen_resume` -- popping `ConfirmDialog`
+      always triggers that screen's own refresh, so a second independent refresh from the delete callback
+      would race it; funnelling through the one resume-time refresh removes the race
+- [X] T016 [US2] Report `NotFoundError`, `UsageError`, and `WorkspaceError` in the status bar and keep the
       session usable (FR-013)
-- [ ] T017 [P] [US2] Add `ctrl+d delete` to `LIST_HELP` and `TASK_LIST_HELP` in
+- [X] T017 [P] [US2] Add `ctrl+d delete` to `LIST_HELP` and `TASK_LIST_HELP` in
       `src/choom/tui/status_bar.py` (FR-014)
 
 **Checkpoint**: Records can be deleted from the list; nothing else on screen changed

@@ -12,11 +12,14 @@ from textual.timer import Timer
 from textual.widgets import Label, ListItem, ListView, Markdown
 from textual.worker import Worker, WorkerCancelled, WorkerFailed
 
+from choom.core.deletion import delete_by_id
 from choom.core.documents import _read_document, scan_documents
+from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
 from choom.tui.command_bar import CommandBar
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.help_screen import HelpScreen
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
@@ -137,6 +140,7 @@ class ListScreen(Screen[None]):
         Binding("e", "edit", "Edit", show=True),
         Binding("b", "toggle_preview_links", "Backlinks", show=True),
         Binding("space", "toggle_task", "Toggle", show=True),
+        Binding("ctrl+d", "delete", "Delete", show=True),
         Binding("/", "open_command_bar", "Filter/command", show=True),
     ]
 
@@ -203,6 +207,12 @@ class ListScreen(Screen[None]):
         await self._refresh_scope_pane()
         await self.refresh_rows(select_id=self._pending_select_id)
         self._pending_select_id = None
+        # A delete's outcome (research above `_delete_record`): rendered here,
+        # after this resume's own refresh, so it is not the thing that gets
+        # overwritten by it.
+        if self._pending_error is not None:
+            self._render_status(error=self._pending_error)
+            self._pending_error = None
 
     async def _refresh_scope_pane(self) -> None:
         scope_pane = self.query_one(ScopePane)
@@ -369,7 +379,7 @@ class ListScreen(Screen[None]):
     # --- collection switching (Tab / shift+Tab) --------------------------------
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action in ("next_collection", "previous_collection"):
+        if action in ("next_collection", "previous_collection", "delete"):
             return not self.query_one(CommandBar).display
         return True
 
@@ -476,6 +486,88 @@ class ListScreen(Screen[None]):
         await self.refresh_rows(select_id=task_id)
         if error:
             self._render_status(error=error)
+
+    # --- delete (ctrl+d, US2) ----------------------------------------------------
+
+    async def action_delete(self) -> None:
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+
+        record_id: str | None
+        title: str
+        if isinstance(highlighted, DocumentRow):
+            record_id = highlighted.document.id
+            title = highlighted.document.title
+        elif isinstance(highlighted, TaskRow):
+            record_id = highlighted.record.id
+            title = highlighted.record.text
+        else:
+            return  # no record highlighted -- the empty-state row, or nothing (FR-014)
+        if record_id is None:
+            return
+
+        # Captured now, acted on when the dialog returns (FR-010, research
+        # R11) -- a background re-read cannot redirect the delete onto a
+        # different record, whether or not it can even run while the dialog
+        # (a ModalScreen) suspends this one.
+        captured_id = record_id
+        dialog = ConfirmDialog(
+            f'Delete "{title}"? This cannot be undone.',
+            cancel_label="Keep It",
+            confirm_label="Delete",
+        )
+
+        async def _handle_dismiss(confirmed: bool | None) -> None:
+            if confirmed:
+                await self._delete_record(captured_id)
+
+        self.app.push_screen(dialog, _handle_dismiss)
+
+    async def _delete_record(self, record_id: str) -> None:
+        """Delete `record_id` and arrange for the next `on_screen_resume` --
+        which fires as soon as `ConfirmDialog` finishes popping itself off the
+        screen stack -- to render the outcome.
+
+        Deliberately does *not* call `refresh_rows`/`_render_status` directly:
+        popping the dialog always triggers `on_screen_resume`'s own refresh on
+        this screen, and a second, independent refresh from here would race
+        it -- whichever finished last would silently overwrite the other's
+        status text. Setting `_pending_select_id`/`_pending_error` here and
+        letting `on_screen_resume` be the one place that renders keeps there
+        being exactly one refresh for this whole gesture.
+        """
+        workspace: Workspace = self.app.workspace  # type: ignore[attr-defined]
+        list_view = self.query_one("#meeting-list", ListView)
+        ids_in_order = [
+            row_id
+            for row in list_view.children
+            if isinstance(row, DocumentRow | TaskRow)
+            and (row_id := (row.document.id if isinstance(row, DocumentRow) else row.record.id))
+            is not None
+        ]
+
+        try:
+            delete_by_id(workspace, record_id)
+        except (NotFoundError, UsageError, WorkspaceError) as exc:
+            self._pending_error = str(exc)
+            return
+
+        self._pending_select_id = self._next_highlight_id(ids_in_order, record_id)
+
+    @staticmethod
+    def _next_highlight_id(ids_in_order: list[str], deleted_id: str) -> str | None:
+        """Which record should be highlighted once `deleted_id` is gone from a
+        list rendered in `ids_in_order`: the next record, or the previous one
+        when the deleted record was last, or `None` when it was the only one
+        (FR-011, FR-012)."""
+        try:
+            index = ids_in_order.index(deleted_id)
+        except ValueError:
+            return None
+        remaining = ids_in_order[:index] + ids_in_order[index + 1 :]
+        if not remaining:
+            return None
+        return remaining[index] if index < len(remaining) else remaining[-1]
 
     # --- scope pane interaction --------------------------------------------------
 

@@ -9,11 +9,11 @@ from choom import __version__
 
 LIST_HELP = (
     "tab collection   / filter   ↑↓/jk move   h/l pane   "
-    "enter open   e edit   b backlinks   ctrl+q quit"
+    "enter open   e edit   b backlinks   ctrl+d delete   ctrl+q quit"
 )
 TASK_LIST_HELP = (
     "tab collection   / filter   ↑↓/jk move   h/l pane   e edit   "
-    "space toggle   b backlinks   ctrl+q quit"
+    "space toggle   b backlinks   ctrl+d delete   ctrl+q quit"
 )
 PREVIEW_HELP = "e edit   b backlinks   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
 #: Swapped in for PREVIEW_HELP while the Links section has focus, the same way
