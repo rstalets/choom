@@ -11,7 +11,12 @@ from textual.screen import Screen
 from textual.widgets import Label, ListItem, ListView, Markdown
 
 from endpaper.core.documents import _read_document
-from endpaper.core.links import inbound_links, outbound_links, resolve_link
+from endpaper.core.links import (
+    inbound_links,
+    outbound_links,
+    resolve_href,
+    resolve_link,
+)
 from endpaper.core.models import Document, Link, LinkStatus, LinkTarget, Workspace
 from endpaper.tui.rendering import (
     NO_INBOUND_LINKS,
@@ -112,7 +117,7 @@ class PreviewScreen(Screen[None]):
         return self.document
 
     def compose(self) -> ComposeResult:
-        yield Markdown(id="full-preview")
+        yield Markdown(id="full-preview", open_links=False)
         with Vertical(id="links-section"):
             yield ListView(id="links-list")
         with Vertical(id="bottom-bar"):
@@ -233,6 +238,30 @@ class PreviewScreen(Screen[None]):
     def _on_link_selected(self, event: ListView.Selected) -> None:
         self.action_open_link()
 
+    def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
+        """Follow a link clicked in the rendered body.
+
+        `Markdown` opens every href with `app.open_url` by default, which sends a
+        workspace-relative path and an `#id` fragment to a web browser. A link
+        endpaper owns is opened here instead; anything else (an `https:` URL a
+        user wrote in their notes) is handed back to the default by re-opening
+        it, since it really is a browser's job.
+        """
+        target = resolve_href(_links_workspace(self.app), self.path, event.href)
+        if target is None:
+            self.app.open_url(event.href)
+            return
+        self._open_target(target)
+
+    def _open_target(self, target: LinkTarget) -> None:
+        if target.kind == "task":
+            from endpaper.tui.edit_screen import open_editor
+
+            open_editor(self.app, target.path)
+            return
+        document = _read_document(target.path)
+        self.app.push_screen(PreviewScreen(target.path, document))
+
     def action_open_link(self) -> None:
         if not self._links_expanded:
             return
@@ -246,12 +275,4 @@ class PreviewScreen(Screen[None]):
             self._render_status(f"link to {unresolved!r} does not resolve")
             return
 
-        target = row.target
-        if target.kind == "task":
-            from endpaper.tui.edit_screen import open_editor
-
-            open_editor(self.app, target.path)
-            return
-
-        document = _read_document(target.path)
-        self.app.push_screen(PreviewScreen(target.path, document))
+        self._open_target(row.target)

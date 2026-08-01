@@ -20,6 +20,7 @@ from endpaper.core.links import (
     outbound_for_target,
     outbound_links,
     relative_destination,
+    resolve_href,
     resolve_id,
     resolve_link,
 )
@@ -125,6 +126,7 @@ __all__ = [
     "relative_destination",
     "render_frontmatter",
     "render_task_line",
+    "resolve_href",
     "resolve_id",
     "resolve_link",
     "save_buffer",

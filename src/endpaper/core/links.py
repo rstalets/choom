@@ -597,6 +597,42 @@ def heal_links(
 # --- Inbound and outbound -----------------------------------------------------
 
 
+def resolve_href(workspace: Workspace, source: Path, href: str) -> LinkTarget | None:
+    """The record a rendered link points at, for a click in a preview pane.
+
+    `href` is a raw markdown destination exactly as the renderer hands it back.
+    Resolution is the usual id-first, path-second rule.
+
+    Returns None for anything endpaper does not own -- an empty destination, a
+    URL carrying a scheme, or a path and id that resolve to nothing -- so a
+    caller can fall through to whatever the platform normally does with it
+    rather than swallowing the click.
+
+    Never raises.
+    """
+    if not href or _SCHEME_RE.match(href):
+        return None
+
+    path_part, sep, frag = href.partition("#")
+    target_id = frag if sep and frag else None
+    path = path_part or None
+    if path is None and target_id is None:
+        return None
+
+    link = Link(
+        source=source,
+        line=0,
+        text="",
+        path=path,
+        target_id=target_id,
+        start=0,
+        end=0,
+        in_tasks_field=False,
+    )
+    target, _status = resolve_link(workspace, link)
+    return target
+
+
 def outbound_links(workspace: Workspace, source: Path) -> tuple[tuple[Link, LinkStatus], ...]:
     """Links `source` points at, including any that do not resolve.
 

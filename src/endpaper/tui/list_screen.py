@@ -9,7 +9,9 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Label, ListItem, ListView, Markdown
 
-from endpaper.core.models import Document, Task, YearMonth
+from endpaper.core.documents import _read_document
+from endpaper.core.links import resolve_href
+from endpaper.core.models import Document, Task, Workspace, YearMonth
 from endpaper.tui.collection_bar import COLLECTIONS, CollectionBar
 from endpaper.tui.command_bar import CommandBar
 from endpaper.tui.help_screen import HelpScreen
@@ -119,7 +121,7 @@ class ListScreen(Screen[None]):
             with Vertical(id="list-pane"):
                 yield ListView(id="meeting-list")
             with Vertical(id="preview-pane"):
-                yield Markdown(id="preview")
+                yield Markdown(id="preview", open_links=False)
         with Vertical(id="bottom-bar"):
             yield CommandBar(id="command-bar")
             yield StatusBar(LIST_HELP, id="status-bar")
@@ -341,6 +343,37 @@ class ListScreen(Screen[None]):
     @on(ListView.Highlighted, "#meeting-list")
     def _on_highlighted(self, event: ListView.Highlighted) -> None:
         self._update_preview()
+
+    def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
+        """Follow a link clicked in the preview pane's rendered body.
+
+        Same rule as the full-screen preview: a link endpaper owns opens the
+        record it names, and anything else goes to the browser, which is what
+        `Markdown` would have done with every href had `open_links` been left on.
+        """
+        workspace: Workspace = self.app.workspace  # type: ignore[attr-defined]
+        highlighted = self.query_one("#meeting-list", ListView).highlighted_child
+        source = (
+            highlighted.document.path
+            if isinstance(highlighted, DocumentRow)
+            else workspace.tasks_file
+        )
+
+        target = resolve_href(workspace, source, event.href)
+        if target is None:
+            self.app.open_url(event.href)
+            return
+
+        if target.kind == "task":
+            from endpaper.tui.edit_screen import open_editor
+
+            open_editor(self.app, target.path)
+            return
+
+        from endpaper.tui.preview_screen import PreviewScreen
+
+        self._pending_select_id = target.id
+        self.app.push_screen(PreviewScreen(target.path, _read_document(target.path)))
 
     @on(ListView.Selected, "#meeting-list")
     def _on_selected(self, event: ListView.Selected) -> None:

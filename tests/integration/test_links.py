@@ -9,6 +9,7 @@ from endpaper.core.links import (
     outbound_for_target,
     outbound_links,
     relative_destination,
+    resolve_href,
     resolve_id,
 )
 from endpaper.core.meetings import create_meeting
@@ -451,3 +452,35 @@ def test_a_task_body_link_does_not_disturb_the_links_field(tmp_workspace: Worksp
     assert target is not None
     found = {link.target_id for link, _status in outbound_for_target(tmp_workspace, target)}
     assert found == {meeting.id, note.id}
+
+
+# --- clicking a rendered link (Markdown.LinkClicked) ---------------------------
+
+
+def test_a_clicked_workspace_link_resolves_to_its_record(tmp_workspace: Workspace) -> None:
+    """`Markdown` sends every href to `app.open_url` unless told otherwise, which
+    handed a workspace-relative path and an `#id` fragment to a web browser. A
+    destination endpaper owns must resolve to the record instead."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    dest = relative_destination(note.path, meeting.path)
+
+    for href in (f"#{meeting.id}", f"{dest}#{meeting.id}", dest):
+        target = resolve_href(tmp_workspace, note.path, href)
+        assert target is not None, href
+        assert target.id == meeting.id
+
+
+def test_an_external_url_is_not_claimed(tmp_workspace: Workspace) -> None:
+    """Anything with a scheme is a browser's job; returning None is how the
+    caller knows to fall through rather than swallow the click."""
+    note = create_note(tmp_workspace, "vendor landscape")
+    for href in ("https://example.com", "http://example.com/x#frag", "mailto:a@b.c"):
+        assert resolve_href(tmp_workspace, note.path, href) is None
+
+
+def test_an_unresolvable_or_empty_destination_is_not_claimed(tmp_workspace: Workspace) -> None:
+    note = create_note(tmp_workspace, "vendor landscape")
+    assert resolve_href(tmp_workspace, note.path, "") is None
+    assert resolve_href(tmp_workspace, note.path, "#meeting_does_not_exist") is None
+    assert resolve_href(tmp_workspace, note.path, "no/such/file.md") is None
