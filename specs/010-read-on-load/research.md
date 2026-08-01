@@ -173,6 +173,17 @@ Two guards on top of that:
 
 ## R6: Hydrating the filter set without stalling the keypress
 
+> **Amended after implementation.** The worker body reads the collection with a single
+> `core.documents.scan_documents(workspace, collection)` call, not a `scan_month` per month plus
+> `scan_unfiled`. `scan_documents` is one `rglob("*.md")` walk of the collection's scan dirs and is
+> already what the CLI calls for the same question (`scan_meetings`, `scan_notes`), so the loop was
+> re-implementing a core function in the adapter (Principle I) and giving the two interfaces two ways to
+> assemble one set (Principle II). It was also slower: the loop walks the tree once to enumerate months,
+> once per month, and once more for unfiled — measured 1.08x the one-shot cost at 12 months and 1.27x at
+> 36 months, on identical output (same documents, same order). The same substitution applies to
+> `ChoomApp._filtered_documents`, the fallback path. R2 below is unaffected: a *list load* still reads
+> only the displayed month; this concerns only the filter's whole-collection read.
+
 **Decision**: Start a `@work(thread=True, exclusive=True, group="filter-hydrate")` worker from
 `ListScreen.action_open_command_bar`, holding the `Worker` on the screen. `_on_filter_changed` — already
 `async` — awaits `worker.wait()` before matching. The handle is dropped in `_on_command_bar_closed`.

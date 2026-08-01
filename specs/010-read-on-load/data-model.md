@@ -118,7 +118,7 @@ by the next read.
 | Meetings/Notes, month scope | That month only | `scan_month` | 29.4 ms / 200 docs |
 | Meetings/Notes, unfiled | Unfiled set only | `scan_unfiled` | Proportional to unfiled count |
 | Tasks | Whole task file | `load_tasks` | 2.95 ms / 1,000 tasks |
-| Filter (any collection) | Every month plus unfiled | `scan_month` × N, `scan_unfiled` | 144 ms / 1,000 docs — on a worker thread |
+| Filter (any collection) | The whole collection, one walk | `scan_documents` | 147 ms / 1,000 docs — on a worker thread |
 | Preview open | One file | `_read_document` | Single file parse |
 | Scope pane | Directory listing only | `list_months` | Directory walk, no file reads |
 

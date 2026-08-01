@@ -12,6 +12,7 @@ from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assista
 from choom.core.documents import (
     list_months,
     match_document,
+    scan_documents,
     scan_month,
     scan_unfiled,
 )
@@ -149,20 +150,16 @@ class ChoomApp(App[None]):
         command bar opened (research R6), bypassing this scan entirely for
         every keystroke after the first. This method still exists for any
         caller without a hydration session -- direct app use, and the first
-        render before a worker has finished."""
-        pool: list[Document] = []
-        warnings: list[ScanWarning] = []
-        for month in self.list_scope(collection).months:
-            documents, month_warnings = scan_month(
-                self.workspace, DOCUMENT_COLLECTIONS[collection], month
-            )
-            pool.extend(documents)
-            warnings.extend(month_warnings)
-        unfiled_documents, unfiled_warnings = scan_unfiled(
-            self.workspace, DOCUMENT_COLLECTIONS[collection]
-        )
-        pool.extend(unfiled_documents)
-        warnings.extend(unfiled_warnings)
+        render before a worker has finished.
+
+        One `scan_documents` walk, not a `scan_month` per month plus
+        `scan_unfiled`: reading the whole collection is a thing `core` already
+        knows how to do, and it is what the CLI's `scan_meetings`/`scan_notes`
+        call for the same question (Principle I, Principle II). Assembling the
+        same set here from month-scoped pieces re-implemented core in the
+        adapter and cost more -- the loop re-walks the tree once to enumerate
+        months, once per month, and once again for unfiled."""
+        pool, warnings = scan_documents(self.workspace, DOCUMENT_COLLECTIONS[collection])
         self._last_warnings = warnings
         return self.match_documents(pool)
 

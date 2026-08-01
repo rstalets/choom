@@ -71,32 +71,37 @@ def _counting_scan_calls(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]
     render (`render_preview_markdown`, wholly outside the cache this test
     protects).
 
-    Patches the names in **both** `choom.tui.list_screen` (the hydration
-    worker's `scan_month`/`scan_unfiled`) and `choom.tui.app` (the fallback
-    `ChoomApp.visible_documents()`/`_filtered_documents()` scan) -- each
-    module did its own `from choom.core.documents import scan_month,
-    scan_unfiled`, which binds a separate name in each module's namespace at
-    import time. Patching only one leaves the other's calls invisible to the
-    counter, which would let exactly the regression this helper exists to
-    catch -- `refresh_rows` falling back to a fresh scan instead of the
-    hydrated pool -- pass unnoticed."""
+    Patches every scan entry point in **both** `choom.tui.list_screen` (the
+    hydration worker's `scan_documents`) and `choom.tui.app` (the scoped
+    `visible_documents()` reads and the `_filtered_documents()` fallback) --
+    each module does its own `from choom.core.documents import ...`, which
+    binds a separate name in each module's namespace at import time. Patching
+    only one leaves the other's calls invisible to the counter, which would let
+    exactly the regression this helper exists to catch -- `refresh_rows`
+    falling back to a fresh scan instead of the hydrated pool -- pass
+    unnoticed.
+
+    Names absent from a module are skipped rather than asserted on, so moving a
+    read between the two adapters does not silently blind the counter again."""
     import choom.tui.app as app_module
     import choom.tui.list_screen as list_screen_module
 
     calls: list[str] = []
 
     def _wrap(owner: object, name: str) -> None:
-        original = getattr(owner, name)
+        original = getattr(owner, name, None)
+        if original is None:
+            return
 
         def counting(*args: object, **kwargs: object) -> object:
             calls.append(name)
-            return original(*args, **kwargs)  # type: ignore[no-any-return]
+            return original(*args, **kwargs)  # type: ignore[no-any-return,misc]
 
         monkeypatch.setattr(owner, name, counting)
 
     for owner in (list_screen_module, app_module):
-        _wrap(owner, "scan_month")
-        _wrap(owner, "scan_unfiled")
+        for name in ("scan_documents", "scan_month", "scan_unfiled"):
+            _wrap(owner, name)
 
     yield calls
 
