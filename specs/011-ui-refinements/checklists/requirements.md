@@ -78,6 +78,17 @@ periodic re-read landing while a confirmation is on screen — is now covered by
 acts on the record it named when raised) and an edge case. Dependencies also records the gate: #51's
 implementation is merged into this branch and the spec re-checked against it before `/speckit-plan`.
 
+**Iteration 5** — the gate from iteration 4 was executed and closed:
+
+`010-read-on-load` landed on main and was merged into this branch, and the spec was re-checked against
+the merged code before planning. Verified in the source rather than assumed: the document and task
+snapshots are gone along with the write-repair paths that maintained them, list reads happen per load,
+and a displayed list refreshes on a short interval that pauses while the screen is suspended. The
+confirmation dialog, the status bar, and the top bar are untouched by that feature, so Stories 1, 5, and
+6 are unaffected. Header, Dependencies, and Assumptions moved from future to present tense, and one edge
+case was added for a record deleted by another process between the confirmation appearing and being
+confirmed. No requirement changed meaning and no new [NEEDS CLARIFICATION] arose.
+
 Note: the Functional Requirements are grouped by theme, so the delete requirements still appear before
 the confirmation ones. That is deliberate — renumbering 27 requirements to mirror story order would
 invalidate every existing cross-reference. Build order is carried by the story priorities, the sequencing
