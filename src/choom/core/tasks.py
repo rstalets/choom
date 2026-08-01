@@ -642,17 +642,34 @@ def get_task(workspace: Workspace, task_id: str) -> Task:
     return matches[0]
 
 
+def _strip_trailing_blank_lines(text: str) -> str:
+    """Drop trailing blank "lines" from `text`, mirroring `_dedent_body`'s own
+    read-side stripping. Without this, a `body` ending in one or more blank
+    lines -- as a padded editor buffer does (US7) -- would write a body that
+    then reads back shorter, breaking the round-trip stability
+    `_dedent_body` already documents and making a same-body save grow the
+    file by a blank line every time it runs."""
+    lines = text.split("\n")
+    while lines and lines[-1] == "":
+        lines.pop()
+    return "\n".join(lines)
+
+
 def set_task_body(workspace: Workspace, task_id: str, body: str) -> Task:
     """Replace one task's body span and return the task as it now stands.
 
     Re-reads and re-parses before writing; locates by id, never by a cached line
-    number. Returns without writing at all when `body` already matches what's on
-    disk (research R3) -- the byte-identical no-op save. A non-empty `body` is
-    re-indented by the span's observed prefix, with one blank line written between
-    the checkbox line and the first body line so the file stays valid CommonMark
-    (research R4). An empty `body` removes the span entirely, leaving a lone
-    checkbox line with no residual blank or indented lines. Every line outside the
-    span is byte-identical; the file's line-ending convention and trailing-newline
+    number. `body` has its trailing blank lines stripped first (research R10),
+    the same normalisation `_dedent_body` already applies when reading a body
+    back -- so a body ending in blank lines round-trips stably rather than
+    growing the file on every save. Returns without writing at all when the
+    normalised `body` already matches what's on disk (research R3) -- the
+    byte-identical no-op save. A non-empty `body` is re-indented by the span's
+    observed prefix, with one blank line written between the checkbox line and
+    the first body line so the file stays valid CommonMark (research R4). An
+    empty `body` removes the span entirely, leaving a lone checkbox line with
+    no residual blank or indented lines. Every line outside the span is
+    byte-identical; the file's line-ending convention and trailing-newline
     state are preserved.
 
     Raises:
@@ -660,6 +677,7 @@ def set_task_body(workspace: Workspace, task_id: str, body: str) -> Task:
         UsageError: more than one task has `task_id` (names the conflicting lines).
         WorkspaceError: the file cannot be written.
     """
+    body = _strip_trailing_blank_lines(body)
     path = workspace.tasks_file
     if not path.exists():
         raise NotFoundError(f"no task with id {task_id!r}")

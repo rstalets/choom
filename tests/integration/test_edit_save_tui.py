@@ -8,7 +8,7 @@ from textual.widgets import TextArea
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditScreen, _pad_for_cursor
 from choom.tui.list_screen import DocumentRow
 from choom.tui.preview_screen import PreviewScreen
 from tests.helpers import (
@@ -27,12 +27,16 @@ _CREATED = re.compile(r"^created: (.+)$", re.MULTILINE)
 async def test_e_opens_raw_markdown_including_frontmatter(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     original_text = meeting.path.read_text(encoding="utf-8")
+    # The cursor lands one blank line below the file's content (US7,
+    # FR-039); trailing blanks the file already had are normalised into
+    # that same single line rather than stacked (FR-040).
+    expected_text, _cursor_row = _pad_for_cursor(original_text)
 
     app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
-        assert editor.text == original_text
+        assert editor.text == expected_text
         assert editor.text.startswith("---\n")
 
 

@@ -99,7 +99,9 @@ async def test_e_on_a_task_with_a_body_opens_exactly_that_body(tmp_workspace: Wo
 
         assert isinstance(app.screen, EditScreen)
         editor = app.screen.query_one("#editor", TextArea)
-        assert editor.text == "Need the Q3 comparison."
+        # One blank line below the body's content, per the cursor-placement
+        # rule (US7, FR-039/FR-043) -- the body itself is unchanged.
+        assert editor.text == "Need the Q3 comparison.\n"
 
 
 async def test_save_lands_in_file_and_pane_with_same_task_highlighted(
@@ -163,7 +165,16 @@ async def test_discard_leaves_tasks_file_unchanged(tmp_workspace: Workspace) -> 
     assert tasks_file(tmp_workspace).read_bytes() == before
 
 
-async def test_no_op_save_leaves_the_file_byte_identical(tmp_workspace: Workspace) -> None:
+async def test_save_without_typing_leaves_the_file_byte_identical(
+    tmp_workspace: Workspace,
+) -> None:
+    # Cursor placement pads the buffer with one blank line below the body's
+    # content (US7); that padding is the buffer's own unedited state
+    # (FR-042). `set_task_body` strips a body's trailing blank lines before
+    # comparing and writing (research R10, mirroring `_dedent_body`'s own
+    # read-side stripping) specifically so this padding washes out rather
+    # than accumulating a blank line on every save -- ctrl+x with nothing
+    # typed is then a true no-op, byte-identical and stable across repeats.
     write_tasks(
         tmp_workspace,
         "- [ ] call the vendor <!-- id:t_a1b2 -->\n\n  Need the Q3 comparison.\n",
@@ -175,7 +186,15 @@ async def test_no_op_save_leaves_the_file_byte_identical(tmp_workspace: Workspac
         await pilot.pause()
         await pilot.press("e")
         await pilot.pause()
+        await pilot.press("ctrl+x")
+        await pilot.pause()
+        assert isinstance(app.screen, ListScreen)
 
+        assert tasks_file(tmp_workspace).read_bytes() == before
+
+        # Stable across repeats too.
+        await pilot.press("e")
+        await pilot.pause()
         await pilot.press("ctrl+x")
         await pilot.pause()
         assert isinstance(app.screen, ListScreen)

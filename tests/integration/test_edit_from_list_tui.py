@@ -4,6 +4,7 @@ from textual.widgets import TextArea
 
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
+from choom.core.tasks import add_task
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import DocumentRow, ListScreen
@@ -120,3 +121,95 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
     # necessarily construct the same screen class with the same bindings --
     # what remains to verify is that the buffer contents agree too.
     assert list_text == preview_text
+
+
+# --- US7: cursor placement on entering edit mode --------------------------------
+
+
+async def test_cursor_lands_one_blank_line_below_existing_content(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("e")
+        await pilot.pause()
+
+        editor = app.screen.query_one("#editor", TextArea)
+        row, col = editor.cursor_location
+        assert col == 0
+        lines = editor.text.split("\n")
+        assert row == len(lines) - 1
+        assert lines[row] == ""
+
+        # Typing lands exactly where the cursor already is -- appending a
+        # thought costs no cursor-movement keystrokes (SC-009).
+        await pilot.press("h", "i")
+        await pilot.pause()
+        assert editor.text.split("\n")[row] == "hi"
+
+
+async def test_cursor_lands_on_the_first_line_of_an_empty_task_body(
+    tmp_workspace: Workspace,
+) -> None:
+    add_task(tmp_workspace, "buy milk")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await pilot.press("e")
+        await pilot.pause()
+
+        editor = app.screen.query_one("#editor", TextArea)
+        assert editor.text == ""
+        assert editor.cursor_location == (0, 0)
+
+
+async def test_entering_and_leaving_a_document_without_typing_raises_no_confirmation(
+    tmp_workspace: Workspace,
+) -> None:
+    # Positioning the cursor is not an edit (FR-042): the padded buffer is
+    # the screen's own unedited state (research R10), so leaving without
+    # typing anything pops straight back rather than raising ConfirmDialog,
+    # and the file on disk is untouched.
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    before = meeting.path.read_bytes()
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, EditScreen)
+        assert app.screen.is_dirty is False
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ListScreen)
+
+    assert meeting.path.read_bytes() == before
+
+
+async def test_entering_and_leaving_a_task_body_without_typing_raises_no_confirmation(
+    tmp_workspace: Workspace,
+) -> None:
+    add_task(tmp_workspace, "buy milk")
+    before = tmp_workspace.tasks_file.read_bytes()
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await pilot.pause()
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, EditScreen)
+        assert app.screen.is_dirty is False
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ListScreen)
+
+    assert tmp_workspace.tasks_file.read_bytes() == before

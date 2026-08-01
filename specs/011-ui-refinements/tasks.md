@@ -238,13 +238,18 @@ below the last content. Leave without typing — no confirmation, file unchanged
 
 **Independent of** every other phase.
 
-- [ ] T031 [P] [US7] Unit tests `tests/unit/test_cursor_placement.py` for the padding rule: content
+- [X] T031 [P] [US7] Unit tests `tests/unit/test_cursor_placement.py` for the padding rule: content
       without trailing blanks, content with several, empty content, and the resulting cursor row.
       Must fail first
-- [ ] T032 [US7] In `src/choom/tui/edit_screen.py`, compute the padded text once at construction, load
+- [X] T032 [US7] In `src/choom/tui/edit_screen.py`, compute the padded text once at construction, load
       the `TextArea` with it, set `original_text` to the padded text so `is_dirty` stays false, and place
-      the cursor on the last line at column 0 — for documents and task bodies alike (research R10)
-- [ ] T033 [US7] Extend `tests/integration/test_edit_from_list_tui.py`: entering and leaving edit mode
+      the cursor on the last line at column 0 — for documents and task bodies alike (research R10).
+      Found and fixed a related latent bug: `set_task_body` didn't strip a body's trailing blank lines
+      before comparing/writing, so a padded task-body buffer saved without edits was not idempotent —
+      each ctrl+x added another blank line. Fixed in `core/tasks.py` by normalising trailing blanks off
+      `body` first, mirroring `_dedent_body`'s existing read-side stripping; this also makes a genuine
+      no-op save on a task body a true no-write again
+- [X] T033 [US7] Extend `tests/integration/test_edit_from_list_tui.py`: entering and leaving edit mode
       without typing raises no confirmation and leaves the file's bytes unchanged (FR-042)
 
 **Checkpoint**: Appending to a note costs zero cursor-movement keystrokes
