@@ -102,24 +102,24 @@ def test_task_done_unknown_id_exits_1(tmp_path: Path, monkeypatch, capsys) -> No
     monkeypatch.chdir(tmp_path)
     main(["init"])
     capsys.readouterr()
-    assert main(["task", "done", "t_zzzz"]) == 1
+    assert main(["task", "done", "task_zzzz"]) == 1
 
 
 def test_task_done_duplicate_id_exits_2(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     main(["init"])
     (tmp_path / "tasks.md").write_text(
-        "- [ ] one <!-- id:t_dupe -->\n- [ ] two <!-- id:t_dupe -->\n", encoding="utf-8"
+        "- [ ] one <!-- id:task_dupe -->\n- [ ] two <!-- id:task_dupe -->\n", encoding="utf-8"
     )
     capsys.readouterr()
-    assert main(["task", "done", "t_dupe"]) == 2
+    assert main(["task", "done", "task_dupe"]) == 2
 
 
 def test_task_no_workspace_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:
     monkeypatch.chdir(tmp_path)
     assert main(["task", "list"]) == 3
     assert main(["task", "add", "buy milk"]) == 3
-    assert main(["task", "done", "t_a1b2"]) == 3
+    assert main(["task", "done", "task_a1b2"]) == 3
 
 
 def test_config_assistant_success_exits_0(tmp_path: Path, monkeypatch, capsys) -> None:

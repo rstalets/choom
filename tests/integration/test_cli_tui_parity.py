@@ -65,7 +65,7 @@ def test_cli_and_tui_create_identical_except_id_and_timestamps(
     assert _normalize(cli_text) == _normalize(tui_text)
 
 
-_SEED = "- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup created:2026-07-28 -->\n"
+_SEED = "- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup created:2026-07-28 -->\n"
 
 
 async def _toggle_via_tui(workspace) -> None:  # type: ignore[no-untyped-def]
@@ -89,7 +89,7 @@ def test_cli_and_tui_toggle_produce_byte_identical_files(
     capsys.readouterr()
     (cli_dir / "tasks.md").write_text(_SEED, encoding="utf-8", newline="\n")
 
-    main(["task", "done", "t_a1b2"])
+    main(["task", "done", "task_a1b2"])
     capsys.readouterr()
     cli_text = (cli_dir / "tasks.md").read_text(encoding="utf-8")
 

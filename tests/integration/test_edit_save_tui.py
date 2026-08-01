@@ -11,7 +11,14 @@ from endpaper.tui.app import EndpaperApp
 from endpaper.tui.edit_screen import EditScreen
 from endpaper.tui.list_screen import DocumentRow
 from endpaper.tui.preview_screen import PreviewScreen
-from tests.helpers import list_view, open_edit, row_titles, to_collection, type_literally
+from tests.helpers import (
+    in_scope_month,
+    list_view,
+    open_edit,
+    row_titles,
+    to_collection,
+    type_literally,
+)
 
 _UPDATED = re.compile(r"^updated: (.+)$", re.MULTILINE)
 _CREATED = re.compile(r"^created: (.+)$", re.MULTILINE)
@@ -89,9 +96,9 @@ async def test_ctrl_x_saves_and_returns_to_preview_with_new_content(
 async def test_title_change_appears_in_list_row_with_no_other_row_moved(
     tmp_workspace: Workspace,
 ) -> None:
-    create_meeting(tmp_workspace, "first meeting", now=datetime(2026, 7, 20, 9, 0, 0))
-    create_meeting(tmp_workspace, "second meeting", now=datetime(2026, 7, 21, 9, 0, 0))
-    create_meeting(tmp_workspace, "third meeting", now=datetime(2026, 7, 22, 9, 0, 0))
+    create_meeting(tmp_workspace, "first meeting", now=in_scope_month(20, 9))
+    create_meeting(tmp_workspace, "second meeting", now=in_scope_month(21, 9))
+    create_meeting(tmp_workspace, "third meeting", now=in_scope_month(22, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:

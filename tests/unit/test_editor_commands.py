@@ -70,3 +70,23 @@ def test_empty_line_is_text() -> None:
 @pytest.mark.parametrize("line", ["/ai hello", "  spaced  ", "not a command"])
 def test_never_raises(line: str) -> None:
     parse_line(line)  # must not raise
+
+
+# --- US6: /link --------------------------------------------------------------
+
+
+def test_link_with_search_terms_parses_to_the_link_command() -> None:
+    result = parse_line("/link foo")
+    assert result is not None
+    assert result.command.name == "link"
+    assert result.argument == "foo"
+
+
+def test_link_is_registered_in_editor_commands() -> None:
+    names = [command.name for command in EDITOR_COMMANDS]
+    assert "link" in names
+
+
+def test_line_not_entirely_the_link_command_is_ordinary_text() -> None:
+    assert parse_line("prefix /link foo") is None
+    assert parse_line("  /link foo") is None

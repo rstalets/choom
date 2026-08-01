@@ -9,6 +9,33 @@ from datetime import date
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _TAG_TOKEN = re.compile(r"#([A-Za-z0-9][A-Za-z0-9_-]*)")
 _WHITESPACE = re.compile(r"\s+")
+_TERMINATORS = ("\r\n", "\n", "\r")
+
+
+def _split_terminator(line: str) -> tuple[str, str]:
+    """Split `line` into its content and line terminator (one of "\\r\\n", "\\n",
+    "\\r", or "" for none). Shared by every line-oriented scanner in `core` so a
+    fence/task-line/comment parser never has to special-case a mixed-line-ending
+    file itself."""
+    for terminator in _TERMINATORS:
+        if line.endswith(terminator):
+            return line[: -len(terminator)], terminator
+    return line, ""
+
+
+def matches_terms(haystack: str, query: str) -> bool:
+    """Whether every whitespace-separated term in `query` appears in `haystack`.
+
+    A one-word query behaves exactly like a plain substring test, so this only
+    changes multi-word queries -- which previously required the words to be
+    contiguous and in order, and so matched almost nothing: "research okta"
+    never appears literally in "okta rollout research", even though both words
+    do. An empty query matches everything, which is what a cleared filter means.
+
+    Case-insensitive. Never raises.
+    """
+    lowered = haystack.lower()
+    return all(term in lowered for term in query.lower().split())
 
 
 def slugify(text: str, *, max_length: int = 40) -> str:
@@ -38,11 +65,11 @@ def new_document_id(when: date, prefix: str) -> str:
 
 
 def new_meeting_id(when: date) -> str:
-    return new_document_id(when, "m_")
+    return new_document_id(when, "meeting_")
 
 
 def new_task_id(taken: Container[str]) -> str:
     while True:
-        candidate = f"t_{secrets.token_hex(2)}"
+        candidate = f"task_{secrets.token_hex(2)}"
         if candidate not in taken:
             return candidate

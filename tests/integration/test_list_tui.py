@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime
-
 import pytest
 
 from endpaper.core.meetings import create_meeting
@@ -10,7 +8,7 @@ from endpaper.core.notes import create_note, open_daily_note
 from endpaper.tui.app import EndpaperApp
 from endpaper.tui.list_screen import ListView, MeetingRow
 from endpaper.tui.preview_screen import PreviewScreen
-from tests.helpers import row_titles, to_collection, type_command
+from tests.helpers import in_scope_month, row_titles, to_collection, type_command
 
 _CREATE = {"meetings": create_meeting, "notes": create_note}
 
@@ -18,9 +16,9 @@ _CREATE = {"meetings": create_meeting, "notes": create_note}
 @pytest.mark.parametrize("collection", ["meetings", "notes"])
 async def test_documents_listed_date_descending(tmp_workspace: Workspace, collection: str) -> None:
     create = _CREATE[collection]
-    create(tmp_workspace, "oldest", now=datetime(2026, 7, 20, 9, 0, 0))
-    create(tmp_workspace, "middle", now=datetime(2026, 7, 25, 9, 0, 0))
-    create(tmp_workspace, "newest", now=datetime(2026, 7, 28, 9, 0, 0))
+    create(tmp_workspace, "oldest", now=in_scope_month(20, 9))
+    create(tmp_workspace, "middle", now=in_scope_month(25, 9))
+    create(tmp_workspace, "newest", now=in_scope_month(28, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -31,19 +29,20 @@ async def test_documents_listed_date_descending(tmp_workspace: Workspace, collec
 async def test_daily_and_typed_notes_appear_together_sorted_date_descending(
     tmp_workspace: Workspace,
 ) -> None:
-    create_note(tmp_workspace, "oldest", now=datetime(2026, 7, 20, 9, 0, 0))
-    open_daily_note(tmp_workspace, now=datetime(2026, 7, 25, 9, 0, 0))
-    create_note(tmp_workspace, "newest", now=datetime(2026, 7, 28, 9, 0, 0))
+    create_note(tmp_workspace, "oldest", now=in_scope_month(20, 9))
+    open_daily_note(tmp_workspace, now=in_scope_month(25, 9))
+    create_note(tmp_workspace, "newest", now=in_scope_month(28, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "notes")
-        assert row_titles(app) == ["newest", "2026-07-25", "oldest"]
+        daily_title = in_scope_month(25).strftime("%Y-%m-%d")
+        assert row_titles(app) == ["newest", daily_title, "oldest"]
 
 
 async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspace) -> None:
     for i in range(3):
-        create_meeting(tmp_workspace, f"meeting {i}", now=datetime(2026, 7, 20 + i, 9, 0, 0))
+        create_meeting(tmp_workspace, f"meeting {i}", now=in_scope_month(20 + i, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -61,7 +60,7 @@ async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspac
 
 
 async def test_list_reflects_meeting_created_while_in_preview(tmp_workspace: Workspace) -> None:
-    create_meeting(tmp_workspace, "existing meeting", now=datetime(2026, 7, 20, 9, 0, 0))
+    create_meeting(tmp_workspace, "existing meeting", now=in_scope_month(20, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -83,8 +82,8 @@ async def test_list_reflects_meeting_created_while_in_preview(tmp_workspace: Wor
 async def test_selection_preserved_across_preview_when_nothing_created(
     tmp_workspace: Workspace,
 ) -> None:
-    create_meeting(tmp_workspace, "first", now=datetime(2026, 7, 20, 9, 0, 0))
-    create_meeting(tmp_workspace, "second", now=datetime(2026, 7, 21, 9, 0, 0))
+    create_meeting(tmp_workspace, "first", now=in_scope_month(20, 9))
+    create_meeting(tmp_workspace, "second", now=in_scope_month(21, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -147,7 +146,7 @@ async def test_single_meeting_row_is_visually_highlighted(tmp_workspace: Workspa
     # either, so ListView.index was set against stale/incomplete `_nodes` and
     # the reactive's highlight watcher marked the wrong (or a since-removed)
     # widget. With exactly one row, there was no down/up workaround available.
-    create_meeting(tmp_workspace, "only one", now=datetime(2026, 7, 20, 9, 0, 0))
+    create_meeting(tmp_workspace, "only one", now=in_scope_month(20, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
@@ -165,8 +164,8 @@ async def test_top_row_highlighted_after_refocusing_list_without_moving_cursor(
     # though `list_view.index` correctly reported 0 -- only pressing an
     # explicit down-then-up forced a real re-highlight. Moving focus alone
     # (h then l) must not require that workaround.
-    create_meeting(tmp_workspace, "one", now=datetime(2026, 7, 20, 9, 0, 0))
-    create_meeting(tmp_workspace, "two", now=datetime(2026, 7, 21, 9, 0, 0))
+    create_meeting(tmp_workspace, "one", now=in_scope_month(20, 9))
+    create_meeting(tmp_workspace, "two", now=in_scope_month(21, 9))
 
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:

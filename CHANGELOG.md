@@ -4,6 +4,58 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Document links
+
+**CLI and TUI, user-visible**
+
+Any record can now point at any other. A link is an ordinary CommonMark inline link,
+`[text](path#id)` -- the `#id` fragment is authoritative and permanent, and the path is derived,
+computed by endpaper, and repaired whenever it goes stale. Write a link by hand with just the
+fragment (`[Q3 planning](#meeting_20260728_a1b2c3d4)`) and the correct relative path is filled in
+on the next save; move the target and the path is corrected the same way. Nothing about a link is
+indexed, cached, or persisted beyond the markdown itself.
+
+`endpaper links <id> [--json] [--direction out|in|both]` answers what a record points at and what
+points at it, computed by scanning on demand. `endpaper links check` reports stale and dead links
+as two distinct classes; `endpaper links heal [--dry-run]` repairs every stale link and never
+touches a dead one, and never opens a file for writing when nothing in it is stale. In the editor,
+`/link <search terms>` on its own line becomes a correct markdown link to the one matching record;
+zero or several matches leave the line untouched and report in the status bar. The preview pane
+gained a collapsible **Links** section (`l` to toggle, `enter`/`o` to open) showing outbound links
+above and inbound links below; inbound costs one workspace scan, fetched only on first expansion.
+
+**Breaking: id prefixes changed.** Meeting, note, and task ids are now prefixed with their full
+collection name -- `meeting_`, `note_`, `task_` -- instead of a single letter (`m_`, `n_`, `t_`),
+so a new collection never needs a registry of abbreviations. Ids written under the old scheme
+keep resolving unchanged; nothing is migrated and no existing file is rewritten.
+
+**The task line gained a `links:` field**, shaped like `tags:` -- comma-separated ids, never
+paths, since the id prefix already says which collection to look in. Field order is now `id`,
+`type`, `tags`, `links`, `created`; a task with no links renders exactly as before. Hand-writing
+`links:` on a task line no longer drops that task from every listing (previously any unrecognised
+key on the metadata comment made the whole line `malformed`).
+
+**Public API**
+
+- `endpaper.core.links` (new module): `find_links`, `resolve_id`, `resolve_link`,
+  `relative_destination`, `format_link`, `heal_text`, `check_links`, `heal_links`,
+  `inbound_links`, `outbound_links`, `outbound_for_target`, `links_for_id`, `find_link_targets`.
+- `endpaper.core.models`: new `Link`, `LinkTarget`, `LinkReport`, `LinkStatus`, `LinkDirection`;
+  `ScanWarningReason` gains `"link_dead"` / `"link_ambiguous"`; `Task` gains `links: tuple[str,
+  ...] = ()`; `SaveResult` gains `warnings: tuple[ScanWarning, ...] = ()`.
+- `endpaper.core.editing.save_buffer()`: new keyword-only `workspace: Workspace | None = None`;
+  when given, heals stale links in the body before stamping `updated` and reports dead links via
+  `SaveResult.warnings`. Defaulted, so every existing call site keeps compiling unchanged.
+- `endpaper.core.tasks`: `render_task_line()` / `_render_comment()` gain `links: Sequence[str] =
+  ()`, emitted between `tags` and `created`.
+- `endpaper.core.meetings.MEETINGS` / `endpaper.core.notes.NOTES`: `id_prefix` changed from
+  `"m_"` / `"n_"` to `"meeting_"` / `"note_"`.
+- `endpaper.core.editor_commands.EDITOR_COMMANDS`: gains `link`.
+- CLI: new `endpaper links <id>` / `links check` / `links heal` subcommands. `task list --json`
+  gains a `links` key.
+- **New JSON schema**: the link report object -- `file`, `line`, `text`, `target_id`, `old_path`,
+  `new_path`, `status` -- shared by `links <id>`, `links check`, and `links heal`.
+
 ### Local AI assistant invocation (v0.0.2)
 
 **TUI, user-visible**

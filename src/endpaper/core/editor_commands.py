@@ -9,6 +9,12 @@ EDITOR_COMMANDS: tuple[EditorCommand, ...] = (
         description="Ask the configured assistant; the reply replaces this line",
         requires_argument=True,
     ),
+    EditorCommand(
+        name="link",
+        argument="<search terms>",
+        description="Insert a link to the matching record",
+        requires_argument=True,
+    ),
 )
 
 _BY_NAME: dict[str, EditorCommand] = {command.name: command for command in EDITOR_COMMANDS}

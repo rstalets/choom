@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-import os
 import re
-import tempfile
 import tomllib
 from pathlib import Path
 
+from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.errors import UsageError, WorkspaceError
 from endpaper.core.models import Workspace
 
@@ -67,18 +66,7 @@ def set_assistant(workspace: Workspace, value: str) -> None:
     if newline != "\n":
         new_text = new_text.replace("\n", newline)
 
-    tmp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", newline="", dir=path.parent, delete=False, suffix=".tmp"
-        ) as tmp_file:
-            tmp_file.write(new_text)
-            tmp_path = Path(tmp_file.name)
-        os.replace(tmp_path, path)
-    except OSError as exc:
-        if tmp_path is not None and tmp_path.exists():
-            tmp_path.unlink()
-        raise WorkspaceError(f"could not write {path}: {exc}") from exc
+    write_text_atomic(path, new_text)
 
 
 def _apply_assistant_value(text: str, value: str) -> str:

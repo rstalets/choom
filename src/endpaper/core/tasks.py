@@ -1,34 +1,25 @@
 from __future__ import annotations
 
-import os
 import re
-import tempfile
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
+from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.documents import _TOKEN_PATTERN, _validate_token
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
 from endpaper.core.models import ParsedTasks, ScanWarning, Task, TaskBodySpan, TaskFilter, Workspace
-from endpaper.core.text import new_task_id, parse_tags
+from endpaper.core.text import _split_terminator, matches_terms, new_task_id, parse_tags
 
 _TASK_LINE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<marker>[-*+])[ \t]+\[(?P<state>[ xX])\][ \t]+(?P<rest>.*)$"
 )
 _IDVAL = re.compile(r"^[A-Za-z0-9_-]+$")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_RECOGNIZED_KEYS = frozenset({"id", "type", "tags", "created"})
-_TERMINATORS = ("\r\n", "\n", "\r")
+_RECOGNIZED_KEYS = frozenset({"id", "type", "tags", "links", "created"})
 
 TASKS_PATH = Path("tasks.md")
-
-
-def _split_terminator(line: str) -> tuple[str, str]:
-    for terminator in _TERMINATORS:
-        if line.endswith(terminator):
-            return line[: -len(terminator)], terminator
-    return line, ""
 
 
 def _split_comment(rest: str) -> tuple[str, str | None, bool]:
@@ -73,6 +64,10 @@ def _classify_body(body: str) -> tuple[str, dict[str, str]]:
     if "tags" in fields:
         tag_values = fields["tags"].split(",") if fields["tags"] else []
         if not tag_values or any(not _TOKEN_PATTERN.match(tag) for tag in tag_values):
+            return "malformed", {}
+    if "links" in fields:
+        link_values = fields["links"].split(",") if fields["links"] else []
+        if not link_values or any(not _IDVAL.match(link) for link in link_values):
             return "malformed", {}
 
     return "task", fields
@@ -196,6 +191,7 @@ def parse_tasks(text: str) -> ParsedTasks:
         created: date | None,
         line: int,
         idx: int,
+        links: tuple[str, ...] = (),
     ) -> None:
         span = _body_span(raw_lines, idx)
         tasks.append(
@@ -205,6 +201,7 @@ def parse_tasks(text: str) -> ParsedTasks:
                 done=done,
                 type=type,
                 tags=tags,
+                links=links,
                 created=created,
                 line=line,
                 body=_dedent_body(raw_lines, span),
@@ -280,6 +277,8 @@ def parse_tasks(text: str) -> ParsedTasks:
         task_type = fields.get("type", "")
         tags_raw = fields.get("tags", "")
         tags = tuple(tags_raw.split(",")) if tags_raw else ()
+        links_raw = fields.get("links", "")
+        links = tuple(links_raw.split(",")) if links_raw else ()
 
         created_raw = fields.get("created")
         created_value: date | None = None
@@ -304,6 +303,7 @@ def parse_tasks(text: str) -> ParsedTasks:
             done=done,
             type=task_type,
             tags=tags,
+            links=links,
             created=created_value,
             line=line_no,
             idx=idx,
@@ -319,13 +319,20 @@ def parse_tasks(text: str) -> ParsedTasks:
 
 
 def _render_comment(
-    *, id: str, type: str = "", tags: Sequence[str] = (), created: date | None = None
+    *,
+    id: str,
+    type: str = "",
+    tags: Sequence[str] = (),
+    links: Sequence[str] = (),
+    created: date | None = None,
 ) -> str:
     fields = [f"id:{id}"]
     if type:
         fields.append(f"type:{type}")
     if tags:
         fields.append(f"tags:{','.join(tags)}")
+    if links:
+        fields.append(f"links:{','.join(links)}")
     if created is not None:
         fields.append(f"created:{created.isoformat()}")
     return f"<!-- {' '.join(fields)} -->"
@@ -338,18 +345,19 @@ def render_task_line(
     id: str,
     type: str = "",
     tags: Sequence[str] = (),
+    links: Sequence[str] = (),
     created: date | None = None,
 ) -> str:
     """Render one task line, without a terminator.
 
-    Fields appear in the order id, type, tags, created; empty ones are omitted.
-    Raises UsageError if `text` is empty after stripping.
+    Fields appear in the order id, type, tags, links, created; empty ones are
+    omitted. Raises UsageError if `text` is empty after stripping.
     """
     stripped = text.strip()
     if not stripped:
         raise UsageError("task text must not be empty")
     checkbox = "x" if done else " "
-    comment = _render_comment(id=id, type=type, tags=tags, created=created)
+    comment = _render_comment(id=id, type=type, tags=tags, links=links, created=created)
     return f"- [{checkbox}] {stripped} {comment}"
 
 
@@ -376,25 +384,16 @@ def filter_tasks(tasks: Iterable[Task], f: TaskFilter) -> list[Task]:
 
 
 def match_task(task: Task, query: str) -> bool:
-    """Case-insensitive substring over text, type, and tags. For the TUI's live filter."""
-    haystack = " ".join([task.text, task.type, *task.tags]).lower()
-    return query.lower() in haystack
+    """Case-insensitive over text, type, and tags; every term must appear, order
+    irrelevant. For the TUI's live filter."""
+    return matches_terms(" ".join([task.text, task.type, *task.tags]), query)
 
 
 def _atomic_write(path: Path, lines: Sequence[str]) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
-                fh.write("".join(lines))
-            os.replace(tmp_path, path)
-        except BaseException:
-            tmp_path.unlink(missing_ok=True)
-            raise
-    except (PermissionError, OSError) as exc:
-        raise WorkspaceError(f"could not write {path}: {exc}") from exc
+    """Thin wrapper kept for tasks.py's own call sites, which all already hold
+    a list of lines rather than one string -- the shared primitive itself only
+    knows how to write text."""
+    write_text_atomic(path, "".join(lines))
 
 
 def _read_text(path: Path) -> str:

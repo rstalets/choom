@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import cast
 
 from textual import on
@@ -9,10 +10,13 @@ from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Label, ListItem, ListView, Markdown
 
-from endpaper.core.models import Document, Task, YearMonth
+from endpaper.core.documents import _read_document
+from endpaper.core.links import resolve_href
+from endpaper.core.models import Document, LinkTarget, Task, Workspace, YearMonth
 from endpaper.tui.collection_bar import COLLECTIONS, CollectionBar
 from endpaper.tui.command_bar import CommandBar
 from endpaper.tui.help_screen import HelpScreen
+from endpaper.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from endpaper.tui.rendering import render_preview_markdown, render_task_markdown
 from endpaper.tui.scope_pane import CategoryRow, MonthRow, ScopePane, UnfiledRow
 from endpaper.tui.status_bar import LIST_HELP, TASK_LIST_HELP, StatusBar, collection_indicator
@@ -103,6 +107,7 @@ class ListScreen(Screen[None]):
         Binding("l", "focus_list", "Pane", show=False),
         Binding("right", "focus_list", "Pane", show=False),
         Binding("e", "edit", "Edit", show=True),
+        Binding("b", "toggle_preview_links", "Backlinks", show=True),
         Binding("space", "toggle_task", "Toggle", show=True),
         Binding("/", "open_command_bar", "Filter/command", show=True),
     ]
@@ -110,6 +115,7 @@ class ListScreen(Screen[None]):
     def __init__(self) -> None:
         super().__init__()
         self._pending_select_id: str | None = None
+        self._preview_links_expanded = False
         self._pending_error: str | None = None
 
     def compose(self) -> ComposeResult:
@@ -119,12 +125,15 @@ class ListScreen(Screen[None]):
             with Vertical(id="list-pane"):
                 yield ListView(id="meeting-list")
             with Vertical(id="preview-pane"):
-                yield Markdown(id="preview")
+                yield Markdown(id="preview", open_links=False)
+                with Vertical(id="preview-links-section"):
+                    yield ListView(id="preview-links-list")
         with Vertical(id="bottom-bar"):
             yield CommandBar(id="command-bar")
             yield StatusBar(LIST_HELP, id="status-bar")
 
     async def on_mount(self) -> None:
+        self.query_one("#preview-links-section").display = False
         await self._refresh_scope_pane()
         self.query_one("#meeting-list", ListView).focus()
         await self.refresh_rows()
@@ -341,6 +350,96 @@ class ListScreen(Screen[None]):
     @on(ListView.Highlighted, "#meeting-list")
     def _on_highlighted(self, event: ListView.Highlighted) -> None:
         self._update_preview()
+        if self._preview_links_expanded:
+            # The pane describes whatever row is highlighted, so moving the
+            # cursor has to re-fetch rather than leave a stale record's links on
+            # screen. The inbound scan is the cost of having it open.
+            self.call_later(self._populate_preview_links)
+
+    # --- Links pane (b) ---------------------------------------------------------
+
+    async def action_toggle_preview_links(self) -> None:
+        section = self.query_one("#preview-links-section")
+        if self._preview_links_expanded:
+            self._preview_links_expanded = False
+            section.display = False
+            self.query_one("#meeting-list", ListView).focus()
+            return
+        self._preview_links_expanded = True
+        section.display = True
+        await self._populate_preview_links()
+        self.query_one("#preview-links-list", ListView).focus()
+
+    async def _populate_preview_links(self) -> None:
+        list_view = self.query_one("#preview-links-list", ListView)
+        await list_view.clear()
+
+        workspace: Workspace = self.app.workspace  # type: ignore[attr-defined]
+        highlighted = self.query_one("#meeting-list", ListView).highlighted_child
+        source: Path
+        document_id: str | None
+        if isinstance(highlighted, DocumentRow):
+            source, document_id = highlighted.document.path, highlighted.document.id
+        elif isinstance(highlighted, TaskRow):
+            source, document_id = workspace.tasks_file, highlighted.record.id
+        else:
+            return
+
+        inbound = fetch_inbound(workspace, document_id)
+        await list_view.extend(build_link_rows(workspace, source, document_id, inbound))
+
+    @on(ListView.Selected, "#preview-links-list")
+    def _on_preview_link_selected(self, event: ListView.Selected) -> None:
+        row = event.item
+        if not isinstance(row, LinkRow):
+            return
+        if row.target is None:
+            unresolved = row.link.target_id or row.link.path or "?"
+            self.query_one(StatusBar).update(
+                f"⚠ link to {unresolved!r} does not resolve   {LIST_HELP}"
+            )
+            return
+        self._open_link_target(row.target)
+
+    def on_markdown_link_clicked(self, event: Markdown.LinkClicked) -> None:
+        """Follow a link clicked in the preview pane's rendered body.
+
+        Same rule as the full-screen preview: a link endpaper owns opens the
+        record it names, and anything else goes to the browser, which is what
+        `Markdown` would have done with every href had `open_links` been left on.
+        """
+        workspace: Workspace = self.app.workspace  # type: ignore[attr-defined]
+        highlighted = self.query_one("#meeting-list", ListView).highlighted_child
+        source = (
+            highlighted.document.path
+            if isinstance(highlighted, DocumentRow)
+            else workspace.tasks_file
+        )
+
+        target = resolve_href(workspace, source, event.href)
+        if target is None:
+            self.app.open_url(event.href)
+            return
+        self._open_link_target(target)
+
+    def _open_link_target(self, target: LinkTarget) -> None:
+        """Open a record named by a link -- from a click in the rendered body or
+        from `enter` in the links pane. One path, so the two cannot diverge."""
+        if target.kind == "task":
+            from endpaper.tui.edit_screen import open_editor
+
+            open_editor(self.app, target.path)
+            return
+
+        from endpaper.tui.preview_screen import PreviewScreen
+
+        # Deliberately *not* setting `_pending_select_id`. That exists so that
+        # opening the row you are on returns you to it. Following a link is the
+        # opposite motion -- you went somewhere else -- and `esc` means "back"
+        # everywhere in this app, so it must return to the record you left, not
+        # strand you on the one you visited. `refresh_rows` keeps the current
+        # highlight when no id is pending, which is exactly that behaviour.
+        self.app.push_screen(PreviewScreen(target.path, _read_document(target.path)))
 
     @on(ListView.Selected, "#meeting-list")
     def _on_selected(self, event: ListView.Selected) -> None:

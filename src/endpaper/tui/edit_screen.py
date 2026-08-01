@@ -23,6 +23,7 @@ from endpaper.core.config import get_assistant
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.editor_commands import parse_line
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
+from endpaper.core.links import find_link_targets, format_link
 from endpaper.core.models import (
     AssistantReply,
     ParsedCommand,
@@ -32,7 +33,14 @@ from endpaper.core.models import (
 )
 from endpaper.core.tasks import parse_tasks, set_task_body
 from endpaper.tui.discard_dialog import DiscardDialog
-from endpaper.tui.status_bar import EDIT_HELP, StatusBar, in_flight_status, pick_breadcrumb
+from endpaper.tui.status_bar import (
+    EDIT_HELP,
+    StatusBar,
+    in_flight_status,
+    link_ambiguous_status,
+    link_no_match_status,
+    pick_breadcrumb,
+)
 
 _PLACEHOLDER = "⋯"
 
@@ -69,7 +77,8 @@ def open_editor(app: App[None], path: Path) -> bool:
         return False
 
     def _save(text: str) -> SaveResult:
-        result = save_buffer(file.path, text, file)
+        workspace = app.workspace  # type: ignore[attr-defined]
+        result = save_buffer(file.path, text, file, workspace=workspace)
         if result.ok:
             app.refresh_document(file.path)  # type: ignore[attr-defined]
         return result
@@ -239,6 +248,8 @@ class EditScreen(Screen[None]):
         self.original_text = result.saved_text
         if self.target.stamps_frontmatter and not result.stamped:
             self._render_status("frontmatter's updated: field could not be found; saved as typed")
+        elif result.warnings:
+            self._render_status("; ".join(w.message for w in result.warnings))
         else:
             self._render_status(None)
         return True
@@ -269,6 +280,38 @@ class EditScreen(Screen[None]):
     def _on_editor_command_submitted(self, message: EditorTextArea.EditorCommandSubmitted) -> None:
         if message.parsed.command.name == "ai":
             self._start_ai_request(message.parsed, message.line_index)
+        elif message.parsed.command.name == "link":
+            self._insert_link(message.parsed, message.line_index)
+
+    def _insert_link(self, parsed: ParsedCommand, line_index: int) -> None:
+        if not parsed.argument:
+            self._render_status(f"/{parsed.command.name} needs search terms")
+            return
+
+        if not self._save():
+            return  # save error already reported
+
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        matches = find_link_targets(workspace, parsed.argument)
+
+        if not matches:
+            self._render_status(link_no_match_status(parsed.argument))
+            return
+        if len(matches) > 1:
+            self._render_status(link_ambiguous_status([m.title for m in matches]))
+            return
+
+        target = matches[0]
+        editor = self.query_one("#editor", EditorTextArea)
+        original_line = editor.get_line(line_index).plain
+        link_text = format_link(self.target.display_path, target, target.title)
+        editor.replace(
+            link_text,
+            (line_index, 0),
+            (line_index, len(original_line)),
+            maintain_selection_offset=False,
+        )
+        self._render_status(None)
 
     def _start_ai_request(self, parsed: ParsedCommand, line_index: int) -> None:
         if parsed.command.requires_argument and not parsed.argument:

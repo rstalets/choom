@@ -38,6 +38,13 @@ _REQUIRED_IN_AGENTS_MD = (
     "task undone",
     "tasks.md",
     "YYYY",
+    "Links",
+    "links:",
+    "meeting_",
+    "note_",
+    "endpaper links",
+    "links check",
+    "links heal",
     "blank line",
 )
 
@@ -54,9 +61,10 @@ def test_claude_md_template_is_short_and_points_at_agents_md() -> None:
 def test_agents_md_stays_within_line_budget(tmp_workspace: Workspace) -> None:
     # init_workspace writes AGENTS.md verbatim from AGENTS.md.tmpl (no
     # substitution -- see workspace.py's `_write_guidance_file`), so the
-    # generated copy and the source template share one line budget.
+    # generated copy and the source template share one line budget. 008
+    # tightened this from 63 to <= 60 while adding link content (research R9).
     text = (tmp_workspace.root / "AGENTS.md").read_text(encoding="utf-8")
-    assert len(text.splitlines()) <= 63
+    assert len(text.splitlines()) <= 60
 
 
 def test_agents_md_documents_the_conventions_an_assistant_needs(

@@ -18,7 +18,7 @@ from endpaper.core.models import (
     Workspace,
     YearMonth,
 )
-from endpaper.core.text import new_document_id, parse_tags, slugify
+from endpaper.core.text import matches_terms, new_document_id, parse_tags, slugify
 
 _TOKEN_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,39}$")
 _MONTH_PATTERN = re.compile(r"^(0[1-9]|1[0-2])$")
@@ -315,5 +315,6 @@ def filter_documents(documents: Iterable[Document], f: DocumentFilter) -> list[D
 
 
 def match_document(document: Document, query: str) -> bool:
-    haystack = " ".join([document.title, document.type, *document.tags]).lower()
-    return query.lower() in haystack
+    """Case-insensitive, every term must appear, order irrelevant. Backs both the
+    TUI's live filter and `/link`, so the two can never disagree."""
+    return matches_terms(" ".join([document.title, document.type, *document.tags]), query)

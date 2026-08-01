@@ -6,7 +6,7 @@ from pathlib import Path
 from endpaper.cli.main import main
 
 EXPECTED_KEYS = {"id", "path", "title", "type", "tags", "created", "updated"}
-EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "created", "line", "body"}
+EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line", "body"}
 
 
 def test_json_schema_has_exactly_seven_keys_and_no_nulls(
@@ -53,7 +53,7 @@ def test_note_list_json_has_exactly_the_same_seven_keys(
     assert len(records) == 1
     record = records[0]
     assert set(record.keys()) == EXPECTED_KEYS
-    assert record["id"].startswith("n_")
+    assert record["id"].startswith("note_")
     assert "/" in record["path"]
     assert "\\" not in record["path"]
 

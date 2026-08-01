@@ -21,7 +21,7 @@ from endpaper.core.models import (
     YearMonth,
 )
 
-MEETINGS = Collection("m_", "meetings", ("meetings",), frozenset())
+MEETINGS = Collection("meeting_", "meetings", ("meetings",), frozenset())
 
 
 def create_meeting(
