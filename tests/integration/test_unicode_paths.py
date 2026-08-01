@@ -8,7 +8,9 @@ from endpaper.core.config import get_assistant, set_assistant
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.links import relative_destination
 from endpaper.core.meetings import create_meeting, scan_meetings
+from endpaper.core.mirrors import capture_task, propagate_to_documents, reconcile_on_open
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
+from endpaper.core.tasks import set_task_state
 from endpaper.core.workspace import init_workspace
 
 
@@ -120,3 +122,59 @@ def test_a_destination_with_a_space_uses_the_angle_bracket_form(tmp_path: Path) 
     expected_dest = relative_destination(linking_note.path, target)
     assert " " in expected_dest  # the case that requires escaping
     assert f"(<{expected_dest}#note_00000000_aaaaaaaa>)" in result.saved_text
+
+
+# --- T071: mirror capture and propagation in a workspace with spaces and non-ASCII
+
+
+def test_capture_and_mirror_round_trip_in_a_workspace_with_spaces_and_non_ascii(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
+    task, line = capture_task(
+        workspace,
+        "appeler Terry à propos du renouvellement",
+        source=meeting.path,
+        source_id=meeting.id,
+    )
+    assert task.id is not None
+    # No filesystem path budget is spent by a mirror -- it is link text inside
+    # a document, not a path -- but it must still round-trip correctly through
+    # a workspace whose own root already carries spaces and non-ASCII.
+    assert f"#{task.id}" in line
+    assert line.startswith("- [ ] [appeler Terry")
+
+    text = meeting.path.read_text(encoding="utf-8")
+    meeting.path.write_text(text + line + "\n", encoding="utf-8")
+
+    updated_task = set_task_state(workspace, task.id, done=True)
+    written, warnings = propagate_to_documents(workspace, updated_task)
+    assert warnings == ()
+    assert meeting.path in written
+    assert "- [x] [appeler Terry" in meeting.path.read_text(encoding="utf-8")
+
+
+def test_reconcile_on_open_works_in_a_workspace_with_spaces_and_non_ascii(
+    tmp_path: Path,
+) -> None:
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
+    task, line = capture_task(workspace, "appeler Terry", source=meeting.path, source_id=meeting.id)
+    assert task.id is not None
+    text = meeting.path.read_text(encoding="utf-8")
+    meeting.path.write_text(text + line + "\n", encoding="utf-8")
+
+    set_task_state(workspace, task.id, done=True)
+
+    report = reconcile_on_open(
+        workspace, meeting.path.read_text(encoding="utf-8"), source=meeting.path
+    )
+    assert "[x]" in report.text
+    assert report.warnings == ()

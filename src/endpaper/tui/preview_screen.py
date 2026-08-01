@@ -11,12 +11,14 @@ from textual.screen import Screen
 from textual.widgets import Label, ListItem, ListView, Markdown
 
 from endpaper.core.documents import _read_document
+from endpaper.core.editing import load_for_edit
 from endpaper.core.links import (
     inbound_links,
     outbound_links,
     resolve_href,
     resolve_link,
 )
+from endpaper.core.mirrors import reconcile_on_open, write_document
 from endpaper.core.models import Document, Link, LinkStatus, LinkTarget, Workspace
 from endpaper.tui.rendering import (
     NO_INBOUND_LINKS,
@@ -128,6 +130,7 @@ class PreviewScreen(Screen[None]):
             yield StatusBar(PREVIEW_HELP, id="status-bar")
 
     def on_mount(self) -> None:
+        self._reconcile_mirrors()
         self._update_content()
         self.query_one("#links-section").display = False
         if self._note:
@@ -140,12 +143,29 @@ class PreviewScreen(Screen[None]):
         if not self._resumed_once:
             self._resumed_once = True
             return
+        self._reconcile_mirrors()
         self.document = _read_document(self.path)
         self._update_content()
         self._links_expanded = False
         self._inbound_cache = None
         self.query_one("#links-section").display = False
         self._render_status()
+
+    def _reconcile_mirrors(self) -> None:
+        """Bring every mirror in this document into agreement with tasks.md
+        before it is rendered (FR-026, US6 scenario 6) -- the preview is the
+        most common way a document is looked at, and it must never show a
+        checkbox the editing path would immediately correct. Best-effort: a
+        read or write failure here is silently skipped and surfaces the next
+        time the document is actually opened for editing."""
+        workspace = _links_workspace(self.app)
+        try:
+            file = load_for_edit(self.path)
+        except OSError:
+            return
+        report = reconcile_on_open(workspace, file.text, source=self.path)
+        if report.text is not file.text:
+            write_document(self.path, report.text, file)
 
     def _update_content(self) -> None:
         self.query_one("#full-preview", Markdown).update(

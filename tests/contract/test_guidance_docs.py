@@ -46,6 +46,9 @@ _REQUIRED_IN_AGENTS_MD = (
     "links check",
     "links heal",
     "blank line",
+    "--link",
+    "/task",
+    "control surface",
 )
 
 

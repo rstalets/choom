@@ -457,6 +457,7 @@ def add_task(
     *,
     type: str = "",
     tags: Sequence[str] = (),
+    links: Sequence[str] = (),
     now: datetime | None = None,
 ) -> Task:
     """Append one task to tasks.md and return it.
@@ -464,6 +465,8 @@ def add_task(
     Parses inline #tags out of `description` and merges them after `tags`, exactly
     as create_document does. Creates tasks.md if absent. Every pre-existing byte is
     preserved; if the file did not end with a newline, the terminator is added.
+    `links` is passed straight through to `render_task_line`; a call without it
+    produces a line identical in shape to one written before this parameter existed.
     """
     when = now or datetime.now()
     title, inline_tags = parse_tags(description)
@@ -489,6 +492,7 @@ def add_task(
         id=new_id,
         type=normalized_type,
         tags=tuple(merged_tags),
+        links=tuple(links),
         created=when.date(),
     )
 
@@ -507,6 +511,7 @@ def add_task(
         done=False,
         type=normalized_type,
         tags=tuple(merged_tags),
+        links=tuple(links),
         created=when.date(),
         line=len(lines),
     )

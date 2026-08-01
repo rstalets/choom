@@ -43,3 +43,20 @@ def test_links_public_surface_is_exported() -> None:
     ):
         assert name in endpaper.core.__all__, f"{name} missing from endpaper.core.__all__"
         assert hasattr(endpaper.core, name)
+
+
+def test_mirrors_public_surface_is_exported() -> None:
+    for name in (
+        "Mirror",
+        "MirrorReport",
+        "MirrorResolution",
+        "capture_task",
+        "find_mirrors",
+        "mirror_line",
+        "propagate_to_documents",
+        "reconcile_on_open",
+        "reconcile_on_save",
+        "write_document",
+    ):
+        assert name in endpaper.core.__all__, f"{name} missing from endpaper.core.__all__"
+        assert hasattr(endpaper.core, name)

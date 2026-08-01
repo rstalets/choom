@@ -29,6 +29,17 @@ async def test_help_pane_lists_every_verb_with_a_description(tmp_workspace: Work
             assert verb.description in body
 
 
+async def test_help_pane_lists_the_in_editor_task_command(tmp_workspace: Workspace) -> None:
+    # FR-010: /task's discoverability comes entirely from being registered in
+    # EDITOR_COMMANDS -- no help text is written by hand in a second place.
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await _open_help(pilot)
+        body = str(app.screen.query_one("#help-body").content)  # type: ignore[attr-defined]
+        assert "/task <description>" in body
+        assert "this line becomes a link to it" in body
+
+
 async def test_help_pane_names_e_for_a_tasks_details(tmp_workspace: Workspace) -> None:
     app = EndpaperApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:

@@ -40,21 +40,35 @@ One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment; `
   Need the Q3 comparison before the renewal meeting.
 ```
 
+## Task mirrors
+
+A checklist item that links to a task, `- [ ] [text](path#task_id)`, is a control surface onto that
+task's own `[ ]`/`[x]` state -- not a copy of it. Ticking either one and saving updates the other;
+opening a document reconciles it against `tasks.md` automatically, with no repair command needed.
+The link tolerates hand-editing: reword the text, reindent the line, move the file -- it is still
+found by its `#task_id` fragment, never by line number or wording. A mirror whose task no longer
+exists is skipped and warned about, never rewritten and never fatal.
+
+In the editor, `/task <description>` (or `/task.<type> <description>`) on its own line captures a
+task from that line's words and replaces the line with the mirror; `endpaper task add --link <id>`
+does the same thing from the command line.
+
 ## Commands
 
 ```bash
 endpaper meeting new "Q3 planning" --type standup --tag platform
 endpaper meeting list --json --type standup --tag platform --since 2026-07-01
 endpaper note today                       # note new/note list take the same flags as meeting new/list
-endpaper task add "send the vendor comparison" --type followup --tag procurement
+endpaper task add "send the vendor comparison" --type followup --tag procurement --link meeting_20260728_a1b2c3d4
 endpaper task list --json --all --type followup --tag procurement  # --done: completed only
 endpaper task show task_a1b2 [--json]                      # print one task and its body
-endpaper task done task_a1b2                               # endpaper task undone task_a1b2
+endpaper task done task_a1b2 [--json]                       # endpaper task undone task_a1b2 [--json]
 endpaper links <id> [--json] [--direction out|in|both]     # what it points at / is pointed at by
 endpaper links check [<path>...] [--json]                  # report stale/dead links
 endpaper links heal  [<path>...] [--json] [--dry-run]      # repair stale links; dead ones untouched
 endpaper config assistant [<value>] [--json]               # get/set the /ai assistant
 ```
 
-`--tag` is repeatable, the supported way to attach tags -- an unquoted `#tag` is eaten by the shell.
+`--tag` and `--link` are repeatable; an unquoted `#tag` is eaten by the shell, so use `--tag`.
+`task done`/`undone --json` add `documents_updated` and `warnings` for mirrors it spliced or could not.
 Exit codes: `0` success · `1` not found · `2` usage error · `3` workspace error; diagnostics to stderr, data to stdout, never interleaved.

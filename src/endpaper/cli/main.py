@@ -26,8 +26,9 @@ from endpaper.core.assistants import resolve_assistant
 from endpaper.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from endpaper.core.documents import filter_documents
 from endpaper.core.errors import EndpaperError, NotFoundError, UsageError, WorkspaceError
-from endpaper.core.links import check_links, heal_links, links_for_id
+from endpaper.core.links import check_links, heal_links, links_for_id, resolve_id
 from endpaper.core.meetings import create_meeting, scan_meetings
+from endpaper.core.mirrors import propagate_to_documents
 from endpaper.core.models import DocumentFilter, TaskFilter, Workspace
 from endpaper.core.notes import create_note, open_daily_note, scan_notes
 from endpaper.core.tasks import add_task, filter_tasks, get_task, load_tasks, set_task_state
@@ -126,6 +127,13 @@ def _build_parser() -> argparse.ArgumentParser:
         default=[],
         help="repeatable; the supported way to attach a tag on the command line",
     )
+    task_add_parser.add_argument(
+        "--link",
+        action="append",
+        default=[],
+        help="repeatable; record a link to an existing meeting, note, or task id",
+    )
+    task_add_parser.add_argument("--json", action="store_true")
 
     task_list_parser = task_subparsers.add_parser("list", help="list tasks")
     task_list_parser.add_argument("--json", action="store_true")
@@ -142,9 +150,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     task_done_parser = task_subparsers.add_parser("done", help="mark a task complete")
     task_done_parser.add_argument("id")
+    task_done_parser.add_argument("--json", action="store_true")
 
     task_undone_parser = task_subparsers.add_parser("undone", help="mark a task incomplete")
     task_undone_parser.add_argument("id")
+    task_undone_parser.add_argument("--json", action="store_true")
 
     config_parser = subparsers.add_parser("config", help="get or set workspace settings")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
@@ -298,15 +308,35 @@ def _cmd_note_list(namespace: argparse.Namespace) -> int:
     return 0
 
 
+def _resolve_task_links(workspace: Workspace, raw_ids: list[str]) -> tuple[str, ...]:
+    """Every `--link` id, resolved before anything is written (FR-036).
+
+    Raises:
+        NotFoundError: an id does not resolve to any record -- exit 1, not 2,
+            because the flag was well-formed and names a thing that is not
+            there (research R10).
+    """
+    for target_id in raw_ids:
+        target, _warnings = resolve_id(workspace, target_id)
+        if target is None:
+            raise NotFoundError(f"no record with id {target_id!r}")
+    return tuple(raw_ids)
+
+
 def _cmd_task_add(namespace: argparse.Namespace) -> int:
     workspace = find_workspace(Path.cwd())
+    links = _resolve_task_links(workspace, namespace.link)
     task = add_task(
         workspace,
         namespace.description,
         type=namespace.type,
         tags=tuple(namespace.tag),
+        links=links,
     )
-    print(task.id)
+    if namespace.json:
+        print_task_show_json(task)
+    else:
+        print(task.id)
     return 0
 
 
@@ -341,16 +371,43 @@ def _cmd_task_show(namespace: argparse.Namespace) -> int:
     return 0
 
 
-def _cmd_task_done(namespace: argparse.Namespace) -> int:
+def _set_task_state_and_propagate(namespace: argparse.Namespace, *, done: bool) -> int:
+    """Shared body of `task done`/`task undone` (contracts/cli.md): tasks.md is
+    written first, exactly as before this feature; then every document the
+    task links to has its mirrors spliced to the new state. A document failure
+    is a warning, never a non-zero exit -- the operation asked for (completing
+    or reopening the task) already succeeded, and exiting non-zero would make
+    an assistant retry a completion that already happened (research R11)."""
     workspace = find_workspace(Path.cwd())
-    set_task_state(workspace, namespace.id, done=True)
+    task = set_task_state(workspace, namespace.id, done=done)
+    documents_updated, warnings = propagate_to_documents(workspace, task)
+    for warning in warnings:
+        print_error(warning.message)
+
+    if namespace.json:
+        print(
+            json.dumps(
+                {
+                    "id": task.id,
+                    "done": task.done,
+                    "links": list(task.links),
+                    "documents_updated": [
+                        path.relative_to(workspace.root).as_posix() for path in documents_updated
+                    ],
+                    "warnings": [w.message for w in warnings],
+                },
+                ensure_ascii=False,
+            )
+        )
     return 0
+
+
+def _cmd_task_done(namespace: argparse.Namespace) -> int:
+    return _set_task_state_and_propagate(namespace, done=True)
 
 
 def _cmd_task_undone(namespace: argparse.Namespace) -> int:
-    workspace = find_workspace(Path.cwd())
-    set_task_state(workspace, namespace.id, done=False)
-    return 0
+    return _set_task_state_and_propagate(namespace, done=False)
 
 
 def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
