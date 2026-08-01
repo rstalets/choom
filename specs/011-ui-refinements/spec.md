@@ -24,7 +24,7 @@ type and no new stored state.
 
 ## Overview
 
-Four of these five items are presentation: where a cursor starts, what the bottom bar says, how a row is
+Four of these five items are presentation: where a cursor starts, what the top bar says, how a row is
 laid out, how a dialog asks a question. The fifth — deleting a record — is the one genuine capability
 gap, and it is the reason the others travel together: a delete needs a confirmation, and today's
 confirmation is exactly the dialog the user is asking to replace.
@@ -34,20 +34,63 @@ Taken together they close the loop on the everyday motions:
 1. **Editing starts where you type.** Entering edit mode puts the cursor on a fresh line below the
    existing content, separated by one blank line, so the common case — appending a thought to something
    already written — costs no keystrokes to reach.
-2. **The tool says which workspace it is showing.** The path is on screen, so telling an assistant or a
-   terminal where the notes live is a matter of reading it rather than remembering it.
+2. **The tool says which workspace it is showing.** The path sits in the top bar, snapped to the
+   top-right corner, so telling an assistant or a terminal where the notes live is a matter of reading it
+   rather than remembering it.
 3. **The list is a table, not a sentence.** Four labelled columns hold their position whether or not a
    record has a type or tags, so the eye finds the title in the same place on every row.
-4. **Records can be deleted from either front-end.** In the terminal interface, `ctrl+d` on the
-   highlighted row after a confirmation. On the command line, a peer `delete` command per record type
-   that takes an explicit flag and never prompts, so an assistant sharing the workspace can clean up
-   after itself.
-5. **Confirmations are a line, not a form.** One question, two labelled keys — `Esc` always stops,
+4. **Confirmations are a line, not a form.** One question, two labelled keys — `Esc` always stops,
    `Enter` always proceeds — centred on screen, with no highlight to move and no button to hit.
+5. **Records can be deleted from either front-end.** In the terminal interface, `ctrl+d` on the
+   highlighted row, confirmed with the dialog above. On the command line, a peer `delete` command per
+   record type that takes an explicit flag and never prompts, so an assistant sharing the workspace can
+   clean up after itself.
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 - Delete a record without leaving the tool (Priority: P1)
+**Sequencing note**: the stories below are in build order, and one of the dependencies is binding rather
+than a preference. Story 1 (the confirmation) MUST land before Story 2 (deleting from the list) is wired
+up. Deletion is the one new confirmation point this feature adds, and FR-026 requires every confirmation
+in the product to be the same one — so building the delete against the confirmation that exists today
+would mean writing the confirmation twice and shipping the old style in the interval. Stories 3 and 4
+follow Story 2 because they extend the same deletion behaviour. Stories 5, 6, and 7 touch none of this
+and may be built in any order, before or after the rest.
+
+### User Story 1 - Confirmations are a line with two named keys (Priority: P1)
+
+Any time choom needs a yes or no — discarding unsaved edits, deleting a record — it shows a slim,
+centred, single-question bar with two options: `Esc` to stop and `Enter` to proceed. The wording names
+the outcome of each key, not an abstract "OK/Cancel". There is nothing to highlight and nothing to move.
+
+**Why this priority**: Everything the delete stories confirm against is built here. Deletion is this
+feature's only new confirmation point, and there is exactly one confirmation in the product (FR-026), so
+building delete first would mean building its dialog twice and shipping the button-and-highlight style in
+between. It also delivers on its own: with no delete in the tool at all, the discard confirmation the
+editor already raises becomes slimmer, centred, and resolvable with one keypress.
+
+**Independent Test**: Trigger the discard confirmation by editing a document and leaving without saving,
+and confirm the dialog is a slim centred bar, that `Esc` returns to the editor with the edits intact, and
+that `Enter` leaves without saving. Repeat in a narrow and a wide terminal.
+
+**Acceptance Scenarios**:
+
+1. **Given** unsaved changes in the editor, **When** the user tries to leave, **Then** a slim centred bar
+   asks the question and offers exactly two options, each labelled with its key and the outcome that key
+   produces — for example `(Esc) Continue Editing` and `(Enter) Exit Without Saving`.
+2. **Given** a confirmation is on screen, **When** the user presses `Esc`, **Then** the action that raised
+   it is abandoned and the user is returned to where they were with nothing changed.
+3. **Given** a confirmation is on screen, **When** the user presses `Enter`, **Then** the action the user
+   originally asked for goes ahead.
+4. **Given** a confirmation is on screen, **When** the user presses any other key, **Then** the
+   confirmation stays up and nothing happens — no key falls through to the screen underneath.
+5. **Given** the confirmation was raised by activity in one pane of a multi-pane screen, **When** it
+   appears, **Then** it is centred on the whole screen rather than positioned over the originating pane.
+6. **Given** the terminal is resized while a confirmation is on screen, **When** the resize completes,
+   **Then** the confirmation is still centred and its full text is still readable.
+
+---
+
+### User Story 2 - Delete a record without leaving the tool (Priority: P2)
 
 A user has a meeting note created by mistake, a duplicate note, or a task that is no longer relevant.
 They move the highlight onto it in the list, press `ctrl+d`, read a one-line confirmation naming what
@@ -56,10 +99,10 @@ file (or the task's lines) is gone from the workspace. Pressing `Esc` at the con
 everything exactly as it was.
 
 **Why this priority**: It is the only item in this feature that is a missing capability rather than a
-rough edge. Today the only way to remove a record is to leave the tool, find the file, and delete it by
-hand — and for a task, to hand-edit `tasks.md` and hope the surrounding lines survive. It is also the
-item the other four are sequenced around, since it is what makes a good confirmation dialog worth
-having.
+rough edge, and it is the highest-value behaviour here — today the only way to remove a record is to
+leave the tool, find the file, and delete it by hand, and for a task, to hand-edit `tasks.md` and hope
+the surrounding lines survive. It sits second only because the confirmation it raises is the one built in
+Story 1; everything after it is presentation.
 
 **Independent Test**: Create a meeting, a note, and a task in a scratch workspace. Delete each from the
 list with `ctrl+d` → `Enter` and confirm the record is gone from the list, gone from disk (or gone from
@@ -89,16 +132,17 @@ changes.
 
 ---
 
-### User Story 2 - Delete a record from the command line (Priority: P2)
+### User Story 3 - Delete a record from the command line (Priority: P3)
 
 An assistant working in the same workspace created a note in the wrong place, or the user wants to script
 a cleanup. Each record type has a `delete` command that takes the record's id and an explicit flag, does
 the deletion without asking anything, prints nothing to stdout on success, and exits 0.
 
-**Why this priority**: Principle II makes this a peer of Story 1, not an extra: any behaviour available in
-one front-end must be available in the other. It is second only because the interactive path is the one a
-human reaches for first, and because the command line has no equivalent of "the row I am looking at" —
-it needs the id, which the interactive path does not.
+**Why this priority**: Principle II makes this a peer of Story 2, not an extra: any behaviour available in
+one front-end must be available in the other. It follows the interactive path only because that is the
+one a human reaches for first, and because the command line has no equivalent of "the row I am looking
+at" — it needs the id, which the interactive path does not. It has no dependency on Story 1: the command
+line never confirms, it takes a flag.
 
 **Independent Test**: Create each record type, capture its id from the matching `list --json` output,
 delete it by id with the flag, and confirm exit code 0 and that the record is gone. Run the same command
@@ -123,14 +167,14 @@ without the flag and confirm it exits with a usage error and deletes nothing.
 
 ---
 
-### User Story 3 - A deleted task's mirrors stay in the user's words (Priority: P3)
+### User Story 4 - A deleted task's mirrors stay in the user's words (Priority: P4)
 
 A task was captured from inside a note, so the note carries a checkbox pointing at it. The user deletes
 the task. The note keeps the line the user typed, exactly as typed; the link is now dead, and choom
 reports it as dead the next time it looks — the same outcome a mirror already has when its task cannot be
 found.
 
-**Why this priority**: It is a correctness constraint on Stories 1 and 2 rather than a separate gesture,
+**Why this priority**: It is a correctness constraint on Stories 2 and 3 rather than a separate gesture,
 so it cannot ship before them. It is called out as its own story because it is the one place where
 deleting can damage a file that the user did not ask to touch, and Principle IV makes that the
 non-negotiable part of the feature.
@@ -151,39 +195,6 @@ reports the link as dead rather than repairing or removing it.
    than the save failing.
 4. **Given** several documents mirror the same task, **When** the task is deleted, **Then** every one of
    those documents is left unmodified.
-
----
-
-### User Story 4 - Confirmations are a line with two named keys (Priority: P4)
-
-Any time choom needs a yes or no — discarding unsaved edits, deleting a record — it shows a slim,
-centred, single-question bar with two options: `Esc` to stop and `Enter` to proceed. The wording names
-the outcome of each key, not an abstract "OK/Cancel". There is nothing to highlight and nothing to move.
-
-**Why this priority**: It is the largest visible change to a surface the user meets often, and both
-existing confirmation points adopt it at once, so it is worth doing after the behaviour that needs it
-exists rather than twice. It stands alone: with no delete in the tool at all, the discard confirmation
-still gets slimmer and faster.
-
-**Independent Test**: Trigger the discard confirmation by editing a document and leaving without saving,
-and confirm the dialog is a slim centred bar, that `Esc` returns to the editor with the edits intact, and
-that `Enter` leaves without saving. Repeat in a narrow and a wide terminal.
-
-**Acceptance Scenarios**:
-
-1. **Given** unsaved changes in the editor, **When** the user tries to leave, **Then** a slim centred bar
-   asks the question and offers exactly two options, each labelled with its key and the outcome that key
-   produces — for example `(Esc) Continue Editing` and `(Enter) Exit Without Saving`.
-2. **Given** a confirmation is on screen, **When** the user presses `Esc`, **Then** the action that raised
-   it is abandoned and the user is returned to where they were with nothing changed.
-3. **Given** a confirmation is on screen, **When** the user presses `Enter`, **Then** the action the user
-   originally asked for goes ahead.
-4. **Given** a confirmation is on screen, **When** the user presses any other key, **Then** the
-   confirmation stays up and nothing happens — no key falls through to the screen underneath.
-5. **Given** the confirmation was raised by activity in one pane of a multi-pane screen, **When** it
-   appears, **Then** it is centred on the whole screen rather than positioned over the originating pane.
-6. **Given** the terminal is resized while a confirmation is on screen, **When** the resize completes,
-   **Then** the confirmation is still centred and its full text is still readable.
 
 ---
 
@@ -219,29 +230,36 @@ that every value sits under its own header regardless of which neighbouring fiel
 
 ---
 
-### User Story 6 - The bottom bar names the workspace (Priority: P6)
+### User Story 6 - The top bar names the workspace (Priority: P6)
 
-The user glances at the bottom of the screen and reads the path of the workspace they are in, so they can
-tell an assistant, another terminal, or a colleague where the notes are without leaving the tool.
+The user glances at the top-right corner of the screen and reads the path of the workspace they are in,
+so they can tell an assistant, another terminal, or a colleague where the notes are without leaving the
+tool.
 
 **Why this priority**: A small, self-contained addition to an existing bar. Real value — the question
 "which workspace is this?" has no answer inside the tool today — but the cost of not having it is a
 lookup, not a broken flow.
 
-**Independent Test**: Launch the tool against two different workspaces in turn and confirm the bottom bar
-names each one's path, including one workspace whose path contains a space and a non-ASCII character.
+**Independent Test**: Launch the tool against two different workspaces in turn and confirm the top bar
+names each one's path at the right-hand edge, including one workspace whose path contains a space and a
+non-ASCII character, and confirm the bottom bar is unchanged.
 
 **Acceptance Scenarios**:
 
-1. **Given** the tool is launched in a workspace, **When** any screen with a bottom bar is shown, **Then**
-   that bar names the workspace's path.
-2. **Given** the workspace lives under the user's home directory, **When** the path is shown, **Then** it
+1. **Given** the tool is launched in a workspace, **When** the top bar is shown, **Then** it names the
+   workspace's path, aligned to the right-hand edge of the bar.
+2. **Given** the terminal is resized, **When** the redraw completes, **Then** the path is still flush with
+   the right-hand edge — it is anchored to the corner, not placed at a fixed offset.
+3. **Given** the workspace lives under the user's home directory, **When** the path is shown, **Then** it
    is shown in its shortened home form rather than spelled out in full.
-3. **Given** a workspace path too long for the available width, **When** the path is shown, **Then** it is
-   shortened so that the deepest part of the path — the part that identifies the workspace — stays
-   readable, and the bar's help text and version indicator are not pushed off screen or truncated.
-4. **Given** a workspace path containing spaces and non-ASCII characters, **When** it is shown, **Then**
+4. **Given** a workspace path too long for the space left over in the top bar, **When** the path is
+   shown, **Then** it is shortened so that the deepest part of the path — the part that identifies the
+   workspace — stays readable, and the collection names keep their position and full text.
+5. **Given** a workspace path containing spaces and non-ASCII characters, **When** it is shown, **Then**
    it renders correctly and the bar's layout is unaffected.
+6. **Given** the workspace path is displayed, **When** the bottom bar is drawn, **Then** its help text and
+   version indicator occupy exactly the space they did before this feature — no bottom-bar room is spent
+   on the workspace.
 
 ---
 
@@ -296,8 +314,10 @@ empty line one blank line below the last content, then type a character and conf
   confirmation appears.
 - **A confirmation on a terminal too narrow for its question**: the question wraps or shortens, but both
   key labels stay visible — the user is never shown a question with no way to read the options.
-- **The workspace path is the only thing that fits in the bottom bar**: help text is what gives way
-  first; the path and the version indicator do not shrink to nothing.
+- **The top bar is too narrow to hold the collections and the whole path**: the path is what gives way,
+  shortening from the left; the collection names never truncate, since they are what the user navigates
+  by. At the extreme, the path shortens to its final component and no further — it never disappears
+  entirely, because a path that vanishes on a narrow terminal is worse than one that is elided.
 - **A record with no tags and no type**: two empty cells, and the date and title stay in their columns.
 - **Entering edit mode on a file that is not valid markdown or whose frontmatter does not parse**: the
   editor still opens on the raw text and the cursor rule still applies.
@@ -327,7 +347,8 @@ empty line one blank line below the last content, then type a character and conf
 **Deleting records — terminal interface**
 
 - **FR-009**: Pressing `ctrl+d` with a record highlighted in the list MUST raise a confirmation naming
-  the record that will be deleted.
+  the record that will be deleted. That confirmation MUST be the one specified in FR-021–FR-026, not a
+  second dialog of its own.
 - **FR-010**: Confirming MUST delete the record; declining MUST leave the record, the list, and the
   highlight exactly as they were.
 - **FR-011**: After a successful delete, the list MUST refresh, the deleted row MUST be gone, and the
@@ -387,24 +408,27 @@ empty line one blank line below the last content, then type a character and conf
 
 **Workspace path**
 
-- **FR-034**: The bottom bar MUST show the path of the workspace the session is reading.
+- **FR-034**: The top bar MUST show the path of the workspace the session is reading, anchored to the
+  bar's right-hand edge and staying anchored there across terminal resizes.
 - **FR-035**: A path under the user's home directory MUST be shown in its shortened home form.
-- **FR-036**: A path too long for the available width MUST be shortened by eliding from the left, keeping
-  the final component intact and marking the elision visibly, and MUST NOT push the bar's help text or
-  version indicator off screen.
+- **FR-036**: A path too long for the space the top bar has left MUST be shortened by eliding from the
+  left, keeping the final component intact and marking the elision visibly. The collection names MUST
+  keep their position and their full text; the path is what gives way.
 - **FR-037**: Paths containing spaces and non-ASCII characters MUST render correctly.
+- **FR-038**: The workspace path MUST NOT consume any bottom-bar width. The bottom bar's help text and
+  version indicator MUST be unchanged by this feature.
 
 **Cursor placement on entering edit mode**
 
-- **FR-038**: Entering edit mode MUST place the cursor on an empty line separated from the last non-empty
+- **FR-039**: Entering edit mode MUST place the cursor on an empty line separated from the last non-empty
   line of content by exactly one blank line.
-- **FR-039**: When the content already ends in blank lines, the rule MUST resolve against the last
+- **FR-040**: When the content already ends in blank lines, the rule MUST resolve against the last
   non-empty line rather than stacking further blank lines.
-- **FR-040**: Entering edit mode on empty content MUST place the cursor on the first line with nothing
+- **FR-041**: Entering edit mode on empty content MUST place the cursor on the first line with nothing
   inserted above it.
-- **FR-041**: Positioning the cursor MUST NOT by itself count as an unsaved change: entering edit mode
+- **FR-042**: Positioning the cursor MUST NOT by itself count as an unsaved change: entering edit mode
   and leaving without typing MUST raise no confirmation and MUST leave the file on disk unchanged.
-- **FR-042**: The rule MUST apply wherever edit mode is entered, including editing a task's body.
+- **FR-043**: The rule MUST apply wherever edit mode is entered, including editing a task's body.
 
 ### Key Entities
 
@@ -436,8 +460,9 @@ empty line one blank line below the last content, then type a character and conf
   in the product is a bare "OK", "Yes", "No", or "Cancel".
 - **SC-007**: In a list containing records with every combination of missing type and missing tags, a
   value never appears under the wrong header, and the title starts at the same position on every row.
-- **SC-008**: A user can read the workspace path from the screen at any time on a standard 80-column
-  terminal without opening a menu or running a command.
+- **SC-008**: A user can read the workspace path from the top-right corner of the list screen on a
+  standard 80-column terminal without opening a menu or running a command, and the bottom bar shows
+  exactly what it showed before this feature.
 - **SC-009**: Appending a line to an existing note takes zero cursor-movement keystrokes between entering
   edit mode and typing.
 - **SC-010**: Entering and leaving edit mode without typing produces no confirmation and no file write,
@@ -460,8 +485,14 @@ empty line one blank line below the last content, then type a character and conf
 - **Delete takes an id, not a path.** Ids are what `--json` output already exposes and what links already
   resolve against, and one identifier form for all three record types keeps the three delete commands
   identical. A path form for documents was considered and left out as a second way to say the same thing.
-- **The workspace path appears in the same bar as the version indicator**, on every screen that has one,
-  so the answer does not depend on which screen the user happens to be on.
+- **The workspace path lives in the top bar, not the bottom one.** Issue #32 as filed asked for the
+  bottom bar; that was revised during specification. Bottom-bar width is already spent on
+  help text and the version indicator, and the help text is the thing a user reads most often. The top
+  bar has room to the right of the collection names, and a corner is the easiest place on a screen to
+  find something that never moves. The consequence is that the path shows on screens that have a top bar
+  — the list screen today — and not on the full-screen preview and editor, which are transient states the
+  user returns from. That is accepted rather than overlooked: adding a bar to those screens to carry one
+  string would cost more room than it saves.
 - **Cursor placement inserts nothing.** The editor positions the cursor below the content without writing
   blank lines into the buffer, so an untouched document stays untouched. Any trailing blank lines that end
   up in the file arise only from what the user actually types.
@@ -477,11 +508,11 @@ empty line one blank line below the last content, then type a character and conf
 
 - **Issue #57 (editor replaces the preview pane)** was split out of this issue and is *not* part of this
   feature. It touches the `list → preview → edit` model; the two items here that interact with it —
-  cursor placement on entering edit mode (Story 7) and the confirmation the editor raises (Story 4) —
+  cursor placement on entering edit mode (Story 7) and the confirmation the editor raises (Story 1) —
   are specified in terms of *entering edit mode* and *any confirmation*, so they hold whether the editor
   is full-screen or in-pane. If both features are in flight, they touch the same screens and should be
   sequenced rather than developed in parallel.
-- **Issue #38 (delete records)** was closed as a duplicate of #32; its content is folded into Stories 1–3
+- **Issue #38 (delete records)** was closed as a duplicate of #32; its content is folded into Stories 2–4
   and nothing from it is outstanding.
 - **Issue #43 (completed tasks stored outside `tasks.md`)** touches the same file and the same
   "remove a line without losing the surrounding ones" mechanics as task deletion. If both land, the task
@@ -492,7 +523,7 @@ empty line one blank line below the last content, then type a character and conf
   and list do on resume — the same refresh path a delete triggers. Both are in flight for v0.0.3 and
   should be sequenced rather than developed in parallel.
 - **Existing mirror resolution** already has a `dead` outcome for a mirror whose task cannot be found.
-  Story 3 depends on that outcome existing and reuses it rather than introducing a new one.
+  Story 4 depends on that outcome existing and reuses it rather than introducing a new one.
 - **Existing exit-code registry** (`docs/REQUIREMENTS.md` §4.1) covers everything the delete commands
   need; this feature adds no new exit code.
 
@@ -511,7 +542,9 @@ empty line one blank line below the last content, then type a character and conf
   columns are a fixed, sensible default; configuration beyond workspace paths is out of scope by
   Principle III.
 - **Changing which date a row shows or how records are ordered.**
-- **A workspace switcher, or any way to change workspace from inside the tool.** The bottom bar reports
+- **A workspace switcher, or any way to change workspace from inside the tool.** The top bar reports
   the workspace; it does not manage it.
+- **Any other change to the top bar.** The product name, the divider, and the collection names keep their
+  content, order, and position; this feature only adds the path at the right-hand edge.
 - **Any change to what the editor saves, when it saves, or how it handles conflicts.** This feature moves
   a cursor; it does not touch save semantics.

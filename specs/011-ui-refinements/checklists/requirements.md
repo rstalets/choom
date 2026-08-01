@@ -51,6 +51,28 @@
 source issue was resolved as an informed default and written into Assumptions with the rejected
 alternative and the reason.
 
+**Iteration 3** — two revisions after review, both re-validated:
+
+1. *Scope is clearly bounded / requirements are testable* — **story order was wrong for implementation**.
+   Deleting from the list was P1 and the confirmation redesign was P4, so an implementer working in
+   priority order would have wired the delete to the dialog that exists today and then replaced it three
+   stories later — building the confirmation twice and shipping the old style in between. The
+   confirmation is now P1 and the three delete stories follow it as P2–P4. A **Sequencing note** at the
+   head of the user-scenarios section states which dependency is binding and which stories are free to
+   move, and FR-009 now says outright that the delete confirmation is the confirmation specified in
+   FR-021–FR-026, so the dependency survives someone reading the requirements without the stories.
+2. *Requirements are testable and unambiguous* — **Story 6 moved the workspace path from the bottom bar
+   to the top bar**, snapped to the top-right corner, because bottom-bar width is at a premium. Story 6,
+   FR-034/FR-036, the narrow-bar edge case, SC-008, and the Assumptions entry were all rewritten; a new
+   FR-038 makes "spends no bottom-bar width" checkable, and the cursor-placement requirements renumbered
+   to FR-039–FR-043. The Assumptions entry records that the source issue asked for the bottom bar and
+   that this was a deliberate revision, not a misreading.
+
+Note: the Functional Requirements are grouped by theme, so the delete requirements still appear before
+the confirmation ones. That is deliberate — renumbering 27 requirements to mirror story order would
+invalidate every existing cross-reference. Build order is carried by the story priorities, the sequencing
+note, and FR-009's explicit pointer.
+
 ### Terminology note on "implementation details"
 
 The spec names user-facing surfaces — `ctrl+d`, `Esc`, `Enter`, `choom <type> delete <id> --force`,
@@ -65,5 +87,7 @@ design. No module, function, widget, language, or data-structure choice appears.
   with no path form for documents.
 - Entering edit mode positions the cursor without writing blank lines into the buffer, so an untouched
   document is never marked dirty by the placement alone.
+- The workspace path shows only on screens that have a top bar (the list screen today), not on the
+  full-screen preview or editor.
 - Deletion does not scan for inbound links before confirming; dead links are left for the existing link
   check to report.
