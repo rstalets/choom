@@ -39,8 +39,11 @@ def _claude_build_args(prompt: str) -> list[str]:
 
 
 def _copilot_build_args(prompt: str) -> list[str]:
-    # Same reasoning as _claude_build_args, in Copilot CLI's flag shape.
-    return ["-p", prompt, "--allow-tool", "read"]
+    # Same reasoning as _claude_build_args, in Copilot CLI's flag shape. Unlike Claude
+    # Code's `-p` mode, Copilot's `-p` mode prints tool-call status lines and a stats
+    # footer alongside the reply by default; `-s`/`--silent` restricts stdout to just the
+    # agent's response text (see #69).
+    return ["-p", prompt, "--allow-tool", "read", "-s"]
 
 
 PROFILES: tuple[AssistantProfile, ...] = (

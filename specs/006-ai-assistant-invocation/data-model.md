@@ -68,7 +68,7 @@ supporting a new assistant (FR-020).
 | `name` | `display_name` | `binary` | `build_args(prompt)` |
 |---|---|---|---|
 | `claude` | Claude Code CLI | `claude` | `["-p", prompt, "--allowedTools", "Read"]` |
-| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", prompt, "--allow-tool", "read"]` |
+| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", prompt, "--allow-tool", "read", "-s"]` |
 
 Both add a read-only permission flag, in each CLI's own shape — see [research.md](./research.md)
 R2 and R13. Neither grants `Bash`/`Edit`/write: FR-018 ("do not edit any file") is enforced at the

@@ -85,7 +85,7 @@ def test_claude_build_args_grants_read_only_permission() -> None:
 def test_copilot_build_args_grants_read_only_permission() -> None:
     copilot = next(p for p in PROFILES if p.name == "copilot")
     args = copilot.build_args("a prompt")
-    assert args == ["-p", "a prompt", "--allow-tool", "read"]
+    assert args == ["-p", "a prompt", "--allow-tool", "read", "-s"]
 
 
 def test_echo_mode_shows_the_permission_flag_reached_argv(
