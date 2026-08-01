@@ -122,9 +122,14 @@ On entering edit mode, from any entry point including a task body (FR-043):
 
 | Content | Cursor lands |
 |---|---|
-| `"# Notes\nfirst line"` | line 3, column 0 — one blank line below `first line` (FR-039) |
-| `"# Notes\nfirst line\n\n\n"` | one blank line below `first line`; existing trailing blanks are normalised, not stacked (FR-040) |
+| `"# Notes\nfirst line"` | line 4, column 0 — line 2 is the content, **line 3 is a blank separator**, line 4 is the cursor's own empty line (FR-039) |
+| `"# Notes\nfirst line\n\n\n"` | the same line 4; existing trailing blanks are normalised, not stacked (FR-040) |
 | `""` | line 1, column 0; nothing inserted above (FR-041) |
+
+The cursor is **two** lines below the last content line, not one. "One blank line below the content" and
+"the last line of the buffer is empty" are both true of the off-by-one where the cursor sits directly
+under the content — the separating blank line is what distinguishes them, so state it rather than
+counting lines.
 
 The buffer is padded to make that position exist, and `original_text` is set to the padded text, so:
 

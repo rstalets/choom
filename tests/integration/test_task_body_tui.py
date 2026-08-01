@@ -99,9 +99,12 @@ async def test_e_on_a_task_with_a_body_opens_exactly_that_body(tmp_workspace: Wo
 
         assert isinstance(app.screen, EditScreen)
         editor = app.screen.query_one("#editor", TextArea)
-        # One blank line below the body's content, per the cursor-placement
-        # rule (US7, FR-039/FR-043) -- the body itself is unchanged.
-        assert editor.text == "Need the Q3 comparison.\n"
+        # A blank separator line and then the cursor's own line below the body's
+        # content, per the cursor-placement rule (US7, FR-039/FR-043) -- the body
+        # itself is unchanged. Two trailing newlines, not one: a single one would
+        # put the cursor directly under the text with no blank line between.
+        assert editor.text == "Need the Q3 comparison.\n\n"
+        assert app.screen.query_one("#editor", TextArea).cursor_location == (2, 0)
 
 
 async def test_save_lands_in_file_and_pane_with_same_task_highlighted(

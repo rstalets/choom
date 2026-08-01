@@ -224,10 +224,16 @@ the content" requires the lines to exist. The only question is what counts as th
 answering "the buffer as opened" is both the simplest rule and the one that makes FR-042 fall out rather
 than needing a special case.
 
-**Consequence, accepted**: a user who enters edit mode and *saves* without typing writes a file with one
+The padding is **two** empty lines, not one: the first separates the cursor from the content, the second
+is the line the cursor sits on. Padding with a single empty line puts the cursor directly under the last
+content line with nothing between it and the text — which satisfies "the buffer ends in an empty line"
+while failing FR-039, so the separator is what must be asserted, not the line count.
+
+**Consequence, accepted**: a user who enters edit mode and *saves* without typing writes a file with a
 trailing blank line it did not have. That is a save the user asked for, it changes no content, and it is
-idempotent — the second such save writes the same bytes. The alternative, stripping trailing blanks at
-save time, changes what the editor saves, which the spec puts out of scope.
+idempotent — reopening that file normalises the trailing blanks it already has rather than stacking more,
+so the second such save writes the same bytes. The alternative, stripping trailing blanks at save time,
+changes what the editor saves, which the spec puts out of scope.
 
 **Alternatives considered**: *Leave the buffer alone and place the cursor at the end of the last line* —
 no blank line, contradicts FR-039. *Pad the buffer but keep `original_text` as the file text* — every

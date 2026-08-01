@@ -143,6 +143,11 @@ async def test_cursor_lands_one_blank_line_below_existing_content(
         lines = editor.text.split("\n")
         assert row == len(lines) - 1
         assert lines[row] == ""
+        # The separating blank line (FR-039). Without this assertion the test
+        # passes just as happily with the cursor sitting directly under the
+        # content, which is the bug this originally shipped with.
+        assert lines[row - 1] == ""
+        assert lines[row - 2].strip() != ""
 
         # Typing lands exactly where the cursor already is -- appending a
         # thought costs no cursor-movement keystrokes (SC-009).

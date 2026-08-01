@@ -230,8 +230,12 @@ def _pad_for_cursor(text: str) -> tuple[str, int]:
         return "", 0
 
     kept = lines[: last_content + 1]
-    padded = "\n".join([*kept, ""])
-    return padded, len(kept)
+    # Two empties, not one: the first is the blank line that separates the
+    # cursor from the content, the second is the line the cursor sits on.
+    # Padding with a single empty puts the cursor directly under the last
+    # content line with nothing between, which is the state FR-039 rules out.
+    padded = "\n".join([*kept, "", ""])
+    return padded, len(kept) + 1
 
 
 class EditScreen(Screen[None]):
