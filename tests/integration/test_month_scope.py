@@ -69,23 +69,35 @@ def _counting_scan_calls(monkeypatch: pytest.MonkeyPatch) -> Iterator[list[str]]
     a filter hydration performs -- rather than raw file reads, so the count is
     not muddied by the one, unrelated file the preview pane reads on every
     render (`render_preview_markdown`, wholly outside the cache this test
-    protects)."""
+    protects).
+
+    Patches the names in **both** `choom.tui.list_screen` (the hydration
+    worker's `scan_month`/`scan_unfiled`) and `choom.tui.app` (the fallback
+    `ChoomApp.visible_documents()`/`_filtered_documents()` scan) -- each
+    module did its own `from choom.core.documents import scan_month,
+    scan_unfiled`, which binds a separate name in each module's namespace at
+    import time. Patching only one leaves the other's calls invisible to the
+    counter, which would let exactly the regression this helper exists to
+    catch -- `refresh_rows` falling back to a fresh scan instead of the
+    hydrated pool -- pass unnoticed."""
+    import choom.tui.app as app_module
     import choom.tui.list_screen as list_screen_module
 
     calls: list[str] = []
-    original_scan_month = list_screen_module.scan_month
-    original_scan_unfiled = list_screen_module.scan_unfiled
 
-    def counting_scan_month(*args: object, **kwargs: object) -> object:
-        calls.append("scan_month")
-        return original_scan_month(*args, **kwargs)  # type: ignore[arg-type]
+    def _wrap(owner: object, name: str) -> None:
+        original = getattr(owner, name)
 
-    def counting_scan_unfiled(*args: object, **kwargs: object) -> object:
-        calls.append("scan_unfiled")
-        return original_scan_unfiled(*args, **kwargs)  # type: ignore[arg-type]
+        def counting(*args: object, **kwargs: object) -> object:
+            calls.append(name)
+            return original(*args, **kwargs)  # type: ignore[no-any-return]
 
-    monkeypatch.setattr(list_screen_module, "scan_month", counting_scan_month)
-    monkeypatch.setattr(list_screen_module, "scan_unfiled", counting_scan_unfiled)
+        monkeypatch.setattr(owner, name, counting)
+
+    for owner in (list_screen_module, app_module):
+        _wrap(owner, "scan_month")
+        _wrap(owner, "scan_unfiled")
+
     yield calls
 
 
@@ -154,7 +166,19 @@ async def test_typing_a_filter_term_does_not_rescan_per_keystroke(
     `app.visible_documents()` while a filter is active -- turning every
     keystroke back into a full collection scan -- would actually be caught.
     Do not "simplify" this to `type_command`; that would silently delete the
-    coverage."""
+    coverage.
+
+    Not asserting "zero scans while typing": the verb `filter ` completes
+    with an empty term one keystroke before the first character of the
+    search text, and an empty filter term shows the plain month scope (FR-019)
+    -- `_hydrated_pool()` returns `None` for it, on purpose, and the render
+    falls through to `ChoomApp.visible_documents()`'s scoped single-month
+    read. That is one call, not a collection-wide rescan, and it happens
+    exactly once, at exactly that keystroke. Documented and asserted for
+    explicitly, so it reads as expected behaviour rather than a leak; the
+    property this test actually protects is what happens once the term is
+    non-empty, where the hydrated pool must answer every further keystroke on
+    its own -- no scan at all, scoped or collection-wide."""
     now = datetime.now()
     workspace = generate(tmp_path, 60, spread_months=6, now=now, current_month_count=5)
 
@@ -168,7 +192,16 @@ async def test_typing_a_filter_term_does_not_rescan_per_keystroke(
             after_open = len(calls)
             assert after_open > 0  # the hydration itself scanned
 
-            await type_literally(pilot, "filter meeting 1")
+            await type_literally(pilot, "filter ")
+            await pilot.pause()
+            # The verb just completed with an empty term -- exactly one
+            # scoped month read, not a rescan of the collection.
+            after_empty_term = len(calls)
+            assert after_empty_term - after_open == 1
+
+            await type_literally(pilot, "meeting 1")
             await pilot.pause()
 
-            assert len(calls) == after_open
+            # Every keystroke from here on has a non-empty term: the
+            # hydrated pool answers all of them, with no scan at all.
+            assert len(calls) == after_empty_term
