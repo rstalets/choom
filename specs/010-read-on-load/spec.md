@@ -68,12 +68,12 @@ guess that navigating away and back is what refreshes things. It is a genuine im
 workspace story but not a correctness fix, and it depends on US1 having removed the cache first.
 
 **Independent Test**: Park the app on a list, change the workspace from another process, touch nothing, and
-confirm the list catches up within roughly ten seconds. Testable in isolation once US1 has landed.
+confirm the list catches up within a couple of seconds. Testable in isolation once US1 has landed.
 
 **Acceptance Scenarios**:
 
 1. **Given** the Tasks list is open and untouched, **When** another process completes a task, **Then** the
-   list shows it as done within approximately ten seconds without any user input.
+   list shows it as done within approximately two seconds without any user input.
 2. **Given** a list is open and nothing in the workspace has changed, **When** the refresh interval elapses,
    **Then** the view does not visibly change — no flicker, no scroll jump, no re-render.
 3. **Given** the user has a row selected partway down a list, **When** a refresh adds a document that sorts
@@ -129,8 +129,13 @@ of US1 and US2 once the cache is gone.
   not steal focus, close the bar, or discard the term in progress.
 - **A refresh lands while a confirmation dialog is open.** The dialog stays; the list behind it is not
   re-rendered in a way that changes what the dialog refers to.
-- **A refresh lands while a filter is active.** The refresh applies to what is displayed — the filtered set —
-  and the filter term is not cleared.
+- **A filter is active.** Periodic refresh is suspended while a filter is showing. A filtered view is a
+  full-collection read on every tick, and it answers a point-in-time question the same way the preview does;
+  it reconciles when the filter is cleared, which restores the month scope and takes a normal scoped read.
+  The filter term is never cleared by a refresh.
+- **Scrolling a very large month.** The periodic read happens on the same thread that draws the screen, so a
+  month large enough to scan slowly could be felt as a stutter while a movement key is held. The budget in
+  SC-003 is what keeps this out of reach at the sizes choom targets.
 - **An empty month or an empty workspace.** The empty-state message renders on every load, and a refresh that
   finds nothing does not replace it with an error.
 - **Very large workspaces.** Well beyond the hundreds-to-low-thousands the tool targets, a per-load scan will
@@ -162,11 +167,12 @@ of US1 and US2 once the cache is gone.
 **Keeping an open view current (US2)**
 
 - **FR-009**: While a list view is displayed, choom MUST re-read and re-render it periodically without user
-  input, at an interval of approximately ten seconds.
+  input, at an interval of approximately two seconds.
 - **FR-010**: A periodic refresh that finds no change MUST NOT alter what the user sees in any way.
 - **FR-011**: A periodic refresh MUST preserve the user's selection by identity, so a record that moves
   position stays selected.
-- **FR-012**: A periodic refresh MUST NOT run while a document is being read in the preview or edited.
+- **FR-012**: A periodic refresh MUST NOT run while a document is being read in the preview or edited, nor
+  while a filter is active.
 - **FR-013**: A periodic refresh MUST NOT take focus, dismiss an open command bar or dialog, clear an active
   filter term, or interrupt typing.
 - **FR-014**: The refresh interval MUST NOT be user-configurable; a sensible default is the whole of it
@@ -210,7 +216,7 @@ of US1 and US2 once the cache is gone.
 - **SC-004**: On a workspace of 1,000 documents, opening the command bar never delays the keypress that opens
   it, and the first filter term returns matches in under 500 ms.
 - **SC-005**: A change made by another process to a view the user is looking at, untouched, becomes visible
-  within 15 seconds.
+  within 5 seconds.
 - **SC-006**: A refresh of an unchanged workspace produces no visible change and no loss of selection, across
   100 consecutive refreshes.
 - **SC-007**: No sequence of in-app actions leaves a list disagreeing with the files on disk. Verified against
@@ -224,12 +230,14 @@ of US1 and US2 once the cache is gone.
 - **Workspace size**: hundreds to low thousands of files, as the constitution assumes. The measurements in
   issue #51 — 2.95 ms to read 1,000 tasks, 29.4 ms to scan a 200-document month, 144 ms for a full
   1,000-document collection scan — are the basis for the budgets above.
-- **Refresh interval**: approximately ten seconds, chosen as fast enough to feel live and slow enough that the
-  background cost is negligible. Not configurable, per Principle III.
+- **Refresh interval**: approximately two seconds. A scoped month read costs 29.4 ms at 200 documents and a
+  task read 2.95 ms at 1,000 tasks, so a 2-second cadence spends under 2% of one core in the worst case and
+  far less typically — the interval is set by what feels immediate, not by what the disk can afford. Not
+  configurable, per Principle III.
 - **Preview is read-on-open but not on a timer**: re-rendering a body someone is mid-read on is disruptive in
   a way a list re-sort is not, and a preview reconciles the next time it is opened — which, with read-on-load,
   is every time. Settled in refinement on issue #51.
-- **No filesystem watcher**: the ten-second window is accepted rather than closed. A watcher means background
+- **No filesystem watcher**: the two-second window is accepted rather than closed. A watcher means background
   work, new state, and invalidation logic that can be wrong while looking authoritative — the grounds on which
   issue #27 rejected a stored backlink index. The timer introduces no new state: it performs the same read a
   view load performs, on a schedule.
