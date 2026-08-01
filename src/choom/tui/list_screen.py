@@ -117,6 +117,10 @@ class ListScreen(Screen[None]):
         self._pending_select_id: str | None = None
         self._preview_links_expanded = False
         self._pending_error: str | None = None
+        #: The warning count from `refresh_rows`'s own read, kept as render
+        #: output so `_render_status` -- called on every command-bar keystroke
+        #: via `ModeChanged` -- never triggers a scan of its own (research R3).
+        self._warning_count = 0
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
@@ -194,6 +198,7 @@ class ListScreen(Screen[None]):
                         index = i
                         break
             list_view.index = index
+        self._warning_count = len(app.visible_warnings())  # type: ignore[attr-defined]
         self._update_preview()
         self._render_status()
 
@@ -226,7 +231,7 @@ class ListScreen(Screen[None]):
         active = self.app.active  # type: ignore[attr-defined]
         help_text = TASK_LIST_HELP if active == "tasks" else LIST_HELP
         text = f"{collection_indicator(active)}   {help_text}"
-        warnings = len(self.app.visible_warnings())  # type: ignore[attr-defined]
+        warnings = self._warning_count
         if warnings:
             text += f"   {warnings} warning{'s' if warnings != 1 else ''}"
         status.update(text)
@@ -448,7 +453,11 @@ class ListScreen(Screen[None]):
 
             document = event.item.document
             self._pending_select_id = document.id
-            self.app.push_screen(PreviewScreen(document.path, document))
+            # Read fresh rather than pass the row's `Document` -- matches
+            # `action_open_preview`/`_open_link_target`, so every path into the
+            # preview shows the file as it is now, not as it was when this row
+            # was rendered (010-read-on-load, research R7, FR-003).
+            self.app.push_screen(PreviewScreen(document.path, _read_document(document.path)))
 
     # --- command bar --------------------------------------------------------
 
