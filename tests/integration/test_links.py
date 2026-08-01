@@ -210,7 +210,7 @@ async def test_outbound_links_render_on_expanding_the_section(tmp_workspace: Wor
         links_section = app.screen.query_one("#links-section")
         assert links_section.display is False  # collapsed on open
 
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         assert links_section.display is True
@@ -235,7 +235,7 @@ async def test_inbound_links_appear_only_once_expanded(tmp_workspace: Workspace)
         links_section = app.screen.query_one("#links-section")
         assert links_section.display is False
 
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         list_view = app.screen.query_one("#links-list", ListView)
@@ -254,7 +254,7 @@ async def test_a_record_nothing_points_at_says_so(tmp_workspace: Workspace) -> N
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         list_view = app.screen.query_one("#links-list", ListView)
@@ -275,7 +275,7 @@ async def test_opening_a_dead_link_reports_and_does_not_change_the_view(
         await to_collection(app, pilot, "notes")
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         from endpaper.tui.preview_screen import PreviewScreen
@@ -315,7 +315,7 @@ async def test_escape_collapses_the_links_section_without_leaving_preview(
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         assert app.screen.query_one("#links-section").display is True
@@ -348,7 +348,7 @@ async def test_jk_move_within_the_links_section(tmp_workspace: Workspace) -> Non
         await to_collection(app, pilot, "notes")
         await pilot.press("enter")
         await pilot.pause()
-        await pilot.press("l")
+        await pilot.press("b")
         await pilot.pause()
 
         list_view = app.screen.query_one("#links-list", ListView)

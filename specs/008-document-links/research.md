@@ -424,5 +424,5 @@ flagged is settled above:
 | Does `links:` break existing task lines? | R7 — no; and it fixes a live trap |
 | Command shape and exit codes | R8 — reserved words made safe by R6 |
 | Does `AGENTS.md` still fit the budget? | R9 — yes, but only with deliberate cuts |
-| TUI binding and footer budget | R10 — `l`, 63 chars |
+| TUI binding and footer budget | R10 — `l`, later rebound to `b`; 67 chars |
 | Duplicate ids; `/link` ambiguity | R11 — deterministic + warning; report, don't pick |

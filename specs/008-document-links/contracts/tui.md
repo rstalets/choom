@@ -17,15 +17,25 @@ A collapsible region inside the existing `PreviewScreen`. **Not a fourth state.*
 
 | Key | State | Action | In footer |
 |---|---|---|---|
-| `l` | Preview | Toggle the Links section | Yes |
+| `b` | Preview | Toggle the Links section | Yes |
 | `↑` / `↓`, `j` / `k` | Links section focused | Move between links | Yes |
 | `enter` | Links section focused | Open the selected record | Yes |
 | `o` | Links section focused | Alias for `enter` | Yes (as `enter/o open`) |
 | `esc` | Links section focused | Collapse the section, stay in preview | Yes |
 
-`l` is chosen deliberately, not because it was free. In the list screen `h`/`l` already move between
-panes, so `l` reads as "move rightward into a pane" throughout the app; using it for "open the links
-pane" is consistent rather than colliding. No modifier keys. `ctrl+c` and `ctrl+q` are untouched.
+`b` (for backlinks), after `l` was tried and rejected in use. Two problems with `l`, both found by
+running the app rather than reading the code:
+
+- **It is unreadable in the footer.** `l links` renders as `1 links` in most terminal fonts, so the
+  binding hint reads as a *count* of links and nobody presses anything. A hint that cannot be read is
+  a hint that does not exist.
+- **`l` already means something else.** The list screen binds `h`/`l` to pane movement
+  (`list_screen.py`), so `l` reads as "move rightward into a pane" everywhere else in the app. An
+  earlier draft of this contract called that consistent; it is a collision of meaning, and it is what
+  kept the Links section out of the list screen's preview pane, where `l` is taken.
+
+`b` is free in both screens, is not a digit lookalike, and names what the section is mostly for. No
+modifier keys. `ctrl+c` and `ctrl+q` are untouched.
 
 ### Footer budget
 
@@ -34,7 +44,7 @@ This is a real constraint, enforced by `tests/unit/test_footer_bindings.py`.
 | State | Help text | Width |
 |---|---|---|
 | Preview (today) | `e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit` | 53 |
-| Preview (new) | `e edit   l links   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit` | 63 |
+| Preview (new) | `e edit   b backlinks   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit` | 67 |
 | Links section focused | `↑↓ move   enter/o open   esc close   ctrl+q quit` | ~46 |
 
 The section swaps the help string rather than appending to it, so the footer never overflows — the

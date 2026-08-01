@@ -53,7 +53,7 @@ def test_footer_advertises_every_shown_binding(screen_cls: type, help_text: str)
 
 
 def test_preview_help_advertises_the_links_toggle() -> None:
-    assert "l links" in PREVIEW_HELP
+    assert "b backlinks" in PREVIEW_HELP
 
 
 def test_links_section_help_advertises_move_open_and_close() -> None:

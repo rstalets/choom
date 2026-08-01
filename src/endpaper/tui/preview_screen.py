@@ -82,7 +82,7 @@ def _describe_link_source(workspace: Workspace, link: Link) -> LinkTarget:
 class PreviewScreen(Screen[None]):
     BINDINGS = [
         Binding("e", "edit", "Edit", show=True),
-        Binding("l", "toggle_links", "Links", show=True),
+        Binding("b", "toggle_links", "Backlinks", show=True),
         Binding("escape", "close_preview", "Back", show=True),
         Binding("j", "links_cursor_down", "Down", show=False),
         Binding("k", "links_cursor_up", "Up", show=False),
