@@ -1,6 +1,6 @@
 ---
 name: "demo"
-description: "Create a throwaway endpaper workspace under /tmp and populate it with realistic meetings, notes, and tasks -- including cross-record links -- for writing help docs or giving a demonstration."
+description: "Create a throwaway endpaper workspace under /tmp, populate it with realistic meetings, notes, and tasks -- including cross-record links -- and hand back ready-to-use prompts for exercising an AI assistant against it."
 argument-hint: "[path] (default: a fresh /tmp/endpaper-demo-<timestamp> directory)"
 metadata:
   author: "endpaper"
@@ -14,6 +14,12 @@ Stand up a disposable endpaper workspace populated with enough realistic, varied
 demonstrate every shipped feature at once -- multiple meeting/note types, multi-month history,
 tagging, open and completed tasks with bodies, and cross-record markdown links -- so it can be
 used for screenshots, docs, or a live walkthrough without hand-typing sample data.
+
+It also has a second job: this workspace is a natural test bed for an AI assistant working
+non-interactively in an endpaper vault (the whole point of `AGENTS.md`, `--json`, and the
+CLI-first design). So the skill's last step hands back a list of prompts -- referencing the
+actual names, dates, and topics it just created -- that someone can paste into an assistant
+session to watch it search, cross-reference, and write into the vault.
 
 This workspace lives under `/tmp`. It is scratch content, not part of the repo -- don't create it
 inside a git worktree, and don't commit anything from it.
@@ -99,6 +105,17 @@ and one untyped) and note types (several `research`/`decision`/similar, plus at 
 note per represented month), reusing a handful of tags across records (e.g. `platform`,
 `procurement`, `onboarding`) so tag-filtering has something real to demonstrate.
 
+Compute all dates relative to **today** (`date` arithmetic, not hardcoded years) -- the demo
+prompts in Step 9 will reference "last week" and similar, and those only make sense if the
+underlying dates actually are last week relative to whenever this skill runs.
+
+**Name at least one person explicitly**, on a `1on1` or `vendor` meeting dated within the last
+7 days (e.g. "1:1 with Bob" or "Vendor sync with Priya from Acme"). Give that meeting a body that
+raises something actionable (a question to research, a decision pending data), and make sure a
+task or note elsewhere in the workspace plausibly follows from it -- this is what makes a prompt
+like "find the meeting I had with Bob last week and do the research it calls for" resolvable
+against real content instead of hypothetical content.
+
 ## Step 5 — Give records actual body content
 
 A record with an empty body (all a fresh CLI-created file has) doesn't demonstrate the markdown
@@ -157,3 +174,30 @@ task, at least one task with a body). Then tell the user:
 - The workspace path, and that `cd <path> && endpaper` opens the TUI.
 - A quick tally: meetings/notes per month, task counts (open/done), which records carry links.
 - That the directory is scratch and safe to delete when they're done with it.
+
+## Step 9 — Hand back demo prompts
+
+Write a short list (6-10) of natural-language prompts someone can hand to an AI assistant
+(Claude Code, Copilot, whatever's `cd`'d into the workspace) to exercise it end-to-end. These
+must reference the **specific** content just created -- names, meeting types, tags, dates -- not
+generic placeholders, so they resolve to a real answer instead of requiring the tester to go
+look up what exists first.
+
+Cover a spread of interaction shapes, not just lookups:
+
+- **Find + act + create**, the flagship multi-step case: e.g. "Find the meeting I had with Bob
+  last week, do the research it calls for, and write up a new note with what you find."
+- **Simple query**: e.g. "What are my incomplete to-dos?" or "What did we decide in the retro
+  last month?"
+- **Filtered browse**: e.g. "Show me everything tagged #procurement." (use a tag actually used
+  in Step 4/6)
+- **Follow a link**: e.g. "Open the task linked from last week's vendor sync and tell me what's
+  blocking it." (only if Step 7 actually produced a link there)
+- **Write/update**: e.g. "Mark the 'write onboarding doc' task done and add a note about how it
+  went." (use a task description actually created)
+- **Cross-record synthesis**: e.g. "Summarize everything related to the Acme renewal across
+  meetings, notes, and tasks."
+
+Present these as a plain numbered list in your final message (not just left in a file) --
+they're meant to be copy-pasted immediately into whatever assistant session is testing the
+workspace.
