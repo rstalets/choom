@@ -84,7 +84,7 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(
 def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
     tmp_workspace: Workspace,
 ) -> None:
-    original = "- [ ] existing <!-- id:t_aaaa -->"
+    original = "- [ ] existing <!-- id:task_aaaa -->"
     write_raw(tasks_file(tmp_workspace), original, newline="\n")
 
     add_task(tmp_workspace, "new task")
@@ -181,7 +181,7 @@ def test_body_bearing_fixtures_survive_a_full_read_and_toggle_cycle(
 def test_read_only_file_degrades_gracefully(cli) -> None:
     tasks_path = cli.root / "tasks.md"
     tasks_path.write_text(
-        "- [ ] bare task\n- [ ] typed task <!-- id:t_fixed -->\n",
+        "- [ ] bare task\n- [ ] typed task <!-- id:task_fixed -->\n",
         encoding="utf-8",
         newline="\n",
     )
@@ -200,10 +200,80 @@ def test_read_only_file_degrades_gracefully(cli) -> None:
         assert bare["id"] is None
         assert result.err != ""
 
-        result = cli("task", "done", "t_fixed")
+        result = cli("task", "done", "task_fixed")
         assert result.exit_code == 3
     finally:
         os.chmod(tasks_path.parent, tasks_dir_mode)
         os.chmod(tasks_path, original_mode)
 
     assert tasks_path.read_bytes() == before
+
+
+def test_hand_written_links_field_survives_a_task_done_round_trip(
+    tmp_workspace: Workspace,
+) -> None:
+    original = (
+        "# Tasks\n\n"
+        "- [ ] call Terry "
+        "<!-- id:task_a1b2 links:meeting_20260728_a1b2c3d4 created:2026-07-30 -->\n"
+        "- [ ] untouched line one <!-- id:task_yyyy -->\n"
+        "- [x] untouched line two <!-- id:task_zzzz -->\n"
+    )
+    write_tasks(tmp_workspace, original)
+
+    tasks_before, warnings_before = load_tasks(tmp_workspace)
+    assert warnings_before == []
+    target = next(t for t in tasks_before if t.id == "task_a1b2")
+    assert target.links == ("meeting_20260728_a1b2c3d4",)
+
+    set_task_state(tmp_workspace, "task_a1b2", done=True)
+
+    text_after = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    assert "links:meeting_20260728_a1b2c3d4" in text_after
+    assert "- [x] call Terry" in text_after
+    # every other line is byte-identical -- only the one checkbox character moved
+    assert "- [ ] untouched line one <!-- id:task_yyyy -->\n" in text_after
+    assert "- [x] untouched line two <!-- id:task_zzzz -->\n" in text_after
+
+    tasks_after, warnings_after = load_tasks(tmp_workspace)
+    assert warnings_after == []
+    target_after = next(t for t in tasks_after if t.id == "task_a1b2")
+    assert target_after.links == ("meeting_20260728_a1b2c3d4",)
+    assert target_after.done is True
+
+
+def test_tasks_md_with_no_links_anywhere_is_byte_identical_after_read_write(
+    tmp_workspace: Workspace,
+) -> None:
+    original = (
+        "- [ ] one <!-- id:task_0001 created:2026-07-20 -->\n"
+        "- [ ] two <!-- id:task_0002 type:followup created:2026-07-21 -->\n"
+    )
+    write_tasks(tmp_workspace, original)
+
+    tasks, warnings = load_tasks(tmp_workspace)
+    assert warnings == []
+    assert all(t.links == () for t in tasks)
+    assert tmp_workspace.tasks_file.read_text(encoding="utf-8") == original
+
+    set_task_state(tmp_workspace, "task_0001", done=True)
+    text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    assert "links:" not in text
+
+
+def test_tasks_md_remains_valid_commonmark_with_a_links_field(
+    tmp_workspace: Workspace,
+) -> None:
+    original = (
+        "# Tasks\n\n"
+        "- [ ] call Terry <!-- id:task_a1b2 links:meeting_1,note_2 created:2026-07-30 -->\n"
+    )
+    write_tasks(tmp_workspace, original)
+
+    text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        assert stripped.startswith(("- [ ]", "- [x]", "- [X]"))
+    assert "<!--" in text and "-->" in text  # metadata stays inside an HTML comment

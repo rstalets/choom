@@ -1,20 +1,25 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 
 from textual.widgets import Static
 
 from endpaper import __version__
 
 LIST_HELP = (
-    "tab collection   / filter or command   ↑↓/jk move   h/l pane   "
-    "enter open   e edit   ctrl+q quit"
+    "tab collection   / filter   ↑↓/jk move   h/l pane   "
+    "enter open   e edit   b backlinks   ctrl+q quit"
 )
 TASK_LIST_HELP = (
-    "tab collection   / filter or command   ↑↓/jk move   h/l pane   e edit   "
-    "space toggle   ctrl+q quit"
+    "tab collection   / filter   ↑↓/jk move   h/l pane   e edit   "
+    "space toggle   b backlinks   ctrl+q quit"
 )
-PREVIEW_HELP = "e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+PREVIEW_HELP = "e edit   b backlinks   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+#: Swapped in for PREVIEW_HELP while the Links section has focus, the same way
+#: EDIT_HELP is a whole separate string rather than an append -- the footer must
+#: never grow past what fits, so the two never concatenate (research R10).
+LINKS_SECTION_HELP = "↑↓ move   enter/o open   esc close   ctrl+q quit"
 EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
 
 #: Shown in the status bar while `/ai` is in flight (contracts/editor-commands.md). One
@@ -69,6 +74,18 @@ def in_flight_status(breadcrumb: str, width: int) -> str:
 
 def collection_indicator(active: str) -> str:
     return f"[{active}]"
+
+
+def link_no_match_status(query: str) -> str:
+    """`/link` found nothing matching `query` (FR-044). The line is left exactly
+    as typed; this just names the failure."""
+    return f"no record matches {query!r}"
+
+
+def link_ambiguous_status(candidates: Sequence[str]) -> str:
+    """`/link` matched more than one record. Names every candidate so the user
+    can retype with more specific terms rather than facing a picker (FR-044)."""
+    return f"{len(candidates)} records match -- retype with more terms: {', '.join(candidates)}"
 
 
 def render_version() -> str:

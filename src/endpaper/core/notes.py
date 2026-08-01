@@ -23,7 +23,7 @@ from endpaper.core.models import (
 )
 from endpaper.core.text import new_document_id
 
-NOTES = Collection("n_", "notes", ("notes",), frozenset({"daily"}))
+NOTES = Collection("note_", "notes", ("notes",), frozenset({"daily"}))
 
 
 def create_note(

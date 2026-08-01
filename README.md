@@ -40,6 +40,13 @@ uv tool install endpaper
 
 ### Create a workspace
 
+**Cloud-synced folder? Pin it to this device first.** endpaper has no index — every command
+reads whichever files are actually present, so a file that is only a cloud placeholder is
+invisible to it, and to any assistant reading the folder. Turn off on-demand/online-only
+storage for the workspace folder: **OneDrive** → "Always keep on this device"; **Dropbox** →
+"Make available offline"; **Google Drive** → "Available offline"; **iCloud Drive** → keep it
+downloaded and exclude it from "Optimize Mac Storage" (or it may be evicted later).
+
 ```bash
 mkdir notes && cd notes
 endpaper init

@@ -135,10 +135,13 @@ TUI:  /task.<type> <description> #<tag>
 CLI:  endpaper task add <description> --type <type> --tag <tag>
 ```
 
-- Tasks are standalone in v0.0.1 — not attached to a meeting or note.
+- A task may optionally name the records it came from via a `links:` field (see 4.6.1) —
+  comma-separated ids, never paths, since the id prefix already says which collection to look in.
 - Stored as markdown checkboxes in a single file, `tasks.md`, one per line:
-  `- [ ] send the vendor comparison <!-- id:t_a1b2 type:followup tags:procurement created:2026-07-28 -->`
-- The HTML comment carries metadata without breaking rendering in any markdown viewer.
+  `- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup tags:procurement links:meeting_20260728_a1b2c3d4 created:2026-07-28 -->`
+- The HTML comment carries metadata without breaking rendering in any markdown viewer. Field
+  order is `id`, `type`, `tags`, `links`, `created`; empty fields are omitted, so a task with no
+  links renders exactly as it did before this field existed.
 - **The parser must tolerate hand-editing of `tasks.md`.** Users will edit this file directly, in endpaper and elsewhere. Therefore:
   - A checkbox line with no id comment is valid. On scan, generate an id and write it back.
   - A line with a malformed or partial comment is skipped, not fatal. Log it and continue parsing the rest of the file.
@@ -160,7 +163,7 @@ CLI:  endpaper task list [--json] [--all] [--tag] [--type]
 **Acceptance criteria**
 
 1. `space` on a task in the TUI changes `- [ ]` to `- [x]` in `tasks.md` within one second, preserving the id comment.
-2. `endpaper task done t_a1b2` produces the identical file change.
+2. `endpaper task done task_a1b2` produces the identical file change.
 3. `tasks.md` remains valid CommonMark and renders as a checklist in any markdown viewer.
 4. The task parser reads checkboxes by scanning markdown, not by reading a database — so that v0.1 can extend it to any file without a migration.
 5. A hand-written line `- [ ] buy milk` with no id comment is picked up on the next scan and given an id, in place, without disturbing surrounding lines.
@@ -304,7 +307,7 @@ Frontmatter — exactly these fields, no more:
 
 ```yaml
 ---
-id: m_20260728_a1b2c3d4
+id: meeting_20260728_a1b2c3d4
 type: standup
 title: Q3 planning
 tags: [platform]
@@ -335,6 +338,22 @@ updated: 2026-07-28T09:41:00
 - **Partitions are created on demand and never pruned.** Writing the first file of a month creates its directory; nothing creates directories in advance, and an empty partition left behind by a deleted file is harmless and is left alone.
 - **Scans are recursive.** Reading a collection means walking its whole subtree, not listing one directory. A file the user has filed under the wrong month still lists — its date comes from frontmatter, never from its path. endpaper never moves a file to match its partition.
 - Paths must stay well under the Windows 260-character limit — assume the root is already something like `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\`. The partition adds 8 characters (`/YYYY/MM`), taking the worst-case generated path from 107 to 115 characters below the workspace root.
+
+#### 4.6.1 Document links
+
+Any record may point at any other, as an ordinary CommonMark inline link: `[text](path#id)`.
+
+```markdown
+See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20260728_a1b2c3d4).
+```
+
+- **The `#id` fragment is authoritative and permanent.** It is what endpaper resolves against; the path is never consulted when the id resolves.
+- **The path is derived, not authored.** It is the relative path from the linking file to the target, computed by endpaper and repaired whenever it goes stale — a link may be written with no path at all (`[text](#id)`), and gains the correct one on the next save.
+- **Repair is a byte-level splice.** Only the destination between `(` and `)` changes; link text, surrounding prose, and line endings are untouched. A link is never rewritten by re-rendering the document.
+- **A link that cannot be resolved is dead, not an error.** It is left byte-identical and reported — `endpaper links check` and `endpaper links heal` distinguish *stale* (id resolves, path wrong — mechanically fixable) from *dead* (id resolves to nothing — needs a human decision).
+- **Inbound links are never stored.** `endpaper links <id>` and the preview pane's Links section answer "what points at this record" by scanning the workspace at the moment they are asked, the same way `meeting list` scans a collection. No index, no cache, no back-reference written into any target.
+- Text inside a fenced code block or an inline code span is never treated as a link — a note that documents link syntax is not rewritten.
+- A task may carry links too, via the `links:` field on its checkbox line (3.3) — bare ids, never paths, since a task line is already one line of metadata.
 
 ### 4.7 Platform and environment
 
