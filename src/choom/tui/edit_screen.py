@@ -524,7 +524,10 @@ class EditScreen(Screen[None]):
             return
 
         prompt = compose_prompt(
-            parsed.argument, self.target.display_path, self.target.ai_line_offset + line_index + 1
+            parsed.argument,
+            self.target.display_path,
+            self.target.ai_line_offset + line_index + 1,
+            task_capture=self.target.captures_tasks,
         )
         request = start_request(
             resolved.profile,

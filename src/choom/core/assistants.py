@@ -35,6 +35,15 @@ do not see it anywhere first.
 - Do not edit any file. The document is open in an editor whose unsaved buffer
   overwrites the file on the next save, so any edit you make is discarded."""
 
+_TASK_SYNTAX = """\
+- Writing a task is not editing a file: on a line of its own, unindented and
+  outside any code fence, you may write `/task <description>` or
+  `/task.<type> <description>` -- e.g. `/task.followup call Terry about the
+  renewal`. Any `#tags` inside the description are lifted out and attached to
+  the task rather than kept in its text. choom creates the task and replaces
+  that line with a link to it, so write the surrounding prose as if the link
+  is already there. This is optional -- most replies need none."""
+
 
 def _claude_build_args(prompt: str) -> list[str]:
     # Read-only: the composed prompt tells the assistant to read the saved document to
@@ -144,7 +153,7 @@ def resolve_assistant(configured: str | None) -> ResolvedAssistant:
     return ResolvedAssistant(profile=None, source="unset", available=available)
 
 
-def compose_prompt(user_prompt: str, document: Path, line: int) -> str:
+def compose_prompt(user_prompt: str, document: Path, line: int, *, task_capture: bool) -> str:
     """Build the text handed to the assistant.
 
     Prepends the instructions required by FR-010 -- that the reply is inserted directly
@@ -155,9 +164,19 @@ def compose_prompt(user_prompt: str, document: Path, line: int) -> str:
     `line` is the 1-based line number of the `/ai` line in the file as saved, counted over
     the whole file including frontmatter, so the assistant can resolve positional requests
     like "the paragraph above" or "lines 15-18" (FR-009).
+
+    `task_capture` is required rather than defaulted: a caller that forgets it would either
+    promise a capability that silently does nothing (default True) or make the feature's
+    absence the failure a test is least likely to catch (default False) -- research R3. When
+    `True`, one identical clause is appended after "Do not edit any file", stating both task
+    forms, that `#tags` are lifted out, that the line must be the whole line and unindented
+    and outside a fence, that choom replaces it with a link, and that it is optional
+    (FR-001 - FR-006). The clause never varies by assistant. When `False`, the prompt is
+    byte-identical to what this function produced before the clause existed.
     """
+    instructions = f"{_INSTRUCTIONS}\n\n{_TASK_SYNTAX}" if task_capture else _INSTRUCTIONS
     return (
-        f"{_INSTRUCTIONS}\n\n"
+        f"{instructions}\n\n"
         f"The user's document has just been saved to:\n"
         f"  {document}\n\n"
         f"The request is on line {line} of that file. Content above that line comes before it\n"
