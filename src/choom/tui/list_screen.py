@@ -3,17 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.timer import Timer
 from textual.widgets import Label, ListItem, ListView, Markdown
+from textual.worker import Worker, WorkerCancelled, WorkerFailed
 
-from choom.core.documents import _read_document
+from choom.core.documents import _read_document, scan_month, scan_unfiled
 from choom.core.links import resolve_href
-from choom.core.models import Document, LinkTarget, Task, Workspace, YearMonth
+from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
 from choom.tui.command_bar import CommandBar
 from choom.tui.help_screen import HelpScreen
@@ -155,6 +156,12 @@ class ListScreen(Screen[None]):
         #: screen, or dialog is on top (research R5) so no tick fires while
         #: this screen is not what the user is looking at.
         self._refresh_timer: Timer | None = None
+        #: The command-bar session's filter hydration (US3, research R6):
+        #: started in `action_open_command_bar`, awaited by `_on_filter_changed`
+        #: before the first match, dropped in `_on_command_bar_closed`. Its
+        #: lifetime is exactly one bar session (contract C5, plan Complexity
+        #: Tracking) -- never consulted once the bar is closed.
+        self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
@@ -226,10 +233,20 @@ class ListScreen(Screen[None]):
                 select_id = highlighted.record.id
 
         await list_view.clear()
-        items = cast(
-            "list[Document | Task]",
-            app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
-        )
+        hydrated = self._hydrated_pool()
+        if hydrated is not None:
+            # A command-bar session's already-hydrated read (US3, research
+            # R6): match+sort it directly rather than scanning the collection
+            # again for every keystroke after the first (contract C5).
+            documents, warnings = hydrated
+            items = cast("list[Document | Task]", app.match_documents(documents))  # type: ignore[attr-defined]
+            self._warning_count = len(warnings)
+        else:
+            items = cast(
+                "list[Document | Task]",
+                app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+            )
+            self._warning_count = len(app.visible_warnings())  # type: ignore[attr-defined]
         self._last_render_key = (
             _task_key(cast("list[Task]", items))
             if is_tasks
@@ -248,9 +265,21 @@ class ListScreen(Screen[None]):
                         index = i
                         break
             list_view.index = index
-        self._warning_count = len(app.visible_warnings())  # type: ignore[attr-defined]
         self._update_preview()
         self._render_status()
+
+    def _hydrated_pool(self) -> tuple[list[Document], list[ScanWarning]] | None:
+        """The active command-bar session's hydrated read, if a filter is set
+        and the worker has finished (US3, research R6) -- `None` otherwise,
+        meaning the caller should read fresh through `app.visible_documents()`.
+        Never consulted once the bar has closed (contract C5); the caller
+        drops the worker handle in `_on_command_bar_closed`."""
+        hydration = self._filter_hydration
+        if not self.app.filter_query or hydration is None:  # type: ignore[attr-defined]
+            return None
+        if not hydration.is_finished or hydration.result is None:
+            return None
+        return hydration.result
 
     def _update_preview(self) -> None:
         list_view = self.query_one("#meeting-list", ListView)
@@ -385,6 +414,33 @@ class ListScreen(Screen[None]):
 
     def action_open_command_bar(self) -> None:
         self.query_one(CommandBar).open()
+        # Started here, not from `CommandBar.ModeChanged` -- that message is
+        # posted on every keystroke, so starting the hydration there would
+        # restart the scan per character (research R6). Tasks needs no
+        # hydration: filtering it re-reads one file, not every month.
+        active = self.app.active  # type: ignore[attr-defined]
+        self._filter_hydration = None if active == "tasks" else self._hydrate_filter_pool(active)
+
+    @work(thread=True, exclusive=True, group="filter-hydrate")
+    def _hydrate_filter_pool(self, collection: str) -> tuple[list[Document], list[ScanWarning]]:
+        """Read every month plus unfiled for `collection` on a worker thread
+        (US3, research R6), so the `/` keypress that opens the command bar
+        never stalls (FR-016). Filesystem work does not belong on the event
+        loop -- the existing worker precedent is `edit_screen.py`'s AI-request
+        thread. `exclusive=True` means a second `/` while one is in flight
+        supersedes it rather than racing it."""
+        app = self.app
+        descriptor = app.collection_descriptor(collection)  # type: ignore[attr-defined]
+        pool: list[Document] = []
+        warnings: list[ScanWarning] = []
+        for month in app.list_scope(collection).months:  # type: ignore[attr-defined]
+            documents, month_warnings = scan_month(app.workspace, descriptor, month)  # type: ignore[attr-defined]
+            pool.extend(documents)
+            warnings.extend(month_warnings)
+        unfiled_documents, unfiled_warnings = scan_unfiled(app.workspace, descriptor)  # type: ignore[attr-defined]
+        pool.extend(unfiled_documents)
+        warnings.extend(unfiled_warnings)
+        return pool, warnings
 
     def action_edit(self) -> None:
         list_view = self.query_one("#meeting-list", ListView)
@@ -569,6 +625,15 @@ class ListScreen(Screen[None]):
     @on(CommandBar.FilterChanged)
     async def _on_filter_changed(self, message: CommandBar.FilterChanged) -> None:
         self.app.set_filter(message.query)  # type: ignore[attr-defined]
+        if self._filter_hydration is not None:
+            # Waits for the read started when the bar opened, so the first
+            # term matches the whole collection rather than a partial set
+            # (FR-017). A failed or superseded hydration falls back to
+            # `refresh_rows`'s own scan via `_hydrated_pool` returning None.
+            try:
+                await self._filter_hydration.wait()
+            except (WorkerFailed, WorkerCancelled):
+                pass
         await self._refresh_scope_pane()
         await self.refresh_rows(reset_selection=True)
 
@@ -635,6 +700,10 @@ class ListScreen(Screen[None]):
 
     @on(CommandBar.Closed)
     def _on_command_bar_closed(self, message: CommandBar.Closed) -> None:
+        # The snapshot's lifetime is exactly one bar session (FR-019, contract
+        # C5) -- a filter left showing after the bar closes is a point-in-time
+        # answer that reconciles when cleared, not on the next keystroke.
+        self._filter_hydration = None
         self._render_status(error=self._pending_error)
         self._pending_error = None
         self.query_one("#meeting-list", ListView).focus()

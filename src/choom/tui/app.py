@@ -107,6 +107,12 @@ class ChoomApp(App[None]):
     def list_scope(self, collection: str) -> MonthListing:
         return list_months(self.workspace, DOCUMENT_COLLECTIONS[collection])
 
+    def collection_descriptor(self, collection: str) -> Collection:
+        """The scan-path descriptor for `collection` -- exposed so `ListScreen`
+        can hydrate a filter pool on a worker thread (research R6) without
+        reaching into this module's private `DOCUMENT_COLLECTIONS` mapping."""
+        return DOCUMENT_COLLECTIONS[collection]
+
     def select_scope(self, collection: str, selection: ScopeSelection) -> None:
         self.scope_selection[collection] = selection
         if isinstance(selection, YearMonth):
@@ -137,7 +143,13 @@ class ChoomApp(App[None]):
 
     def _filtered_documents(self, collection: str) -> list[Document]:
         """A filter reads every month of the collection plus unfiled (FR-015,
-        FR-017) -- the one read that is not scoped to a single month."""
+        FR-017) -- the one read that is not scoped to a single month. This is
+        the fallback path: `ListScreen` normally supplies an already-hydrated
+        pool to `match_documents` directly, from the worker started when the
+        command bar opened (research R6), bypassing this scan entirely for
+        every keystroke after the first. This method still exists for any
+        caller without a hydration session -- direct app use, and the first
+        render before a worker has finished."""
         pool: list[Document] = []
         warnings: list[ScanWarning] = []
         for month in self.list_scope(collection).months:
@@ -152,7 +164,13 @@ class ChoomApp(App[None]):
         pool.extend(unfiled_documents)
         warnings.extend(unfiled_warnings)
         self._last_warnings = warnings
+        return self.match_documents(pool)
 
+    def match_documents(self, pool: list[Document]) -> list[Document]:
+        """Match `pool` against the active filter term and sort it exactly as
+        `_filtered_documents` sorts a fresh scan -- shared so a caller holding
+        an already-hydrated pool (`ListScreen`'s command-bar session) gets
+        identical ordering without re-implementing it."""
         matches = [d for d in pool if match_document(d, self.filter_query)]
         matches.sort(key=lambda d: str(d.path))
         matches.sort(key=lambda d: d.created, reverse=True)
