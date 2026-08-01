@@ -517,6 +517,61 @@ def add_task(
     )
 
 
+def delete_task(workspace: Workspace, task_id: str) -> Task:
+    """Remove one task's checkbox line and its whole body span, returning the
+    task as it stood immediately before deletion.
+
+    Re-reads and re-parses before writing; locates by id, never by a cached
+    line number -- the same discipline `set_task_body` uses, whose write path
+    this reuses (research R2). Every line outside the removed span is
+    byte-identical, in the same order; the file's line-ending convention and
+    trailing-newline state are preserved.
+
+    Raises:
+        NotFoundError: no task has `task_id`.
+        UsageError: more than one task has `task_id` (names the conflicting lines).
+        WorkspaceError: the file cannot be written.
+    """
+    path = workspace.tasks_file
+    if not path.exists():
+        raise NotFoundError(f"no task with id {task_id!r}")
+
+    text = _read_text(path)
+    parsed = parse_tasks(text)
+    matching_indices = [i for i, t in enumerate(parsed.tasks) if t.id == task_id]
+
+    if not matching_indices:
+        raise NotFoundError(f"no task with id {task_id!r}")
+    if len(matching_indices) > 1:
+        line_numbers = _format_line_numbers([parsed.tasks[i].line for i in matching_indices])
+        raise UsageError(
+            f"id {task_id!r} appears on lines {line_numbers}; "
+            "edit tasks.md to give one of them a different id"
+        )
+
+    index = matching_indices[0]
+    task = parsed.tasks[index]
+    span = parsed.bodies[index]
+    lines = list(parsed.lines)
+    checkbox_idx = span.start - 1
+    tail = lines[span.end :]
+
+    newline = next((t for line in lines if (t := _split_terminator(line)[1])), "\n")
+    original_trailing = bool(lines) and _split_terminator(lines[-1])[1] != ""
+
+    new_lines = lines[:checkbox_idx] + tail
+
+    if not tail and new_lines:
+        # The removed block was at the end of the file -- restore the file's
+        # own trailing-newline state on its new last line, whichever one that is.
+        last_content, _terminator = _split_terminator(new_lines[-1])
+        new_lines[-1] = last_content + (newline if original_trailing else "")
+
+    _atomic_write(path, new_lines)
+
+    return task
+
+
 def _format_line_numbers(numbers: Sequence[int]) -> str:
     if len(numbers) == 2:
         return f"{numbers[0]} and {numbers[1]}"

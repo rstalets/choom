@@ -36,9 +36,9 @@ Single project: `src/choom/`, `tests/` at repository root.
 
 **Purpose**: Establish a known-good starting point on the merged branch
 
-- [ ] T001 Run `scripts/dev-tests.sh` and record the green baseline (733 tests at the merge of
+- [X] T001 Run `scripts/dev-tests.sh` and record the green baseline (733 tests at the merge of
       `010-read-on-load`), so any later failure is attributable to this feature
-- [ ] T002 [P] Re-read `src/choom/tui/list_screen.py`'s refresh timer and `on_screen_suspend`/
+- [X] T002 [P] Re-read `src/choom/tui/list_screen.py`'s refresh timer and `on_screen_suspend`/
       `on_screen_resume` pair to confirm research R11 still holds: pushing a modal pauses the timer
 
 **Checkpoint**: Baseline green, refresh-timer assumption verified
@@ -52,19 +52,19 @@ Single project: `src/choom/`, `tests/` at repository root.
 **⚠️ Blocks US2, US3, and US4.** US1, US5, US6, and US7 do not depend on this phase and may proceed in
 parallel with it.
 
-- [ ] T003 [P] Unit tests for task-line removal in `tests/unit/test_delete_task.py`: body span removed
+- [X] T003 [P] Unit tests for task-line removal in `tests/unit/test_delete_task.py`: body span removed
       whole, neighbouring tasks byte-identical, CRLF and LF files, trailing-newline state preserved,
       missing id raises `NotFoundError`, duplicate id raises `UsageError` naming the lines. Must fail first
-- [ ] T004 [P] Unit tests for id dispatch in `tests/unit/test_deletion.py`: unresolvable id →
+- [X] T004 [P] Unit tests for id dispatch in `tests/unit/test_deletion.py`: unresolvable id →
       `NotFoundError`, ambiguous id → `UsageError` naming every path, `expect` mismatch → `NotFoundError`,
       each kind routed to the right remover. Must fail first
-- [ ] T005 [P] Implement `delete_document(path: Path) -> None` in `src/choom/core/documents.py` — removes
+- [X] T005 [P] Implement `delete_document(path: Path) -> None` in `src/choom/core/documents.py` — removes
       the file, raises `NotFoundError` if absent and `WorkspaceError` on failure; leaves the containing
       directory in place even if it becomes empty (data-model §2)
-- [ ] T006 [P] Implement `delete_task(workspace: Workspace, task_id: str) -> Task` in
+- [X] T006 [P] Implement `delete_task(workspace: Workspace, task_id: str) -> Task` in
       `src/choom/core/tasks.py`, reusing `set_task_body`'s locate-by-id, `_body_span`, newline and
       trailing-newline handling, and `_atomic_write` (research R2)
-- [ ] T007 Create `src/choom/core/deletion.py` with the `Deleted` dataclass and
+- [X] T007 Create `src/choom/core/deletion.py` with the `Deleted` dataclass and
       `delete_by_id(workspace, record_id, *, expect=None) -> Deleted`, converting `links.resolve_id`'s
       warnings into the refusals of research R4 (depends on T005, T006)
 
