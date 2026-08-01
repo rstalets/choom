@@ -64,10 +64,15 @@ def test_claude_md_template_is_short_and_points_at_agents_md() -> None:
 def test_agents_md_stays_within_line_budget(tmp_workspace: Workspace) -> None:
     # init_workspace writes AGENTS.md verbatim from AGENTS.md.tmpl (no
     # substitution -- see workspace.py's `_write_guidance_file`), so the
-    # generated copy and the source template share one line budget. 008
-    # tightened this from 63 to <= 60 while adding link content (research R9);
-    # the ceiling was raised to 100 in parallel work so 009 could document
-    # task mirrors without cutting anything already there.
+    # generated copy and the source template share one line budget.
+    #
+    # The binding rule is content, not length: nothing an assistant could infer
+    # from the workspace itself, and no restating the README. This bound is the
+    # checkable backstop for that rule, raised from 60 to 100 by constitution
+    # v1.2.0. At 60 the cap had twice forced real instructions out of the file
+    # (007's `task show`, 008's link syntax), which inverts what it is for.
+    # Failing here means reviewing the whole file for content that has stopped
+    # earning its place -- not deleting whatever was added last.
     text = (tmp_workspace.root / "AGENTS.md").read_text(encoding="utf-8")
     assert len(text.splitlines()) <= 100
 

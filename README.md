@@ -93,7 +93,7 @@ The note it produced shows up like any other — because it is:
 
 ![The assistant's research note, rendered back in the TUI](docs/screenshots/research-note.png)
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter schema, and exit codes.
+Run `endpaper --help` for the full command reference. The `AGENTS.md` that `init` writes into your workspace documents the folder layout, the frontmatter schema, the task line format, link syntax, and the exit codes.
 
 ## Features (v0.0.1)
 
@@ -103,20 +103,20 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter s
 - **Inline task capture** — inside any meeting or note, typing `/task <description>` (or `/task.<type> <description>`) on its own line and pressing `enter` captures a task without leaving the editor: the line becomes a checklist item linking to it, `- [ ] [call Terry about the renewal](../../../tasks.md#task_a1b2)`, cursor at its end, nothing else on screen moving. Prefix an existing line with `/task.followup ` to promote its own words into the task instead. That checklist item is a **two-way control surface**, not a copy — tick it and save, or tick the task from the tasks list, and the other side follows; opening a document brings every mirror in it into agreement with `tasks.md` first, so nothing shown is ever stale, with no repair command and no background process. `endpaper task add "<description>" --link <id>` does the same capture from the command line, and `task done`/`undone --json` report which documents were updated.
 - **Workspace init** — `endpaper init` sets up a workspace (config, `AGENTS.md`, `meetings/`, `notes/daily/`, `tasks.md`) in the current directory. Multi-user shared workspaces are planned but not in v0.0.1 — see [Roadmap](#roadmap).
 - **View and edit** — every note or meeting opens in a rendered markdown preview (`enter`), switches to a raw editor (`e`) with line numbers and soft wrap, and saves with `ctrl+o` (stay) or `ctrl+x` (save and return). `esc` discards, but only prompts when there's something to lose. `ctrl+s` is also bound as a save alias, but `ctrl+o` is the canonical key: some terminals treat `ctrl+s` as the legacy XOFF flow-control signal and swallow it before it ever reaches endpaper. If saves with `ctrl+s` seem to do nothing, run `stty -ixon` in that shell (or use `ctrl+o` instead).
-- **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `endpaper find`, `read`, `write`, `append`, `--json` on every read command, meaningful exit codes, nothing that opens an editor or blocks on input.
+- **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `--json` on every read command, meaningful exit codes, data on stdout and errors on stderr, nothing that opens an editor or blocks on input. Assistants create records through the commands, so frontmatter and file placement stay correct, then edit the markdown bodies directly like any other file.
 - **`/ai` in the editor** — type `/ai <prompt>` on its own line and press `enter`: the document saves, your already-installed Claude Code CLI or GitHub Copilot CLI runs the prompt, and the reply lands where the command was. The line shows `⋯` and the status bar names a random breadcrumb plus `ctrl+c to cancel` while it works; every failure — cancelled, no reply, the assistant errored — restores the line exactly as typed. Which assistant to call is detected automatically when only one is installed, or set explicitly with `endpaper config assistant <claude|copilot|none>` (CLI) or `/config assistant <value>` (TUI command bar) — a workspace with neither tool installed keeps every other feature unchanged.
 - **No index, no database** — the markdown files are the only state. endpaper globs and parses the workspace in memory on launch; nothing to corrupt, nothing to reindex.
 - **`AGENTS.md`** — generated at `init`, under ~100 lines, so an assistant landing in the workspace is productive immediately.
 
-See [REQUIREMENTS.md](REQUIREMENTS.md) for the full v0.0.1 specification, including CLI syntax, frontmatter schema, and acceptance criteria. Not everything above has landed on `main` yet — check [CHANGELOG.md](CHANGELOG.md) for what's actually shipped so far.
+Not everything above has landed on `main` yet — see [Releases](https://github.com/rstalets/endpaper/releases) for what has actually shipped.
 
 ## Roadmap
 
-Planned for a future release, tracked in [REQUIREMENTS.md §6](REQUIREMENTS.md#6-backlog--future):
+Planned for a future release, tracked in [issue #18](https://github.com/rstalets/endpaper/issues/18):
 
 - **Multi-user shared workspaces** — `endpaper init <name>` inside a shared root (e.g. a OneDrive folder), `/workspace` switching, and cross-workspace search, so a team can share one root without a server.
 
-Considered and explicitly out of scope for v0.0.1 (see [REQUIREMENTS.md §5](REQUIREMENTS.md#5-explicitly-out-of-scope-for-v001)):
+Considered and explicitly out of scope, each tracked in [issues](https://github.com/rstalets/endpaper/issues):
 
 - Webcam or image capture (`/pic`)
 - Embeddings, vector search, semantic retrieval
