@@ -2,6 +2,13 @@
 
 Repo-specific instructions for Claude Code sessions working on choom.
 
+## Testing
+
+- **Run tests via `scripts/dev-tests.sh`**, not a hand-rolled `pytest` invocation — it
+  runs the suite in parallel (`-n auto`) and is the standard entry point for agents and
+  humans alike. Pass pytest args/flags straight through, e.g.
+  `scripts/dev-tests.sh tests/unit/test_foo.py -k something`.
+
 ## Pull requests
 
 - **Check CI before considering a PR done.** After opening a PR or pushing updates to one,
