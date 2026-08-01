@@ -1,43 +1,97 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Bump rationale: MINOR. Principle VI's testing rule is materially rewritten
-(risk-based coverage replaces the 1:1 acceptance-criterion-to-test mandate,
-plus new guidance on what each test layer is for), but no principle is
-removed or renamed, and the change only loosens what was previously
-required — nothing that satisfied the old rule becomes non-compliant.
+Version change: 1.1.0 → 1.2.0
+Bump rationale: MINOR, covering two amendments in one bump. (1) Principle VI
+gains a new testing rule (tests must not depend on the wall clock), which
+materially expands existing guidance. (2) The `AGENTS.md` constraint raises its
+line cap from 60 to 100 and reframes the cap as the backstop to a content rule
+rather than the rule itself — a relaxation. No principle is removed, renamed,
+or redefined, and nothing that satisfied the 1.1.0 rules becomes non-compliant:
+the tests that violated the new wall-clock rule were already fixed before this
+amendment, and the `AGENTS.md` template sits at 60 lines, well inside the new
+cap.
 
 Modified principles:
-  - VI. Readable Python, Enforced Automatically — testing bullet replaced:
-    "every acceptance criterion in a spec MUST map to at least one test"
-    → risk-based coverage chosen by the author, plus a definition of what
-    contract/integration/unit/performance tests are each for.
+  - VI. Readable Python, Enforced Automatically — new bullet added alongside
+    the existing testing bullet: "Tests MUST NOT depend on the wall clock",
+    with the failure it prevents (a fixture pinned to a literal month falling
+    out of a month-scoped view and rendering an empty list) and the remedy
+    (derive such dates from the same clock the behaviour reads).
+  - Platform & Distribution Constraints — the `AGENTS.md` bullet no longer
+    leads with "MUST stay under roughly 60 lines". The binding rule is now
+    content (nothing an assistant could infer from the workspace itself; no
+    restating the README) and roughly 100 lines is its checkable backstop.
+    Two reasons. The number was already under water: the template is at
+    exactly 60 today, has been hand-tightened twice to stay there (007's
+    `task show`, 008's link syntax), and REQUIREMENTS.md §4.2 already promises
+    `read`, `write`, `append`, and `find` — four AI-facing commands that must
+    appear in the file when they land. With `workspace list/use/current` from
+    the §6.1 backlog, v1.0 projects to roughly 75–80 lines. More importantly,
+    a hard cap that forces deleting real instructions inverts its own purpose;
+    exceeding the cap now triggers a review of the whole file rather than the
+    automatic removal of whatever was added last. The rationale about context
+    files is preserved verbatim in substance — only the number and the framing
+    change.
 
 Added sections: none
 Removed sections: none
 
 Templates requiring updates:
   ✅ .specify/templates/plan-template.md — Constitution Check gate VI row
-     updated to describe risk-based coverage instead of the AC-mapping rule
-  ✅ .specify/templates/tasks-template.md — per-user-story test scaffolding
-     no longer offers an unconditional contract test + integration test;
-     both are now conditioned on the story actually needing that layer, and
-     integration tests are directed to be parametrized across CLI/TUI
-     adapters instead of duplicated into separate files
-  ✅ .specify/templates/spec-template.md — reviewed; no constitution-driven
-     mandatory sections added or removed
-  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated references to
-     the old 1:1 AC→test rule found
-  ✅ README.md / AGENTS.md — reviewed; neither references the old rule
+     extended with "and no test depends on the wall clock", so every future
+     plan is checked against the new rule at the gate
+  ✅ .specify/templates/tasks-template.md — reviewed; left unchanged. Its
+     per-user-story notes govern which test layers a story needs, not how a
+     fixture is written, and repeating the rule in all three story phases
+     would add noise without adding a check the plan gate does not already do
+  ✅ .specify/templates/spec-template.md — reviewed; left unchanged. No
+     constitution-driven mandatory section is added or removed, and how a
+     test sources its dates is an implementation concern, not a spec one
+  ✅ .specify/templates/checklist-template.md — reviewed; left unchanged. It
+     carries no test-authoring guidance to contradict
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; left unchanged. None
+     instructs an agent to write date literals into fixtures, and each already
+     defers to the constitution as the authority on testing discipline
+  ✅ README.md — updated for amendment 2 only: the `AGENTS.md` bullet said
+     "under ~60 lines" and would otherwise contradict this document. Reviewed
+     for amendment 1 and left unchanged there; it documents usage, not test
+     authoring. (No AGENTS.md exists at the repository root; the file is
+     generated into a workspace at `init`.)
+
+Non-template files, amendment 2:
+  ✅ tests/contract/test_guidance_docs.py — updated. It held the one test that
+     asserted the old number (`test_agents_md_stays_within_line_budget`,
+     `<= 60`); it now asserts `<= 100`, with a comment recording what the bound
+     is a backstop for. The only `tests/` change in this amendment; no source
+     behaviour changes.
+  ✅ REQUIREMENTS.md §4.3 — reviewed; deliberately left unchanged. It still
+     reads "Kept under roughly 60 lines" and so now states a tighter cap than
+     this document. That divergence is known and accepted, not an oversight:
+     REQUIREMENTS.md is being retired under separate work in flight, and
+     editing it here would only create a conflict for that job on a file that
+     is going away. The Governance section already settles which document wins
+     — this constitution supersedes other practices, and REQUIREMENTS.md does
+     not override it — so the stale number misleads no one with authority to
+     act on it, and no note was added to REQUIREMENTS.md saying so.
 
 Follow-up TODOs:
   - README.md names the project "cairn" while REQUIREMENTS.md, the command
-    name, and this constitution use "endpaper". Not changed here (outside the
-    constitution workflow's scope); resolve before first public release.
-  - The actual retrofit of tests/ (consolidating CLI/TUI duplicate files,
-    dropping tests that don't survive the new rule) is deferred — see
-    Next Actions. This command only updates governance and templates.
+    name, and this constitution use "endpaper". Carried over from 1.1.0, not
+    changed here (outside the constitution workflow's scope); resolve before
+    first public release.
+  - (Dropped) REQUIREMENTS.md §4.3's stale "six commands" count was logged
+    here mid-amendment, then withdrawn: the file is being retired, so a TODO
+    pointing at it would never be actioned.
+
+Migration path:
+  - Amendment 1 (wall clock): none required. No existing spec, plan, or test
+    becomes non-compliant. The six tests that violated the rule (July-2026
+    fixtures asserted against the month-scoped list introduced by spec 005)
+    were already repaired on main before this amendment landed.
+  - Amendment 2 (AGENTS.md cap): none required. The change only relaxes an
+    existing limit. The template is at 60 lines and stays compliant; anything
+    that satisfied the 60-line cap satisfies the 100-line one.
 -->
 
 # endpaper Constitution
@@ -153,6 +207,10 @@ by strangers.
   TUI adapters rather than duplicated into separate files; `unit/` covers `core` logic
   worth isolating (parsing, id generation); `performance/` covers only scenarios with a
   real budget to protect. A behaviour does not get re-verified at every layer it touches.
+- Tests MUST NOT depend on the wall clock. A meeting fixture dated 20 July, listed by a
+  pane that shows the current month, passes every day of July and returns an empty list on
+  1 August — nothing changed but the date, and it breaks for whoever pushes next rather
+  than whoever wrote it. Derive such dates from the same clock the behaviour reads.
 - Prefer a plain function to a class, a class to a framework, and an explicit branch to a
   clever abstraction. Names say what the thing is; comments explain only why.
 - Public API changes — `--json` schemas, exit codes, frontmatter fields, the task line
@@ -175,9 +233,14 @@ contributor who sends a second patch.
 - Per-user state (such as the current workspace) MUST live in per-user local state, never
   in the shared workspace directory, so two people sharing a synced folder cannot
   overwrite each other's selection.
-- `AGENTS.md` is generated at `init` and MUST stay under roughly 60 lines. It carries the
-  folder layout, the frontmatter schema, the task line format, and the commands an
-  assistant needs. It does not restate the README.
+- `AGENTS.md` is generated at `init`. It carries the folder layout, the frontmatter schema,
+  the task line format, and the commands an assistant needs — and nothing an assistant could
+  infer from the workspace itself. It does not restate the README. That content rule is what
+  binds; roughly 100 lines is its checkable backstop, not a budget to be spent. Short,
+  human-curated, genuinely non-obvious guidance is what helps an assistant, and a bloated
+  file measurably raises exploration cost. A real instruction that pushes the file past the
+  cap means the whole file gets reviewed for content that has stopped earning its place —
+  never that the instruction is dropped to fit under a number.
 
 ## Development Workflow & Quality Gates
 
@@ -216,4 +279,4 @@ in writing is removed rather than merged.
 `REQUIREMENTS.md` holds the current version's scope and acceptance criteria; `AGENTS.md`
 in a workspace holds runtime guidance for AI assistants. Neither overrides this document.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-30
+**Version**: 1.2.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
