@@ -362,7 +362,7 @@ the inbound section and confirm what points at it is listed; press the open key 
 **Independent Test**: Read the README's workspace-creation section and confirm it names all four
 providers and the exact setting each needs.
 
-- [ ] T057 [P] [US8] Add the cloud-storage warning to the "Create a workspace" section of
+- [X] T057 [P] [US8] Add the cloud-storage warning to the "Create a workspace" section of
       `README.md`, naming OneDrive ("Always keep on this device"), Dropbox ("Make available
       offline"), Google Drive ("Available offline"), and iCloud Drive (keep downloaded; do not let
       Optimize Storage evict it), and stating **why**: there is no index, so the files have to be
