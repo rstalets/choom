@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.links import find_links
+from endpaper.core.links import find_links, find_task_links
 
 SOURCE = Path("notes/2026/07/2026-07-30-example.md")
 
@@ -174,20 +174,28 @@ def test_never_raises_on_pathological_input() -> None:
         find_links(text, source=SOURCE)  # must not raise
 
 
-def test_in_tasks_field_parses_bare_comma_separated_ids() -> None:
-    links = find_links(
+def test_find_task_links_parses_bare_comma_separated_ids() -> None:
+    links = find_task_links(
         "meeting_20260728_a1b2c3d4,note_20260731_ff00ff00",
         source=Path("tasks.md"),
-        in_tasks_field=True,
+        line=4,
+        text="call Terry about the renewal",
     )
     assert len(links) == 2
     assert links[0].target_id == "meeting_20260728_a1b2c3d4"
     assert links[0].path is None
     assert links[0].in_tasks_field is True
+    assert links[0].line == 4
+    assert links[0].text == "call Terry about the renewal"
     assert links[1].target_id == "note_20260731_ff00ff00"
 
 
-def test_in_tasks_field_single_id() -> None:
-    links = find_links("task_a1b2", source=Path("tasks.md"), in_tasks_field=True)
+def test_find_task_links_single_id() -> None:
+    links = find_task_links("task_a1b2", source=Path("tasks.md"), line=1, text="buy milk")
     assert len(links) == 1
     assert links[0].target_id == "task_a1b2"
+
+
+def test_find_task_links_never_raises() -> None:
+    for value in ("", ",", ",,,", "a,b,c,"):
+        find_task_links(value, source=Path("tasks.md"), line=1, text="x")  # must not raise

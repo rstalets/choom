@@ -16,7 +16,7 @@ how a byte-preservation guarantee gets quietly broken (see plan.md, Structure De
 ## Scanning
 
 ```python
-def find_links(text: str, *, source: Path, in_tasks_field: bool = False) -> tuple[Link, ...]:
+def find_links(text: str, *, source: Path) -> tuple[Link, ...]:
     """Every CommonMark inline link in `text` that could name a record.
 
     Skips images, destinations carrying a URL scheme, and anything inside a fenced code
@@ -34,6 +34,25 @@ The masking rules are the load-bearing part and are specified in
 [link-format.md](link-format.md#grammar). They were verified against 15 probe cases (research R1),
 including a double-backtick span containing a backtick, an unclosed fence, and a fence whose info
 string contains the fence character.
+
+```python
+def find_task_links(value: str, *, source: Path, line: int, text: str) -> tuple[Link, ...]:
+    """Parse one task's `links:` field value -- bare comma-separated ids, never markdown
+    syntax -- into `Link` records. `value` is the raw field value, e.g.
+    `"meeting_20260728_a1b2c3d4,note_20260731_ff00ff00"`. `line` and `text` are the task's
+    own line number and description; every returned `Link` carries them directly.
+
+    Never raises. Any input is valid input.
+    """
+```
+
+**A separate function, not a mode flag on `find_links`.** An earlier revision of this contract
+gave `find_links` an `in_tasks_field: bool = False` parameter that switched it between two
+parsers. That was wrong: the two paths share nothing but a return type. Markdown scanning runs a
+regex over masked text and returns offsets into that text; the task-field parser splits a string
+on commas. A boolean that silently swaps grammars is exactly the kind of API that reads fine until
+someone calls it with the wrong flag and gets a plausible-looking wrong answer -- so it was split
+into two named functions instead, each with its own signature and its own docstring.
 
 ---
 

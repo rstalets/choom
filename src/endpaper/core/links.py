@@ -14,13 +14,11 @@ from __future__ import annotations
 
 import os
 import re
-import tempfile
-from dataclasses import replace
 from pathlib import Path
 
+from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.documents import _read_document, match_document
 from endpaper.core.editing import _apply_line_ending_policy, load_for_edit
-from endpaper.core.errors import WorkspaceError
 from endpaper.core.meetings import scan_meetings
 from endpaper.core.models import (
     EditableFile,
@@ -30,10 +28,12 @@ from endpaper.core.models import (
     LinkStatus,
     LinkTarget,
     ScanWarning,
+    Task,
     Workspace,
 )
 from endpaper.core.notes import scan_notes
 from endpaper.core.tasks import load_tasks, match_task
+from endpaper.core.text import _split_terminator
 
 # --- Scanning -----------------------------------------------------------------
 
@@ -58,13 +58,6 @@ _LINK_RE = re.compile(
     """,
     re.VERBOSE,
 )
-
-
-def _split_terminator(line: str) -> tuple[str, str]:
-    for terminator in ("\r\n", "\n", "\r"):
-        if line.endswith(terminator):
-            return line[: -len(terminator)], terminator
-    return line, ""
 
 
 def _mask_fences(text: str) -> str:
@@ -177,13 +170,42 @@ def _scan_body_links(text: str, source: Path) -> list[tuple[Link, re.Match[str]]
     return results
 
 
-def _find_task_field_links(text: str, *, source: Path) -> tuple[Link, ...]:
-    """Parse a task's ``links:`` field value -- bare comma-separated ids, never
-    markdown link syntax -- into `Link` records. `text` is the raw field value,
-    e.g. ``"meeting_20260728_a1b2c3d4,note_20260731_ff00ff00"``."""
+def find_links(text: str, *, source: Path) -> tuple[Link, ...]:
+    """Every CommonMark inline link in `text` that could name a record.
+
+    Skips images, destinations carrying a URL scheme, and anything inside a
+    fenced code block or an inline code span -- those are content, not links.
+    Reference-style links (``[a][ref]``) are not recognised; endpaper never
+    writes one.
+
+    Each Link carries `start`/`end` character offsets into `text`, so a caller
+    can splice a replacement destination in without re-rendering the document.
+
+    Never raises. Any input is valid input.
+    """
+    return tuple(link for link, _match in _scan_body_links(text, source))
+
+
+def find_task_links(value: str, *, source: Path, line: int, text: str) -> tuple[Link, ...]:
+    """Parse one task's ``links:`` field value -- bare comma-separated ids,
+    never markdown syntax, since a task line is already one line of metadata
+    and the id prefix says which collection to look in -- into `Link` records.
+
+    `value` is the raw field value, e.g.
+    ``"meeting_20260728_a1b2c3d4,note_20260731_ff00ff00"``. `line` and `text`
+    are the task's own line number and description; every returned `Link`
+    carries them directly, so a caller never has to patch them in afterward.
+
+    A separate function from `find_links` rather than a mode flag on it: the
+    two parse entirely different grammars (CommonMark inline links with a
+    code mask, versus a bare comma-separated list) and share only a return
+    type.
+
+    Never raises. Any input is valid input.
+    """
     links: list[Link] = []
     pos = 0
-    for token in text.split(","):
+    for token in value.split(","):
         start = pos
         end = start + len(token)
         pos = end + 1
@@ -192,8 +214,8 @@ def _find_task_field_links(text: str, *, source: Path) -> tuple[Link, ...]:
         links.append(
             Link(
                 source=source,
-                line=1,
-                text=token,
+                line=line,
+                text=text,
                 path=None,
                 target_id=token,
                 start=start,
@@ -202,27 +224,6 @@ def _find_task_field_links(text: str, *, source: Path) -> tuple[Link, ...]:
             )
         )
     return tuple(links)
-
-
-def find_links(text: str, *, source: Path, in_tasks_field: bool = False) -> tuple[Link, ...]:
-    """Every CommonMark inline link in `text` that could name a record.
-
-    Skips images, destinations carrying a URL scheme, and anything inside a
-    fenced code block or an inline code span -- those are content, not links.
-    Reference-style links (``[a][ref]``) are not recognised; endpaper never
-    writes one.
-
-    When `in_tasks_field` is True, `text` is instead the raw value of a task's
-    ``links:`` field -- bare comma-separated ids, not markdown syntax.
-
-    Each Link carries `start`/`end` character offsets into `text`, so a caller
-    can splice a replacement destination in without re-rendering the document.
-
-    Never raises. Any input is valid input.
-    """
-    if in_tasks_field:
-        return _find_task_field_links(text, source=source)
-    return tuple(link for link, _match in _scan_body_links(text, source))
 
 
 # --- Path derivation ------------------------------------------------------------
@@ -499,21 +500,6 @@ def heal_text(
     return new_text, tuple(reports), tuple(warnings)
 
 
-def _write_text_atomic(path: Path, text: str) -> None:
-    tmp_path: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", newline="", dir=path.parent, delete=False, suffix=".tmp"
-        ) as tmp_file:
-            tmp_file.write(text)
-            tmp_path = Path(tmp_file.name)
-        os.replace(tmp_path, path)
-    except OSError as exc:
-        if tmp_path is not None and tmp_path.exists():
-            tmp_path.unlink(missing_ok=True)
-        raise WorkspaceError(f"could not write {path}: {exc}") from exc
-
-
 def _read_editable(path: Path) -> EditableFile | None:
     try:
         return load_for_edit(path)
@@ -533,15 +519,20 @@ def _iter_target_paths(workspace: Workspace, paths: tuple[Path, ...]) -> list[Pa
     return result
 
 
+def _task_links(task: Task, tasks_path: Path) -> tuple[Link, ...]:
+    """Every Link named in one task's `links:` field, already carrying that
+    task's own line and text -- the one place `find_task_links` is called, so
+    every caller gets a correct record without patching it afterward."""
+    if not task.links:
+        return ()
+    return find_task_links(",".join(task.links), source=tasks_path, line=task.line, text=task.text)
+
+
 def _task_field_reports(workspace: Workspace, tasks_path: Path) -> list[LinkReport]:
     tasks, _warnings = load_tasks(workspace)
     reports: list[LinkReport] = []
     for task in tasks:
-        if not task.links:
-            continue
-        field_links = find_links(",".join(task.links), source=tasks_path, in_tasks_field=True)
-        for link in field_links:
-            link = replace(link, line=task.line, text=task.text)
+        for link in _task_links(task, tasks_path):
             _target, status = resolve_link(workspace, link)
             if status == "resolved":
                 continue
@@ -595,7 +586,7 @@ def heal_links(
         if dry_run or new_text == file.text:
             continue
         out_text = _apply_line_ending_policy(new_text, file.newline, file.trailing_newline)
-        _write_text_atomic(path, out_text)
+        write_text_atomic(path, out_text)
     return tuple(reports)
 
 
@@ -627,10 +618,7 @@ def _all_task_field_links(workspace: Workspace, tasks_path: Path) -> list[Link]:
     tasks, _warnings = load_tasks(workspace)
     links: list[Link] = []
     for task in tasks:
-        if not task.links:
-            continue
-        for link in find_links(",".join(task.links), source=tasks_path, in_tasks_field=True):
-            links.append(replace(link, line=task.line, text=task.text))
+        links.extend(_task_links(task, tasks_path))
     return links
 
 
@@ -647,14 +635,9 @@ def outbound_for_target(
 
     tasks, _warnings = load_tasks(workspace)
     task = next((t for t in tasks if t.id == target.id), None)
-    if task is None or not task.links:
+    if task is None:
         return ()
-    field_links = [
-        replace(link, line=task.line, text=task.text)
-        for link in find_links(
-            ",".join(task.links), source=workspace.tasks_file, in_tasks_field=True
-        )
-    ]
+    field_links = _task_links(task, workspace.tasks_file)
     return tuple((link, resolve_link(workspace, link)[1]) for link in field_links)
 
 
