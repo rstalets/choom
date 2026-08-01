@@ -22,7 +22,13 @@ async def test_narrow_terminal_does_not_crash_and_keeps_active_collection_visibl
         bar = app.screen.query_one(CollectionBar)
         rendered = str(bar.content)
         assert "[reverse]" in rendered  # the active collection is still marked
-        assert len(rendered.replace("[reverse]", "").replace("[/reverse]", "")) <= 20
+        plain = rendered.replace("[reverse]", "").replace("[/reverse]", "")
+        # The compact one-letter form is decided from the collections' own
+        # width alone, never from whether the workspace path (US6) also fits
+        # -- it is exactly what it always was, never truncated into
+        # ambiguity (FR-036). The path itself is free to overflow a terminal
+        # this narrow rather than disappear (spec edge case).
+        assert plain.startswith("T N M")
 
 
 async def test_extremely_narrow_terminal_still_boots(tmp_workspace: Workspace) -> None:

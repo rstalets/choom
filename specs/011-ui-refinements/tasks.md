@@ -210,17 +210,20 @@ non-ASCII character; the path is flush right and stays there across a resize.
 
 **Independent of** every other phase.
 
-- [ ] T027 [P] [US6] Unit tests `tests/unit/test_workspace_path.py`: `$HOME` → `~`, left elision with
+- [X] T027 [P] [US6] Unit tests `tests/unit/test_workspace_path.py`: `$HOME` → `~`, left elision with
       `…/` on whole components, final component always kept, spaces and non-ASCII intact. Must fail first
-- [ ] T028 [US6] Add the shortening helper and right-aligned rendering to
+- [X] T028 [US6] Add the shortening helper and right-aligned rendering to
       `src/choom/tui/collection_bar.py`, padding against the bar's own width the way `StatusBar` pins the
       version, with no filesystem access on redraw (research R9)
-- [ ] T029 [US6] Pass the workspace into `CollectionBar` from `src/choom/tui/list_screen.py`'s `compose`
+- [X] T029 [US6] Pass the workspace into `CollectionBar` from `src/choom/tui/list_screen.py`'s `compose`
       (depends on T028)
-- [ ] T030 [US6] Update `tests/integration/test_chrome_tui.py`,
+- [X] T030 [US6] Update `tests/integration/test_chrome_tui.py`,
       `tests/integration/test_narrow_terminal_tui.py`, and
       `tests/integration/test_collection_menu_tui.py` for the bar's new content, including that the
-      compact one-letter fallback still wins at the narrowest widths and the bottom bar is unchanged
+      compact one-letter fallback still wins at the narrowest widths and the bottom bar is unchanged.
+      `test_collection_menu_tui.py` needed no change (its assertions only touch the collections portion,
+      which the path never affects); `test_chrome_tui.py` gained four new tests for US6's acceptance
+      scenarios (flush-right, survives resize, space/non-ASCII, bottom bar untouched)
 
 **Checkpoint**: The workspace is readable from the corner; the bottom bar has lost no width
 

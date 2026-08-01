@@ -180,7 +180,11 @@ class ListScreen(Screen[None]):
         self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
 
     def compose(self) -> ComposeResult:
-        yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
+        yield CollectionBar(
+            self.app.active,  # type: ignore[attr-defined]
+            str(self.app.workspace.root),  # type: ignore[attr-defined]
+            id="collection-bar",
+        )
         with Horizontal(id="body"):
             yield ScopePane(id="scope-pane")
             with Vertical(id="list-pane"):
