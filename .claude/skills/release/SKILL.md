@@ -3,7 +3,7 @@ name: "release"
 description: "Draft release notes for a version's milestone, then use them to open a PR that folds the shipped user-visible changes into README.md."
 argument-hint: "<version, e.g. v0.0.4 or 0.0.4>"
 metadata:
-  author: "endpaper"
+  author: "choom"
 user-invocable: true
 disable-model-invocation: false
 ---
