@@ -27,7 +27,14 @@ thing to keep in sync and would go stale the moment a workspace regenerates its 
 same content rule that governs `AGENTS.md` — nothing an assistant could infer for itself, no
 restating what another document already says — governs this one, more strictly.
 
-The user-visible outcome: after naming the assistant once, starting it in any directory on the
+Naming the assistant is not the only way in. choom already decides, without being asked, which
+assistant `/ai` calls: with nothing configured and exactly one assistant installed on the machine,
+it uses that one. A user in that position never types the command and so never gets the pointer.
+So when choom starts and finds itself in that position with no discovery file installed, it offers
+to install one — once. Answering no is recorded, and the question is not asked again.
+
+The user-visible outcome: after naming the assistant once — or after answering one question at
+launch, or after doing nothing but saying yes — starting the assistant in any directory on the
 machine is enough. The user no longer opens each session by explaining where their notes live and
 that there is a file describing how to write to them.
 
@@ -77,7 +84,61 @@ the complete benefit on its own.
 
 ---
 
-### User Story 2 - Repointing and removal (Priority: P2)
+### User Story 2 - Offered at launch, asked once (Priority: P2)
+
+Someone has choom and exactly one assistant installed. They have never run `config assistant`,
+because they never had a reason to — `/ai` already works, since choom picks the only assistant on
+the machine on its own. They open choom. It asks, once: an assistant was found, may choom tell it
+where this workspace is? They answer yes, and the pointer is installed without them learning that a
+command existed. Had they answered no, they would never be asked again.
+
+**Why this priority**: US1 gives the pointer to users who type a command. This story gives it to
+everyone else — the users who never had to name their assistant because choom named it for them,
+which is the default path for anyone with a single assistant installed. It ranks below US1 because
+it is the same install through a different door, and above the rest because a feature only reachable
+by a command the user has no reason to run is a feature most users never get.
+
+**Why it is a question and not an automatic install**: choom would be writing into the user's own
+profile directory, outside the workspace, for a program choom does not own. That is not a default to
+assume on someone's behalf. The constitution warns that confirmations which guard nothing teach
+users to dismiss them reflexively (Principle V); the protection here is that this one is asked at
+most once and the answer is durable in both directions, so it can never become the dialog a user
+learns to swat away.
+
+**Independent Test**: In a workspace with no assistant configured and exactly one assistant
+installed, start choom and confirm the offer appears; answer no, restart, and confirm silence;
+in a second workspace answer yes and confirm the pointer is installed.
+
+**Acceptance Scenarios**:
+
+1. **Given** a workspace with no assistant configured, exactly one assistant installed on the
+   machine, and no discovery file for it, **When** choom starts, **Then** the user is asked whether
+   to install the discovery file, and the question names the assistant and the workspace.
+2. **Given** that question, **When** the user answers yes, **Then** the discovery file is installed
+   for that assistant pointing at that workspace, the assistant is recorded as the workspace's
+   setting, and the outcome is reported.
+3. **Given** that question, **When** the user answers no, **Then** nothing is installed, the refusal
+   is recorded in the workspace's configuration, and choom continues to start normally.
+4. **Given** the user has answered no, **When** choom starts again in that workspace — on that
+   launch or any later one — **Then** the question is not asked again.
+5. **Given** that question, **When** the user dismisses it without answering — by closing it, or by
+   quitting choom — **Then** nothing is installed and nothing is recorded, and the question may be
+   asked again on the next launch.
+6. **Given** a discovery file is already installed for the assistant choom would use, **When** choom
+   starts, **Then** no question is asked.
+7. **Given** two or more assistants are installed and none is configured, **When** choom starts,
+   **Then** no question is asked, because choom does not know which assistant the user means.
+8. **Given** the assistant is configured as `none`, **When** choom starts, **Then** no question is
+   asked — an explicit opt-out is never re-litigated at launch.
+9. **Given** the user has previously answered no, **When** they later run the set command naming an
+   assistant, **Then** the file is installed and the recorded refusal is cleared, because an
+   explicit request outranks an earlier declined offer.
+10. **Given** the question is showing, **When** the user answers either way, **Then** it takes one
+    keystroke and choom is fully usable immediately afterwards.
+
+---
+
+### User Story 3 - Repointing and removal (Priority: P3)
 
 The user starts a second workspace — a new job, a separate personal vault — and runs
 `choom config assistant claude` from it. The pointer now names the new workspace. Later they decide
@@ -113,7 +174,7 @@ remains anywhere in user scope.
 
 ---
 
-### User Story 3 - The command says what it did (Priority: P3)
+### User Story 4 - The command says what it did (Priority: P4)
 
 The user runs `choom config assistant copilot` and sees, in one line, that the setting was recorded
 and where the discovery file was written. On a locked-down machine where their profile directory is
@@ -147,7 +208,7 @@ unwritable and run it again, confirming the setting is still recorded and the pr
 
 ---
 
-### User Story 4 - Naming the assistant at init (Priority: P4)
+### User Story 5 - Naming the assistant at init (Priority: P5)
 
 Someone creating their first workspace runs `choom init --assistant claude`. The discovery file is
 installed then and there; they never run a second command.
@@ -197,6 +258,28 @@ discovery file exists and points at the new workspace.
   path must still stay inside the Windows limit.
 - **Repeat runs with nothing changed.** Running the same command twice leaves the same single file
   with the same content; there is no accumulation and no second copy.
+- **The launch offer is dismissed rather than answered.** Closing the question, or quitting choom
+  while it is up, is not an answer: nothing is installed, nothing is recorded, and the question is
+  asked again next launch. Only an explicit no is durable.
+- **The install fails after the user says yes.** The refusal is not recorded — the user did not
+  refuse — so the offer stands for the next launch, and the failure is reported like any other.
+- **The user declines, then changes their mind.** Running the set command installs the file and
+  clears the recorded refusal. There is no state a user can get into where the explicit command is
+  refused because of an earlier answer at launch.
+- **The user declines, then removes the assistant and installs a different one.** The recorded
+  refusal covers the workspace, not one assistant, so they are not asked again. Naming the new
+  assistant with the set command still installs the pointer.
+- **An assistant is installed after choom has been used for a while.** A workspace that previously
+  resolved to no assistant starts resolving to one; the offer appears at the next launch, since it
+  is the first launch at which there is anything to offer.
+- **A second person opens the same synced workspace.** The refusal is recorded in the workspace, so
+  a colleague sharing the folder inherits it and is not asked. What they lose is a question, not a
+  setting — their own discovery file, if they want one, is still one command away.
+- **The launch check runs where there is nothing to check.** No assistant installed, an unreadable
+  configuration, or a workspace whose configuration cannot be written: choom starts normally and
+  asks nothing. The check must never be what stops the app from opening.
+- **A command-line invocation in the same situation.** The CLI never asks — it cannot, and must not.
+  Nothing about the launch offer changes what any CLI command does or prints.
 
 ## Requirements *(mandatory)*
 
@@ -253,6 +336,34 @@ discovery file exists and points at the new workspace.
   it just created; `init` naming no assistant MUST install nothing.
 - **FR-021**: Rejected values MUST behave as they do today — the setting is unchanged, and no
   discovery file is written or removed.
+- **FR-022**: When choom starts in a workspace where an assistant will be used but no discovery file
+  is installed for it, and no refusal has been recorded, the user MUST be asked whether to install
+  one. "Will be used" covers both the assistant choom selects on its own — nothing configured,
+  exactly one installed on the machine — and an assistant explicitly configured whose file is
+  missing.
+- **FR-023**: The question MUST name the assistant it would tell and the workspace it would point
+  at, so the user is not agreeing to an unnamed action.
+- **FR-024**: Answering yes MUST install the discovery file exactly as the set command does, record
+  that assistant as the workspace's setting, and report the outcome.
+- **FR-025**: Answering no MUST install nothing and MUST record the refusal in the workspace's
+  configuration, in a form that survives restarts.
+- **FR-026**: A recorded refusal MUST suppress the question on every subsequent launch of that
+  workspace.
+- **FR-027**: Dismissing the question without answering MUST record nothing and install nothing,
+  leaving the question to be asked again at the next launch. Only an explicit no is durable.
+- **FR-028**: Setting the assistant explicitly MUST clear any recorded refusal, so an earlier
+  declined offer can never suppress an install the user has directly asked for.
+- **FR-029**: The question MUST NOT be asked when a discovery file is already installed for the
+  assistant that will be used, when the assistant is configured as `none`, when two or more
+  assistants are installed with none configured, or when no assistant is installed at all.
+- **FR-030**: The launch check MUST NOT prevent, delay perceptibly, or fail the start of the app.
+  A configuration that cannot be read or written means no question is asked, not an error.
+- **FR-031**: Answering the question MUST take one keystroke, and choom MUST be fully usable
+  immediately afterwards.
+- **FR-032**: The question MUST be asked only in the interactive interface. No command-line
+  invocation may prompt, block, or install without being told to.
+- **FR-033**: The machine-readable read output MUST report whether the offer has been refused,
+  so the state is visible without opening the interactive interface.
 
 ### Key Entities
 
@@ -267,6 +378,9 @@ discovery file exists and points at the new workspace.
   monitored afterwards.
 - **Assistant setting**: The existing per-workspace record of which assistant `/ai` calls. Unchanged
   by this feature, except that writing it now has a second, user-scope effect.
+- **Recorded refusal**: A per-workspace record that the user was offered a discovery file at launch
+  and said no. Set only by an explicit no, cleared by explicitly setting an assistant, and read only
+  to decide whether to ask. It suppresses a question, never an install.
 
 ## Success Criteria *(mandatory)*
 
@@ -289,6 +403,14 @@ discovery file exists and points at the new workspace.
 - **SC-008**: A user who has just created a workspace reaches "my assistant can work in it from
   anywhere" with no manual explanation of the workspace path and no hand-written file — at most one
   command beyond creating the workspace, and none when the assistant is named while creating it.
+- **SC-009**: A user who has never run the assistant command, and has exactly one assistant
+  installed, is offered the pointer without having to discover that any command exists, and reaches
+  a working pointer in one keystroke.
+- **SC-010**: A user who declines is asked exactly once, ever: zero further questions across any
+  number of subsequent launches of that workspace.
+- **SC-011**: The launch check adds no perceptible delay to opening choom, and no state it can
+  encounter — no assistant, several assistants, an unreadable or unwritable configuration — prevents
+  the app from starting.
 
 ## Assumptions
 
@@ -302,7 +424,7 @@ discovery file exists and points at the new workspace.
   file installed for the previous one (FR-008). The opposite — leaving each configured assistant's
   file in place — would spread choom's footprint across the profile for assistants the user has
   stopped using, and `none` would have to hunt all of them down anyway.
-- **`init --assistant` installs it too** (US4, FR-020). The issue names `/config assistant` as the
+- **`init --assistant` installs it too** (US5, FR-020). The issue names `/config assistant` as the
   moment the user names their assistant; `init --assistant` is the same act at an earlier moment. It
   is scoped as the lowest-priority story so it can be dropped without touching the rest.
 - **The setting itself does not move.** Which assistant `/ai` calls stays where it is today, in the
@@ -316,6 +438,31 @@ discovery file exists and points at the new workspace.
 - **`AGENTS.md` exists in the workspace.** It is generated at `init`. A workspace whose `AGENTS.md`
   the user deleted still gets a pointer to where it should be; regenerating it is not this feature's
   job.
+- **The refusal is recorded in the workspace configuration**, alongside the assistant setting it
+  belongs to, as directed. This is worth naming because the constitution requires per-user state to
+  live outside the shared workspace, and two people sharing a synced folder do share this record.
+  It is judged acceptable here on two grounds: the assistant setting itself already lives in the
+  workspace configuration, so the refusal sits with the thing it qualifies rather than splitting one
+  decision across two stores; and what a colleague inherits is the absence of a question, not an
+  overwritten selection — their own pointer, in their own profile, remains one command away. The
+  failure the constitution's rule exists to prevent is one person's state silently becoming another
+  person's; that failure is not available here, because the discovery file itself is never shared.
+- **The offer also covers a configured assistant whose file is missing** (FR-022). The narrower
+  reading — offer only when choom picked the assistant itself — would permanently exclude every
+  workspace configured before this feature existed, which is the entire current user base, and every
+  user whose file was removed or whose earlier install failed. Since an explicitly configured
+  assistant is a *stronger* statement of intent than one choom inferred, asking that user is the
+  less presumptuous of the two cases, not the more.
+- **Answering yes also records the assistant** (FR-024). Otherwise a workspace can hold a pointer to
+  an assistant it has no record of, and installing a second assistant later would flip resolution to
+  ambiguous while the pointer stayed behind. Recording it makes what choom will call and what got
+  told about the workspace the same fact.
+- **The refusal covers the workspace, not one assistant.** A user who says no is saying no to being
+  asked, and re-asking them because they changed assistants would defeat the point. The set command
+  remains the way back in, and it clears the refusal (FR-028).
+- **The question belongs to the interactive interface only** (FR-032). A confirmation is inherently
+  interactive, which is the constitution's own exemption to the two-interfaces rule; the CLI's peer
+  behaviour is the set command, which installs the same file without asking anyone anything.
 
 ## Dependencies and Relationships
 
@@ -327,9 +474,13 @@ discovery file exists and points at the new workspace.
 - **Related to #44** (linked task syntax in the composed prompt): the same problem — the assistant
   needs to be told how choom works — at the reply layer rather than the install and discovery layer.
   The two are independent and can land in either order.
-- **Constrained by the constitution**: per-user state never lives in the shared workspace; no
-  network; no admin rights; paths stay well inside the Windows limit; the CLI never prompts, never
-  blocks, and keeps data and diagnostics on separate streams; both interfaces offer the behaviour.
+- **Constrained by the constitution**: no network; no admin rights; paths stay well inside the
+  Windows limit; the CLI never prompts, never blocks, and keeps data and diagnostics on separate
+  streams; both interfaces offer every behaviour that is not inherently interactive. Two rules are
+  in tension with this spec and are answered rather than ignored: per-user state normally lives
+  outside the shared workspace (see the recorded-refusal assumption), and confirmations normally
+  fire only when there is something to lose (see US2, where the protection is that the question is
+  asked at most once and both answers are durable).
 
 ## Out of Scope
 
@@ -341,3 +492,8 @@ discovery file exists and points at the new workspace.
 - Project-scope or repository-scope assistant files. `AGENTS.md` and `CLAUDE.md` at the workspace
   root already cover that surface and are unchanged.
 - Teaching the assistant anything about choom's behaviour beyond where to find its instructions.
+- Prompting, confirming, or installing anything from a command-line invocation. The launch offer is
+  the interactive interface's alone.
+- Re-asking a user who declined, on any trigger — a new assistant, a new machine, a later version.
+  The set command is the only way back in.
+- A general settings surface for suppressed prompts. This records one decision, not a framework.

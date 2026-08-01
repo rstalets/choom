@@ -60,5 +60,31 @@ each reversible without touching the rest of the spec):
   (FR-008), so `none` has a single, checkable meaning and choom's footprint in the user's profile
   cannot accumulate.
 - *`init --assistant` installs it too.* Beyond the literal text of issue #37, which names only
-  `/config assistant`, but the same act of naming an assistant. Isolated as US4/P4 so it can be cut
-  without disturbing US1–US3.
+  `/config assistant`, but the same act of naming an assistant. Isolated as the lowest-priority
+  story so it can be cut without disturbing the ones above it.
+
+**Iteration 2** — scope added: the launch-time offer (US2, FR-022–FR-033). choom already selects an
+assistant on its own when exactly one is installed and none is configured, so a user in that
+position never runs the command and never gets a pointer. The spec now has choom ask, once, at
+launch, and record a refusal so it never asks again. Re-validated; all items still pass. Four
+further decisions taken rather than deferred, each recorded in Assumptions:
+
+- *The refusal is recorded in the workspace configuration.* Directed, and in tension with the
+  constitution's rule that per-user state lives outside the shared workspace. Recorded openly rather
+  than silently: it sits with the assistant setting it qualifies, which is already per-workspace,
+  and what a colleague on a synced folder inherits is a missing question, not an overwritten
+  selection — the discovery file itself is per-profile and never shared. Flagged here because the
+  plan's Constitution Check will meet it.
+- *The offer covers a configured assistant whose file is missing,* not only one choom selected
+  itself. The narrower reading would permanently exclude every workspace configured before this
+  feature shipped.
+- *Answering yes records the assistant too,* so a workspace cannot hold a pointer to an assistant it
+  has no record of.
+- *The question is the interactive interface's alone* (FR-032), under the constitution's own
+  exemption for inherently interactive behaviour. The CLI peer is the set command, which installs
+  without asking.
+
+Also re-checked against Principle V's rule that confirmations fire only when there is something to
+lose. This dialog guards nothing, so it is justified in US2 on the narrower ground that it writes
+into the user's own profile for a program choom does not own — and bounded so it cannot become a
+reflex: asked at most once, durable in both directions, and dismissible without answering.
