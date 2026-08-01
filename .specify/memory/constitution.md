@@ -59,23 +59,30 @@ Templates requiring updates:
      authoring. (No AGENTS.md exists at the repository root; the file is
      generated into a workspace at `init`.)
 
-Non-template files changed for consistency with amendment 2:
-  ✅ REQUIREMENTS.md §4.3 — "Kept under roughly 60 lines" restated as a
-     content rule with roughly 100 lines as its backstop, matching the
-     constitution. Left unchanged, the two documents would contradict.
-  ✅ tests/contract/test_guidance_docs.py — the one test that asserted the old
-     number (`test_agents_md_stays_within_line_budget`, `<= 60`) now asserts
-     `<= 100`, with a comment recording what the bound is a backstop for. The
-     only `tests/` change in this amendment; no source behaviour changes.
+Non-template files, amendment 2:
+  ✅ tests/contract/test_guidance_docs.py — updated. It held the one test that
+     asserted the old number (`test_agents_md_stays_within_line_budget`,
+     `<= 60`); it now asserts `<= 100`, with a comment recording what the bound
+     is a backstop for. The only `tests/` change in this amendment; no source
+     behaviour changes.
+  ✅ REQUIREMENTS.md §4.3 — reviewed; deliberately left unchanged. It still
+     reads "Kept under roughly 60 lines" and so now states a tighter cap than
+     this document. That divergence is known and accepted, not an oversight:
+     REQUIREMENTS.md is being retired under separate work in flight, and
+     editing it here would only create a conflict for that job on a file that
+     is going away. The Governance section already settles which document wins
+     — this constitution supersedes other practices, and REQUIREMENTS.md does
+     not override it — so the stale number misleads no one with authority to
+     act on it, and no note was added to REQUIREMENTS.md saying so.
 
 Follow-up TODOs:
   - README.md names the project "cairn" while REQUIREMENTS.md, the command
     name, and this constitution use "endpaper". Carried over from 1.1.0, not
     changed here (outside the constitution workflow's scope); resolve before
     first public release.
-  - REQUIREMENTS.md §4.3 still says AGENTS.md contains "the six commands an
-    assistant should reach for". That count predates 007 and 008 and was
-    already stale before this amendment; not corrected here.
+  - (Dropped) REQUIREMENTS.md §4.3's stale "six commands" count was logged
+    here mid-amendment, then withdrawn: the file is being retired, so a TODO
+    pointing at it would never be actioned.
 
 Migration path:
   - Amendment 1 (wall clock): none required. No existing spec, plan, or test
