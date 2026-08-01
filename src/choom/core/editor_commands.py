@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from choom.core.models import EditorCommand, ParsedCommand
+from choom.core.models import EditorCommand, ParsedCommand, ReplyLine
 
 EDITOR_COMMANDS: tuple[EditorCommand, ...] = (
     EditorCommand(
@@ -52,3 +52,28 @@ def parse_line(line: str) -> ParsedCommand | None:
     if command is None:
         return None
     return ParsedCommand(command=command, argument=argument.strip(), suffix=suffix)
+
+
+def parse_reply_lines(text: str) -> tuple[ReplyLine, ...]:
+    """Classify every line of an assistant reply as prose or an eligible task command.
+
+    Returns one `ReplyLine` per line of `text`, in order -- never dropped, merged, or
+    reordered. A line is eligible (`task` is not `None`) when it has no leading
+    whitespace and `parse_line` resolves it to a command named `task`, exactly the
+    editor's own whole-line rule -- this delegates to `parse_line` rather than
+    restating the grammar, so the editor and a reply can never disagree about what a
+    task line is. `/task` with no description is still eligible; a `task` being
+    unusable is `capture_task`'s concern, not this function's.
+
+    Fence tracking (excluding a line inside a fenced code block from eligibility) is
+    not yet implemented here -- see `capture_reply_tasks`'s caller and
+    contracts/reply-capture.md §2; that arrives with US3.
+
+    Pure: no workspace, no filesystem, no clock. Never raises.
+    """
+    result: list[ReplyLine] = []
+    for line in text.splitlines():
+        parsed = parse_line(line)
+        task = parsed if parsed is not None and parsed.command.name == "task" else None
+        result.append(ReplyLine(text=line, task=task))
+    return tuple(result)

@@ -57,15 +57,18 @@ _PLACEHOLDER = "⋯"
 class EditTarget:
     """What `EditScreen` edits: the buffer's starting text, how to save it, the
     path shown to the user and handed to `/ai`, the line offset that positions
-    an `/ai` prompt within that file, and whether the target has frontmatter to
-    stamp (research R5). A file and a task's body are its two implementations
-    -- `EditScreen` itself knows neither one, only this shape."""
+    an `/ai` prompt within that file, whether the target has frontmatter to
+    stamp (research R5), and whether it has a document identity a `/task`
+    capture -- typed or from a reply -- can link from (research R3). A file
+    and a task's body are its two implementations -- `EditScreen` itself
+    knows neither one, only this shape."""
 
     text: str
     display_path: Path
     save: Callable[[str], SaveResult]
     ai_line_offset: int
     stamps_frontmatter: bool
+    captures_tasks: bool
 
 
 def open_editor(app: App[None], path: Path) -> bool:
@@ -107,6 +110,7 @@ def open_editor(app: App[None], path: Path) -> bool:
         save=_save,
         ai_line_offset=0,
         stamps_frontmatter=True,
+        captures_tasks=True,
     )
     app.push_screen(EditScreen(target))
     return True
@@ -167,6 +171,7 @@ def open_task_editor(app: App[None], task: Task) -> None:
         save=_save,
         ai_line_offset=_task_ai_line_offset(app, task_id),
         stamps_frontmatter=False,
+        captures_tasks=False,
     )
     app.push_screen(EditScreen(target))
 
@@ -404,7 +409,7 @@ class EditScreen(Screen[None]):
             self._render_status(f"/{parsed.command.name} needs a description")
             return
 
-        if not self.target.stamps_frontmatter:
+        if not self.target.captures_tasks:
             # A task's own body has no document identity of its own to link
             # from -- only `open_editor` targets are documents.
             self._render_status("/task is only available while editing a document")

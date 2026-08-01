@@ -24,6 +24,7 @@ from pathlib import Path
 
 from choom.core.atomic_write import write_text_atomic
 from choom.core.editing import _apply_line_ending_policy, load_for_edit
+from choom.core.editor_commands import parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import find_links, format_link, resolve_id
 from choom.core.models import (
@@ -32,6 +33,7 @@ from choom.core.models import (
     Mirror,
     MirrorReport,
     MirrorResolution,
+    ReplyCapture,
     SaveResult,
     ScanWarning,
     Task,
@@ -162,6 +164,48 @@ def capture_task(
     task = add_task(workspace, description, type=type, links=(source_id,), now=now)
     line = mirror_line(task, source=source, tasks_file=workspace.tasks_file)
     return task, line
+
+
+def capture_reply_tasks(
+    workspace: Workspace, text: str, *, source: Path, source_id: str
+) -> ReplyCapture:
+    """Walk an assistant reply, capturing every eligible task line through `capture_task`.
+
+    Classifies `text` with `parse_reply_lines`, then for each eligible line -- top to
+    bottom, so tasks reach tasks.md in the reply's own order -- calls `capture_task` with
+    that line's argument and type suffix and substitutes the returned mirror line for the
+    text of that line. Every other line is carried through byte-identical. Writes
+    tasks.md through `capture_task`, once per eligible line, and nothing else.
+
+    Returns `ReplyCapture(text, tasks, warnings)`. When `text` has no eligible line, the
+    returned `text` is `text` itself -- the same object -- and no read or write happens
+    (FR-011).
+
+    Raises: UsageError or WorkspaceError, propagated from `capture_task`, on the first
+    line that cannot be captured -- this is the success-path implementation; per-line
+    failure recovery lands separately.
+    """
+    lines = parse_reply_lines(text)
+    if not any(line.task is not None for line in lines):
+        return ReplyCapture(text=text, tasks=(), warnings=())
+
+    tasks: list[Task] = []
+    out_lines: list[str] = []
+    for line in lines:
+        if line.task is None:
+            out_lines.append(line.text)
+            continue
+        task, mirror = capture_task(
+            workspace,
+            line.task.argument,
+            type=line.task.suffix,
+            source=source,
+            source_id=source_id,
+        )
+        tasks.append(task)
+        out_lines.append(mirror)
+
+    return ReplyCapture(text="\n".join(out_lines), tasks=tuple(tasks), warnings=())
 
 
 # --- The non-stamping write -------------------------------------------------------
