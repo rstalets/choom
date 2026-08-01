@@ -6,7 +6,7 @@ import shutil
 import signal
 import subprocess
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from choom.core.models import AssistantProfile, AssistantReply, ResolvedAssistant
 
@@ -92,6 +92,8 @@ PROFILES: tuple[AssistantProfile, ...] = (
         binary="claude",
         build_args=_claude_build_args,
         parse_reply=_claude_parse_reply,
+        # A user-scope skill: read every session, any working directory (research R1).
+        discovery_relpath=PurePosixPath(".claude/skills/choom/SKILL.md"),
     ),
     AssistantProfile(
         name="copilot",
@@ -99,6 +101,9 @@ PROFILES: tuple[AssistantProfile, ...] = (
         binary="copilot",
         build_args=_copilot_build_args,
         parse_reply=_copilot_parse_reply,
+        # Copilot CLI's documented "user-level instructions across all repositories"
+        # location (research R2).
+        discovery_relpath=PurePosixPath(".copilot/instructions/choom.instructions.md"),
     ),
 )
 

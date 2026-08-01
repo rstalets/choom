@@ -10,9 +10,32 @@ from pathlib import Path
 import pytest
 
 from choom.cli.main import main
+from choom.core import discovery
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.core.workspace import init_workspace
+
+
+@pytest.fixture(autouse=True)
+def _isolated_profile_root(
+    tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
+) -> Path:
+    """Redirect every discovery-file path into a scratch directory (013-assistant-
+    discovery-file, research R13). `choom.core.discovery.profile_root()` is the single
+    seam the whole feature is built on -- every path `discovery.py` computes starts
+    from it -- so patching it here, autouse, is what keeps a forgotten test from ever
+    writing into a developer's real `~/.claude` or `~/.copilot`.
+
+    Uses `tmp_path_factory`, not the test's own `tmp_path`: several existing tests
+    (e.g. `test_atomic_write.py`) assert the exact contents of their `tmp_path`, and a
+    fake profile root nested inside it would show up as an extra, unexpected entry.
+    `tmp_path_factory.mktemp` allocates an unrelated directory instead, so this fixture
+    cannot perturb any test that never touches a discovery path.
+    """
+    root = tmp_path_factory.mktemp("profile_root")
+    monkeypatch.setattr(discovery, "profile_root", lambda: root)
+    return root
+
 
 #: The fixed reply `stub_assistant`'s "reply" mode prints, so integration tests can
 #: assert on insertion, ordering, and line endings without duplicating the text.

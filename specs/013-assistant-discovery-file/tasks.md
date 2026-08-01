@@ -33,9 +33,9 @@ Single project: `src/choom/` and `tests/` at the repository root, per plan.md.
 **Purpose**: create the module and, before anything writes to a profile directory, the seam that
 keeps tests out of the developer's real `~/.claude`.
 
-- [ ] T001 Create `src/choom/core/discovery.py` with `profile_root() -> Path` returning `Path.home()`, plus the module docstring stating this is the only place the user's profile directory is resolved (research R3, R13)
-- [ ] T002 Add an autouse fixture to `tests/conftest.py` that monkeypatches `choom.core.discovery.profile_root` to a per-test `tmp_path`, so no test can write to the real profile directory
-- [ ] T003 [P] Add a guard test in `tests/unit/test_discovery_paths.py` asserting `profile_root()` under the fixture is inside `tmp_path` and is not `Path.home()`
+- [X] T001 Create `src/choom/core/discovery.py` with `profile_root() -> Path` returning `Path.home()`, plus the module docstring stating this is the only place the user's profile directory is resolved (research R3, R13)
+- [X] T002 Add an autouse fixture to `tests/conftest.py` that monkeypatches `choom.core.discovery.profile_root` to a per-test `tmp_path`, so no test can write to the real profile directory
+- [X] T003 [P] Add a guard test in `tests/unit/test_discovery_paths.py` asserting `profile_root()` under the fixture is inside `tmp_path` and is not `Path.home()`
 
 **Checkpoint**: the seam exists and is proven closed before any install code is written.
 
@@ -46,14 +46,14 @@ keeps tests out of the developer's real `~/.claude`.
 **Purpose**: per-assistant locations, the rendered content, and the config writer. Every user story
 depends on these; no story is deliverable until they are done.
 
-- [ ] T004 Add the `discovery_relpath: PurePosixPath | None` field to `AssistantProfile` in `src/choom/core/models.py`, with a comment recording that `None` is the FR-017 case
-- [ ] T005 Populate `discovery_relpath` for both entries in `PROFILES` in `src/choom/core/assistants.py`: `.claude/skills/choom/SKILL.md` and `.copilot/instructions/choom.instructions.md` (research R1, R2)
-- [ ] T006 Implement `discovery_path(profile: AssistantProfile) -> Path | None` in `src/choom/core/discovery.py`, joining `profile_root()` with the profile's relative path and returning `None` when the profile has none
-- [ ] T007 [P] Add unit tests in `tests/unit/test_discovery_paths.py` covering both assistants' resolved paths and the `None` profile
-- [ ] T008 Implement the marker constant and `render_discovery_file(workspace: Workspace, profile: AssistantProfile) -> str` in `src/choom/core/discovery.py`, per `contracts/discovery-file.md` — frontmatter for `claude`, plain heading for `copilot`, workspace path alone on its own line, marker comment last
-- [ ] T009 [P] Add unit tests in `tests/unit/test_discovery_content.py`: the marker is present for both assistants; the workspace path appears verbatim including for a path with spaces and non-ASCII characters; the output is at most 20 lines; rendering the same workspace twice is byte-identical; and none of `AGENTS.md.tmpl`'s distinctive strings (`meetings/YYYY/MM/`, `id: meeting_`, `choom task add`, `Exit codes:`) appear
-- [ ] T010 Generalise `_apply_assistant_value` in `src/choom/core/config.py` into a key-taking helper that performs the same three-case line-targeted edit (replace the key line, insert into an existing `[assistant]` table, append the table), leaving `set_assistant`'s observable behaviour byte-identical (research R5)
-- [ ] T011 [P] Extend `tests/unit/test_config_write.py` to prove the generalised writer still preserves comments, key order, and unknown keys, and still handles CRLF files
+- [X] T004 Add the `discovery_relpath: PurePosixPath | None` field to `AssistantProfile` in `src/choom/core/models.py`, with a comment recording that `None` is the FR-017 case
+- [X] T005 Populate `discovery_relpath` for both entries in `PROFILES` in `src/choom/core/assistants.py`: `.claude/skills/choom/SKILL.md` and `.copilot/instructions/choom.instructions.md` (research R1, R2)
+- [X] T006 Implement `discovery_path(profile: AssistantProfile) -> Path | None` in `src/choom/core/discovery.py`, joining `profile_root()` with the profile's relative path and returning `None` when the profile has none
+- [X] T007 [P] Add unit tests in `tests/unit/test_discovery_paths.py` covering both assistants' resolved paths and the `None` profile
+- [X] T008 Implement the marker constant and `render_discovery_file(workspace: Workspace, profile: AssistantProfile) -> str` in `src/choom/core/discovery.py`, per `contracts/discovery-file.md` — frontmatter for `claude`, plain heading for `copilot`, workspace path alone on its own line, marker comment last
+- [X] T009 [P] Add unit tests in `tests/unit/test_discovery_content.py`: the marker is present for both assistants; the workspace path appears verbatim including for a path with spaces and non-ASCII characters; the output is at most 20 lines; rendering the same workspace twice is byte-identical; and none of `AGENTS.md.tmpl`'s distinctive strings (`meetings/YYYY/MM/`, `id: meeting_`, `choom task add`, `Exit codes:`) appear
+- [X] T010 Generalise `_apply_assistant_value` in `src/choom/core/config.py` into a key-taking helper that performs the same three-case line-targeted edit (replace the key line, insert into an existing `[assistant]` table, append the table), leaving `set_assistant`'s observable behaviour byte-identical (research R5)
+- [X] T011 [P] Extend `tests/unit/test_config_write.py` to prove the generalised writer still preserves comments, key order, and unknown keys, and still handles CRLF files
 
 **Checkpoint**: paths resolve, content renders within its rules, and the config can carry a second key without disturbing a hand-edited file.
 
