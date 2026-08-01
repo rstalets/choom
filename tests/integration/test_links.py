@@ -17,6 +17,8 @@ from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note
 from endpaper.core.tasks import add_task
 from endpaper.tui.app import EndpaperApp
+from endpaper.tui.links_pane import LinkRow
+from endpaper.tui.list_screen import DocumentRow
 from endpaper.tui.status_bar import StatusBar
 from tests.helpers import open_edit, submit_editor_line, to_collection
 
@@ -519,3 +521,52 @@ async def test_backlinks_pane_works_in_the_list_preview(tmp_workspace: Workspace
         await pilot.press("b")
         await pilot.pause()
         assert section.display is False
+
+
+async def test_escaping_a_linked_doc_returns_to_the_record_you_left(
+    tmp_workspace: Workspace,
+) -> None:
+    """`esc` means "back" everywhere in this app. Following a link out of the
+    preview pane and escaping must return to the record you were reading, not
+    strand the list on the one you visited.
+
+    Both records are notes on purpose: the bug only shows when the link target
+    is a row in the *same* list, because a pending id that matches nothing falls
+    back to the first row and accidentally looks correct.
+    """
+    target_note = create_note(tmp_workspace, "vendor landscape")
+    source_note = create_note(tmp_workspace, "renewal thinking")
+    source_note.path.write_text(
+        source_note.path.read_text(encoding="utf-8")
+        + f"\nSee [vendor landscape](#{target_note.id}).\n",
+        encoding="utf-8",
+    )
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test() as pilot:
+        await to_collection(app, pilot, "notes")
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        index_of = {
+            row.document.id: i
+            for i, row in enumerate(list_view.children)
+            if isinstance(row, DocumentRow)
+        }
+        list_view.index = index_of[source_note.id]
+        await pilot.pause()
+
+        await pilot.press("b")
+        await pilot.pause()
+        links = app.screen.query_one("#preview-links-list", ListView)
+        rows = [child for child in links.children if isinstance(child, LinkRow)]
+        outbound = next(row for row in rows if row.direction == "out")
+        links.index = list(links.children).index(outbound)
+        await pilot.press("enter")
+        await pilot.pause()
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        list_view = app.screen.query_one("#meeting-list", ListView)
+        back_on = list_view.highlighted_child
+        assert isinstance(back_on, DocumentRow)
+        assert back_on.document.id == source_note.id

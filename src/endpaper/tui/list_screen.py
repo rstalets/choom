@@ -433,7 +433,12 @@ class ListScreen(Screen[None]):
 
         from endpaper.tui.preview_screen import PreviewScreen
 
-        self._pending_select_id = target.id
+        # Deliberately *not* setting `_pending_select_id`. That exists so that
+        # opening the row you are on returns you to it. Following a link is the
+        # opposite motion -- you went somewhere else -- and `esc` means "back"
+        # everywhere in this app, so it must return to the record you left, not
+        # strand you on the one you visited. `refresh_rows` keeps the current
+        # highlight when no id is pending, which is exactly that behaviour.
         self.app.push_screen(PreviewScreen(target.path, _read_document(target.path)))
 
     @on(ListView.Selected, "#meeting-list")
