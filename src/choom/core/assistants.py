@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import signal
@@ -14,7 +15,13 @@ You are answering a request from inside a plain-text notes editor. Your reply is
 inserted directly into the user's document, replacing the line they typed. They
 do not see it anywhere first.
 
-- Answer directly. No preamble, no restating the question, no sign-off.
+- Answer directly. No preamble, no restating the question, no sign-off, and no
+  narration of what you're about to do. You may need to read the file first to
+  resolve a position reference -- do that silently and start your reply with
+  the answer itself, not a sentence announcing the read. For example, if asked
+  to summarize the lines above, the reply must begin with the summary, never
+  with something like "I'll read the file to see what's above" or "Let me
+  check the lines above first."
 - Write markdown that belongs in working notes: prose, a list, a table, or a
   fenced diagram, whichever suits the answer. Do not wrap the whole reply in a
   code fence unless the entire answer is code.
@@ -39,8 +46,43 @@ def _claude_build_args(prompt: str) -> list[str]:
 
 
 def _copilot_build_args(prompt: str) -> list[str]:
-    # Same reasoning as _claude_build_args, in Copilot CLI's flag shape.
-    return ["-p", prompt, "--allow-tool", "read"]
+    # Same reasoning as _claude_build_args, in Copilot CLI's flag shape. `--output-format
+    # json` switches stdout to JSONL events instead of Copilot's default text mode, which
+    # mixes tool-call status lines and a stats footer into the reply -- see
+    # _copilot_parse_reply for why that structure is needed (#69).
+    return ["-p", prompt, "--allow-tool", "read", "--output-format", "json"]
+
+
+def _claude_parse_reply(stdout: str) -> str:
+    return stdout
+
+
+def _copilot_parse_reply(stdout: str) -> str:
+    """Pull the final answer out of Copilot's `--output-format json` event stream.
+
+    Each assistant turn is one "assistant.message" event. A turn that also requests a
+    tool call carries the model's narration of that call in the same `content` field --
+    e.g. "I'll read the file to check what's above" -- and no instruction wording tested
+    reliably suppressed it (#69), so narration turns are identified structurally instead:
+    they're the ones with a non-empty `toolRequests` list. The terminal turn, the last one
+    with none, holds the actual reply.
+    """
+    reply = ""
+    for line in stdout.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if event.get("type") != "assistant.message":
+            continue
+        data = event.get("data") or {}
+        if data.get("toolRequests"):
+            continue
+        reply = data.get("content", "")
+    return reply
 
 
 PROFILES: tuple[AssistantProfile, ...] = (
@@ -49,12 +91,14 @@ PROFILES: tuple[AssistantProfile, ...] = (
         display_name="Claude Code CLI",
         binary="claude",
         build_args=_claude_build_args,
+        parse_reply=_claude_parse_reply,
     ),
     AssistantProfile(
         name="copilot",
         display_name="GitHub Copilot CLI",
         binary="copilot",
         build_args=_copilot_build_args,
+        parse_reply=_copilot_parse_reply,
     ),
 )
 
@@ -176,7 +220,7 @@ class AssistantRequest:
             )
             return AssistantReply(ok=False, text="", message=message, cancelled=False)
 
-        text = _normalise(stdout)
+        text = _normalise(self.profile.parse_reply(stdout))
         if not text.strip():
             return AssistantReply(
                 ok=False,

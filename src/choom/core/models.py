@@ -289,6 +289,7 @@ class AssistantProfile:
     display_name: str
     binary: str
     build_args: Callable[[str], list[str]]
+    parse_reply: Callable[[str], str]
 
 
 @dataclass(frozen=True, slots=True)
