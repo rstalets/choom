@@ -14,7 +14,7 @@ from choom.core.models import Collection, Workspace, YearMonth
 from choom.core.notes import NOTES
 from choom.tui.app import ChoomApp
 from tests.fixtures.generate import generate, generate_notes
-from tests.helpers import to_collection
+from tests.helpers import to_collection, type_literally
 
 
 @contextmanager
@@ -135,3 +135,40 @@ async def test_filter_reads_each_month_at_most_once_per_command_bar_session(
             await pilot.pause()
 
         assert len(new_session_calls) > 0
+
+
+async def test_typing_a_filter_term_does_not_rescan_per_keystroke(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The property the whole of US3 exists to protect, exercised the way a
+    user actually triggers it: one `Input.Changed` (and one `FilterChanged`)
+    per keystroke, not one `Input.Changed` for the whole term.
+
+    The sibling test above (`..._at_most_once_per_command_bar_session`)
+    proves the hydrated pool is reused across two *whole-value* assignments
+    (`bar.value = "filter meeting 1"`), but a single assignment fires exactly
+    one `Input.Changed` regardless of how many characters it represents --
+    it cannot see a per-keystroke rescan even if one were happening. This
+    test uses `type_literally`, which genuinely presses one key at a time,
+    so it is the one place a regression that made `refresh_rows` fall back to
+    `app.visible_documents()` while a filter is active -- turning every
+    keystroke back into a full collection scan -- would actually be caught.
+    Do not "simplify" this to `type_command`; that would silently delete the
+    coverage."""
+    now = datetime.now()
+    workspace = generate(tmp_path, 60, spread_months=6, now=now, current_month_count=5)
+
+    app = ChoomApp(workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await to_collection(app, pilot, "meetings")
+
+        with _counting_scan_calls(monkeypatch) as calls:
+            await pilot.press("/")
+            await pilot.pause()
+            after_open = len(calls)
+            assert after_open > 0  # the hydration itself scanned
+
+            await type_literally(pilot, "filter meeting 1")
+            await pilot.pause()
+
+            assert len(calls) == after_open
