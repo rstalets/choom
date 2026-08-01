@@ -161,9 +161,10 @@ as typed and a dead-link warning is surfaced.
 
 **Depends on**: Phase 2. Test-only — research R3 establishes that `mirrors.py` already handles this.
 
-- [ ] T021 [US4] Integration test `tests/integration/test_delete_mirrors.py`: the mirroring document is
+- [X] T021 [US4] Integration test `tests/integration/test_delete_mirrors.py`: the mirroring document is
       byte-identical after the delete; opening it surfaces a `link_dead` warning; ticking the orphaned
-      checkbox still saves; several documents mirroring one task are all left unmodified
+      checkbox still saves; several documents mirroring one task are all left unmodified. All four passed
+      immediately (research R3 confirmed: no `mirrors.py` change needed, the `dead` outcome already exists)
 
 **Checkpoint**: Deleting a task cannot damage a file the user did not ask to touch
 
