@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+from textual.widgets import TextArea
+
 from endpaper.core.links import inbound_links, outbound_links, relative_destination
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note
 from endpaper.core.tasks import add_task
+from endpaper.tui.app import EndpaperApp
+from endpaper.tui.status_bar import StatusBar
+from tests.helpers import open_edit, submit_editor_line
 
 
 def test_inbound_and_outbound_end_to_end(tmp_workspace: Workspace) -> None:
@@ -96,3 +101,83 @@ def test_a_task_links_field_appears_as_an_inbound_link(tmp_workspace: Workspace)
     assert inbound[0].source == tmp_workspace.tasks_file
     assert inbound[0].in_tasks_field is True
     assert inbound[0].text == "call Terry about the renewal"
+
+
+# --- US6: /link in the editor ---------------------------------------------------
+
+
+async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Workspace) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    create_note(tmp_workspace, "vendor landscape")  # a note to open and edit
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        expected_dest = relative_destination(screen.file.path, meeting.path)
+        expected = f"[Q3 planning]({expected_dest}#{meeting.id})"
+        assert editor.get_line(line_index).plain == expected
+
+        status = screen.query_one(StatusBar)
+        assert "⚠" not in str(status.content)
+
+
+async def test_link_zero_matches_leaves_the_line_and_reports(tmp_workspace: Workspace) -> None:
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link nothing matches this at all")
+
+        assert editor.get_line(line_index).plain == "/link nothing matches this at all"
+        status = screen.query_one(StatusBar)
+        assert "no record matches" in str(status.content)
+
+
+async def test_link_several_matches_leaves_the_line_and_names_candidates(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning alpha")
+    create_meeting(tmp_workspace, "Q3 planning beta")
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+        status = screen.query_one(StatusBar)
+        text = str(status.content)
+        assert "Q3 planning alpha" in text
+        assert "Q3 planning beta" in text
+
+
+async def test_link_partial_line_is_ordinary_text_not_a_command(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    before_bytes = note.path.read_bytes()
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "note: /link q3 planning")
+
+        # Falls through to ordinary newline handling -- the typed text stays
+        # exactly as typed, and no /link command ever fires (so no save
+        # happens on its account and the file on disk is untouched).
+        assert editor.get_line(line_index).plain == "note: /link q3 planning"
+
+    assert note.path.read_bytes() == before_bytes

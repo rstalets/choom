@@ -21,9 +21,17 @@ from endpaper.core.assistants import (
 from endpaper.core.config import get_assistant
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.editor_commands import parse_line
+from endpaper.core.links import find_link_targets, format_link
 from endpaper.core.models import AssistantReply, EditableFile, ParsedCommand, ResolvedAssistant
 from endpaper.tui.discard_dialog import DiscardDialog
-from endpaper.tui.status_bar import EDIT_HELP, StatusBar, in_flight_status, pick_breadcrumb
+from endpaper.tui.status_bar import (
+    EDIT_HELP,
+    StatusBar,
+    in_flight_status,
+    link_ambiguous_status,
+    link_no_match_status,
+    pick_breadcrumb,
+)
 
 _PLACEHOLDER = "⋯"
 
@@ -190,6 +198,38 @@ class EditScreen(Screen[None]):
     def _on_editor_command_submitted(self, message: EditorTextArea.EditorCommandSubmitted) -> None:
         if message.parsed.command.name == "ai":
             self._start_ai_request(message.parsed, message.line_index)
+        elif message.parsed.command.name == "link":
+            self._insert_link(message.parsed, message.line_index)
+
+    def _insert_link(self, parsed: ParsedCommand, line_index: int) -> None:
+        if not parsed.argument:
+            self._render_status(f"/{parsed.command.name} needs search terms")
+            return
+
+        if not self._save():
+            return  # save error already reported
+
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        matches = find_link_targets(workspace, parsed.argument)
+
+        if not matches:
+            self._render_status(link_no_match_status(parsed.argument))
+            return
+        if len(matches) > 1:
+            self._render_status(link_ambiguous_status([m.title for m in matches]))
+            return
+
+        target = matches[0]
+        editor = self.query_one("#editor", EditorTextArea)
+        original_line = editor.get_line(line_index).plain
+        link_text = format_link(self.file.path, target, target.title)
+        editor.replace(
+            link_text,
+            (line_index, 0),
+            (line_index, len(original_line)),
+            maintain_selection_offset=False,
+        )
+        self._render_status(None)
 
     def _start_ai_request(self, parsed: ParsedCommand, line_index: int) -> None:
         if parsed.command.requires_argument and not parsed.argument:

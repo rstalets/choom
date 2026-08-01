@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import random
+from collections.abc import Sequence
 
 from textual.widgets import Static
 
@@ -68,6 +69,18 @@ def in_flight_status(breadcrumb: str, width: int) -> str:
 
 def collection_indicator(active: str) -> str:
     return f"[{active}]"
+
+
+def link_no_match_status(query: str) -> str:
+    """`/link` found nothing matching `query` (FR-044). The line is left exactly
+    as typed; this just names the failure."""
+    return f"no record matches {query!r}"
+
+
+def link_ambiguous_status(candidates: Sequence[str]) -> str:
+    """`/link` matched more than one record. Names every candidate so the user
+    can retype with more specific terms rather than facing a picker (FR-044)."""
+    return f"{len(candidates)} records match -- retype with more terms: {', '.join(candidates)}"
 
 
 def render_version() -> str:

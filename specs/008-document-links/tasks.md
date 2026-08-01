@@ -300,22 +300,22 @@ line survives both.
 
 ### Tests for User Story 6
 
-- [ ] T045 [P] [US6] Extend `tests/unit/test_editor_commands.py`: `/link foo` parses to the `link`
+- [X] T045 [P] [US6] Extend `tests/unit/test_editor_commands.py`: `/link foo` parses to the `link`
       command with argument `foo`; a line that is not entirely the command falls through as ordinary
       text (FR-046).
-- [ ] T046 [P] [US6] Extend `tests/integration/test_links.py` with the three `/link` outcomes — one
+- [X] T046 [P] [US6] Extend `tests/integration/test_links.py` with the three `/link` outcomes — one
       match inserts, zero and several leave the line exactly as typed and report in the status bar —
       and assert the editor never changes state in any of them (US6 AC1–5).
-- [ ] T047 [US6] Implement `find_link_targets(workspace, query)` in `src/endpaper/core/links.py`,
+- [X] T047 [US6] Implement `find_link_targets(workspace, query)` in `src/endpaper/core/links.py`,
       reusing `match_document`'s case-insensitive substring rule so `/link` and the list filter never
       disagree about what "matches" means (R11).
-- [ ] T048 [US6] Register `EditorCommand(name="link", argument="<search terms>", …)` in
+- [X] T048 [US6] Register `EditorCommand(name="link", argument="<search terms>", …)` in
       `src/endpaper/core/editor_commands.py`. `parse_line` needs no change — it dispatches off the
       table, and `/help` picks the entry up automatically.
-- [ ] T049 [US6] Handle the `link` case in the `EditorCommandSubmitted` handler in
+- [X] T049 [US6] Handle the `link` case in the `EditorCommandSubmitted` handler in
       `src/endpaper/tui/edit_screen.py`: save first, then replace the line on a single match, or
       leave it untouched and report otherwise.
-- [ ] T050 [US6] Add the no-match and ambiguous-match status-bar strings to
+- [X] T050 [US6] Add the no-match and ambiguous-match status-bar strings to
       `src/endpaper/tui/status_bar.py`; the ambiguous one names candidates so the user can retype.
 
 **Checkpoint**: Links can be authored without leaving the document.

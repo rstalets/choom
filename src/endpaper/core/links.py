@@ -245,6 +245,16 @@ def _render_destination(dest: str) -> str:
     return dest
 
 
+def format_link(source: Path, target: LinkTarget, text: str) -> str:
+    """A complete markdown link from `source`'s directory to `target`, with
+    `text` as the link text. Used by `/link` insertion so the editor and the
+    healer agree on how a destination is escaped. Never raises.
+    """
+    dest_path = relative_destination(source, target.path)
+    dest = f"{dest_path}#{target.id}"
+    return f"[{text}]({_render_destination(dest)})"
+
+
 # --- Resolution -------------------------------------------------------------
 
 
