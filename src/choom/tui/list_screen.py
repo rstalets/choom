@@ -19,7 +19,13 @@ from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
-from choom.tui.columns import ColumnLayout, column_widths, render_header, render_row
+from choom.tui.columns import (
+    TASK_LEAD,
+    ColumnLayout,
+    column_widths,
+    render_header,
+    render_row,
+)
 from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.help_screen import HelpScreen
@@ -121,7 +127,7 @@ class TaskRow(ListItem):
         # parsed as Rich console markup: an unescaped "[x]" opens a style tag
         # named "x" that Rich silently drops from the rendered text, which
         # would make the done marker invisible on every completed task.
-        marker = "\\[x]" if task.done else "\\[ ]"
+        marker = "\\[x]" if task.done else "\\[ ]"  # 3 visible chars + the space below = TASK_LEAD
         cells = (
             task.created.isoformat() if task.created else "",
             task.type,
@@ -219,7 +225,12 @@ class ListScreen(Screen[None]):
         self._rerender_columns()
 
     def _column_layout(self) -> ColumnLayout:
-        return column_widths(self.query_one("#meeting-list", ListView).size.width)
+        # Tasks reserve room ahead of the first column for the done marker, which
+        # sits outside the four columns (spec Assumptions). Without the lead the
+        # header would sit `TASK_LEAD` characters left of the cells it names, and
+        # a task row would render `TASK_LEAD` characters wider than the pane.
+        lead = TASK_LEAD if self.app.active == "tasks" else 0  # type: ignore[attr-defined]
+        return column_widths(self.query_one("#meeting-list", ListView).size.width, lead=lead)
 
     def _rerender_columns(self) -> None:
         layout = self._column_layout()

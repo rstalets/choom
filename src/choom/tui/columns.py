@@ -20,6 +20,11 @@ _MIN_TITLE_WIDTH = 10
 
 _HEADERS = ("Date", "Type", "Title", "Tags")
 
+#: Visible width of a task row's done marker plus its trailing space -- "[x] ".
+#: The marker sits *outside* the four labelled columns (spec Assumptions), so the
+#: columns start this far in on a task row and the header has to start there too.
+TASK_LEAD = 4
+
 
 @dataclass(frozen=True, slots=True)
 class ColumnLayout:
@@ -28,6 +33,13 @@ class ColumnLayout:
     Date and title are never dropped (FR-032); `show_type`/`show_tags` say
     whether the other two are present. Widths are character counts, exclusive
     of the separator between columns.
+
+    `lead` is the number of characters the columns are indented by -- 0 for
+    documents, `TASK_LEAD` for tasks, whose done marker precedes the first
+    column. It is subtracted from the available width before the columns are
+    sized and re-applied by `render_header`, so the header's names sit over the
+    cells they name instead of `lead` characters to their left, and a task row
+    is no wider than the pane.
     """
 
     show_type: bool
@@ -36,9 +48,10 @@ class ColumnLayout:
     type_width: int
     title_width: int
     tags_width: int
+    lead: int = 0
 
 
-def column_widths(total: int) -> ColumnLayout:
+def column_widths(total: int, *, lead: int = 0) -> ColumnLayout:
     """Compute the column layout for a pane `total` characters wide.
 
     Tries four columns, then drops tags, then drops type as well -- date and
@@ -46,10 +59,15 @@ def column_widths(total: int) -> ColumnLayout:
     column absorbs whatever width is left over once the fixed-width columns
     and the separators between them are accounted for.
 
+    `lead` reserves space ahead of the first column for a row prefix the
+    columns do not own -- a task's done marker. The columns are sized against
+    what is left, so `lead + rendered row` never exceeds `total`.
+
     Never raises. `total` need not be large enough for any column to look
     good; `title_width` is clamped to at least 1.
     """
     sep = len(_SEP)
+    total = max(0, total - lead)
     four_columns_min = _DATE_WIDTH + sep + _TYPE_WIDTH + sep + _MIN_TITLE_WIDTH + sep + _TAGS_WIDTH
     three_columns_min = _DATE_WIDTH + sep + _TYPE_WIDTH + sep + _MIN_TITLE_WIDTH
 
@@ -62,6 +80,7 @@ def column_widths(total: int) -> ColumnLayout:
             type_width=_TYPE_WIDTH,
             title_width=title_width,
             tags_width=_TAGS_WIDTH,
+            lead=lead,
         )
 
     if total >= three_columns_min:
@@ -73,6 +92,7 @@ def column_widths(total: int) -> ColumnLayout:
             type_width=_TYPE_WIDTH,
             title_width=title_width,
             tags_width=0,
+            lead=lead,
         )
 
     title_width = max(1, total - (_DATE_WIDTH + sep))
@@ -83,6 +103,7 @@ def column_widths(total: int) -> ColumnLayout:
         type_width=0,
         title_width=title_width,
         tags_width=0,
+        lead=lead,
     )
 
 
@@ -103,14 +124,19 @@ def _truncate(value: str, width: int) -> str:
 
 def render_header(layout: ColumnLayout) -> str:
     """The header row naming the surviving columns, aligned exactly as
-    `render_row` aligns its cells (FR-028, FR-029)."""
+    `render_row` aligns its cells (FR-028, FR-029).
+
+    Indented by `layout.lead`, so on the tasks list -- where every row starts
+    with a done marker the columns do not own -- each name still sits directly
+    over its own cells rather than over the marker.
+    """
     parts = [_truncate(_HEADERS[0], layout.date_width)]
     if layout.show_type:
         parts.append(_truncate(_HEADERS[1], layout.type_width))
     parts.append(_truncate(_HEADERS[2], layout.title_width))
     if layout.show_tags:
         parts.append(_truncate(_HEADERS[3], layout.tags_width))
-    return _SEP.join(parts)
+    return " " * layout.lead + _SEP.join(parts)
 
 
 def render_row(cells: Sequence[str], layout: ColumnLayout) -> str:

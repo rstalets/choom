@@ -124,6 +124,52 @@ async def test_tasks_use_the_same_columns_and_done_state_stays_visible(
         assert any(span.style == "strike" for span in rendered.spans)  # type: ignore[union-attr]
 
 
+async def test_task_header_sits_over_its_cells_not_over_the_done_marker(
+    tmp_workspace: Workspace,
+) -> None:
+    # The done marker is outside the four columns, so the header has to be
+    # indented past it (spec Assumptions, FR-028/FR-030). Asserting only that
+    # "Date" appears in the header passes even when it sits four characters to
+    # the left of every date it names, which is how this shipped misaligned.
+    add_task(tmp_workspace, "call the vendor", type="followup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=_WIDE) as pilot:
+        await pilot.pause()
+        assert app.active == "tasks"
+
+        header_text = str(app.screen.query_one("#list-header", Static).render())
+        rows = [r for r in list_view(app).children if isinstance(r, TaskRow)]
+        row_text = str(rows[0].children[0].render())  # type: ignore[union-attr]
+
+        assert header_text.index("Date") == row_text.index("2026")
+        assert header_text.index("Title") == row_text.index("call the vendor")
+        assert header_text.index("Type") == row_text.index("followup")
+
+        # And the marker still leads the row rather than living in a column.
+        assert row_text.startswith("[ ] ")
+
+
+async def test_a_task_row_does_not_overrun_the_list_pane(tmp_workspace: Workspace) -> None:
+    # The marker's width comes out of the columns' budget, not on top of it --
+    # otherwise the row is TASK_LEAD characters wider than the pane and the
+    # content flows past the header.
+    add_task(tmp_workspace, "a task with a fairly long description " * 3, type="followup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=_WIDE) as pilot:
+        await pilot.pause()
+
+        pane_width = list_view(app).size.width
+        header_text = str(app.screen.query_one("#list-header", Static).render())
+        rows = [r for r in list_view(app).children if isinstance(r, TaskRow)]
+        row_text = str(rows[0].children[0].render())  # type: ignore[union-attr]
+
+        assert len(row_text) <= pane_width
+        assert len(header_text) <= pane_width
+        assert len(row_text) == len(header_text)
+
+
 async def test_header_and_rows_stay_aligned_after_a_resize(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup", tags=("procurement",))
 

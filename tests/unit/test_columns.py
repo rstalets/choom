@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from choom.tui.columns import column_widths, render_header, render_row
+from choom.tui.columns import TASK_LEAD, column_widths, render_header, render_row
 
 
 def test_all_four_columns_fit_at_80_columns() -> None:
@@ -122,3 +122,45 @@ def test_task_row_content_carries_the_same_four_fields() -> None:
     assert "call the vendor" in row
     assert "followup" in row
     assert "procurement" in row
+
+
+# --- the lead: room for a task's done marker ahead of the first column --------
+#
+# Substring assertions ("Date" is in the header, the task text is in the row)
+# pass just as happily when the header sits four characters left of the cells it
+# names and the row overruns the pane. These check offsets and total width.
+
+
+def test_header_is_indented_by_the_lead_so_names_sit_over_their_cells() -> None:
+    layout = column_widths(80, lead=TASK_LEAD)
+    header = render_header(layout)
+    row = "[ ] " + render_row(("2026-07-28", "followup", "call the vendor", "procurement"), layout)
+
+    assert header.index("Date") == TASK_LEAD == row.index("2026-07-28")
+    assert header.index("Title") == row.index("call the vendor")
+    assert header.index("Type") == row.index("followup")
+    assert header.index("Tags") == row.index("procurement")
+
+
+def test_lead_is_taken_out_of_the_available_width_so_a_task_row_still_fits() -> None:
+    for width in (34, 50, 62, 80, 120):
+        layout = column_widths(width, lead=TASK_LEAD)
+        row = "[ ] " + render_row(("2026-07-28", "followup", "a" * 60, "procurement"), layout)
+        header = render_header(layout)
+
+        assert len(row) == width, width
+        assert len(header) == width, width
+
+
+def test_lead_defaults_to_zero_so_documents_are_unaffected() -> None:
+    assert column_widths(80).lead == 0
+    assert render_header(column_widths(80)).index("Date") == 0
+
+
+def test_a_wide_lead_still_leaves_date_and_title() -> None:
+    # The lead eats into the same budget the drop order spends (FR-032): date
+    # and title survive regardless.
+    layout = column_widths(30, lead=TASK_LEAD)
+    assert layout.date_width > 0
+    assert layout.title_width >= 1
+    assert len(render_header(layout)) <= 30
