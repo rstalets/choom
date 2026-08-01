@@ -138,6 +138,20 @@ See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20
 - Text inside a fenced code block or an inline code span is never treated as a link — a note that documents link syntax is not rewritten.
 - A task may carry links too, via the `links:` field on its checkbox line — bare ids, never paths, since a task line is already one line of metadata.
 
+**A checklist item that links to a task is a control surface onto it, not a copy of it.**
+
+```markdown
+- [ ] [call Terry about the renewal](../../../tasks.md#task_a1b2)
+```
+
+- **`tasks.md` holds the state; the item in the document is a view of it.** Two views of one task can never disagree with no arbiter to settle it, which is what a second checkbox carrying its own `id:` would create.
+- **The item is found by its `#task_…` fragment**, never by line number and never by matching the task's text — so it may be reworded, reindented, moved, or duplicated and still work. Writing to it changes exactly one character, the state between the brackets.
+- **The two converge on read and on write.** Opening a document reconciles its items to `tasks.md`; saving one writes a box the user ticked back to `tasks.md`. Nothing watches the filesystem and there is no repair pass — a hand-edit made elsewhere, a document that was closed when its task completed, an item pasted into a second note, all settle the next time that document is opened.
+- **Syncing an item does not stamp the document's `updated`.** Ticking a box in the tasks list is not an edit to the meeting note, and must not reorder every list sorted by recency.
+- **A document that cannot be written never blocks a completion.** `tasks.md` is written first, a warning names the document, and the item is reconciled next time it is opened.
+- An item whose id resolves to no task is dead in exactly the sense above: left byte-identical, reported, never removed.
+- An ordinary checkbox with no link, and an ordinary link with no checkbox, are both left alone. Only the two together are a control surface — endpaper does not adopt checkboxes a person wrote in their own notes.
+
 ### 3.4 The CLI contract
 
 The CLI is what an assistant drives to create records and read structured output, and it

@@ -54,7 +54,7 @@ taken as informed defaults rather than deferred, and each is written down where 
 
 The spec names user-facing surfaces — the `/task` grammar, `endpaper task add --link`, the `links` field
 in a task's metadata comment, the checklist syntax left in a document. These are the product's contract
-with its users and with the assistants that read a workspace, documented in `REQUIREMENTS.md` and
+with its users and with the assistants that read a workspace, documented in `docs/REQUIREMENTS.md` and
 `AGENTS.md`, not internal design. No module, function, language, or data-structure choice appears.
 
 ### Carried assumptions worth a second look at `/speckit-clarify`
