@@ -2,11 +2,15 @@
 SYNC IMPACT REPORT
 ==================
 Version change: 1.1.0 → 1.2.0
-Bump rationale: MINOR. Principle VI gains a new testing rule (tests must not
-depend on the wall clock), which materially expands existing guidance. No
-principle is removed, renamed, or redefined, and nothing that satisfied the
-1.1.0 rules becomes non-compliant — the only tests that violated the new rule
-were already fixed before this amendment.
+Bump rationale: MINOR, covering two amendments in one bump. (1) Principle VI
+gains a new testing rule (tests must not depend on the wall clock), which
+materially expands existing guidance. (2) The `AGENTS.md` constraint raises its
+line cap from 60 to 100 and reframes the cap as the backstop to a content rule
+rather than the rule itself — a relaxation. No principle is removed, renamed,
+or redefined, and nothing that satisfied the 1.1.0 rules becomes non-compliant:
+the tests that violated the new wall-clock rule were already fixed before this
+amendment, and the `AGENTS.md` template sits at 60 lines, well inside the new
+cap.
 
 Modified principles:
   - VI. Readable Python, Enforced Automatically — new bullet added alongside
@@ -14,6 +18,21 @@ Modified principles:
     with the failure it prevents (a fixture pinned to a literal month falling
     out of a month-scoped view and rendering an empty list) and the remedy
     (derive such dates from the same clock the behaviour reads).
+  - Platform & Distribution Constraints — the `AGENTS.md` bullet no longer
+    leads with "MUST stay under roughly 60 lines". The binding rule is now
+    content (nothing an assistant could infer from the workspace itself; no
+    restating the README) and roughly 100 lines is its checkable backstop.
+    Two reasons. The number was already under water: the template is at
+    exactly 60 today, has been hand-tightened twice to stay there (007's
+    `task show`, 008's link syntax), and REQUIREMENTS.md §4.2 already promises
+    `read`, `write`, `append`, and `find` — four AI-facing commands that must
+    appear in the file when they land. With `workspace list/use/current` from
+    the §6.1 backlog, v1.0 projects to roughly 75–80 lines. More importantly,
+    a hard cap that forces deleting real instructions inverts its own purpose;
+    exceeding the cap now triggers a review of the whole file rather than the
+    automatic removal of whatever was added last. The rationale about context
+    files is preserved verbatim in substance — only the number and the framing
+    change.
 
 Added sections: none
 Removed sections: none
@@ -34,21 +53,38 @@ Templates requiring updates:
   ✅ .claude/skills/speckit-*/SKILL.md — reviewed; left unchanged. None
      instructs an agent to write date literals into fixtures, and each already
      defers to the constitution as the authority on testing discipline
-  ✅ README.md — reviewed; left unchanged. It documents usage, not test
+  ✅ README.md — updated for amendment 2 only: the `AGENTS.md` bullet said
+     "under ~60 lines" and would otherwise contradict this document. Reviewed
+     for amendment 1 and left unchanged there; it documents usage, not test
      authoring. (No AGENTS.md exists at the repository root; the file is
      generated into a workspace at `init`.)
+
+Non-template files changed for consistency with amendment 2:
+  ✅ REQUIREMENTS.md §4.3 — "Kept under roughly 60 lines" restated as a
+     content rule with roughly 100 lines as its backstop, matching the
+     constitution. Left unchanged, the two documents would contradict.
+  ✅ tests/contract/test_guidance_docs.py — the one test that asserted the old
+     number (`test_agents_md_stays_within_line_budget`, `<= 60`) now asserts
+     `<= 100`, with a comment recording what the bound is a backstop for. The
+     only `tests/` change in this amendment; no source behaviour changes.
 
 Follow-up TODOs:
   - README.md names the project "cairn" while REQUIREMENTS.md, the command
     name, and this constitution use "endpaper". Carried over from 1.1.0, not
     changed here (outside the constitution workflow's scope); resolve before
     first public release.
+  - REQUIREMENTS.md §4.3 still says AGENTS.md contains "the six commands an
+    assistant should reach for". That count predates 007 and 008 and was
+    already stale before this amendment; not corrected here.
 
 Migration path:
-  - None required. No existing spec, plan, or test becomes non-compliant. The
-    six tests that violated this rule (July-2026 fixtures asserted against the
-    month-scoped list introduced by spec 005) were already repaired on main
-    before this amendment landed.
+  - Amendment 1 (wall clock): none required. No existing spec, plan, or test
+    becomes non-compliant. The six tests that violated the rule (July-2026
+    fixtures asserted against the month-scoped list introduced by spec 005)
+    were already repaired on main before this amendment landed.
+  - Amendment 2 (AGENTS.md cap): none required. The change only relaxes an
+    existing limit. The template is at 60 lines and stays compliant; anything
+    that satisfied the 60-line cap satisfies the 100-line one.
 -->
 
 # endpaper Constitution
@@ -190,9 +226,14 @@ contributor who sends a second patch.
 - Per-user state (such as the current workspace) MUST live in per-user local state, never
   in the shared workspace directory, so two people sharing a synced folder cannot
   overwrite each other's selection.
-- `AGENTS.md` is generated at `init` and MUST stay under roughly 60 lines. It carries the
-  folder layout, the frontmatter schema, the task line format, and the commands an
-  assistant needs. It does not restate the README.
+- `AGENTS.md` is generated at `init`. It carries the folder layout, the frontmatter schema,
+  the task line format, and the commands an assistant needs — and nothing an assistant could
+  infer from the workspace itself. It does not restate the README. That content rule is what
+  binds; roughly 100 lines is its checkable backstop, not a budget to be spent. Short,
+  human-curated, genuinely non-obvious guidance is what helps an assistant, and a bloated
+  file measurably raises exploration cost. A real instruction that pushes the file past the
+  cap means the whole file gets reviewed for content that has stopped earning its place —
+  never that the instruction is dropped to fit under a number.
 
 ## Development Workflow & Quality Gates
 

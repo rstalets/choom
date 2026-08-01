@@ -105,7 +105,7 @@ See [REQUIREMENTS.md](REQUIREMENTS.md) for the full CLI reference, frontmatter s
 - **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `endpaper find`, `read`, `write`, `append`, `--json` on every read command, meaningful exit codes, nothing that opens an editor or blocks on input.
 - **`/ai` in the editor** — type `/ai <prompt>` on its own line and press `enter`: the document saves, your already-installed Claude Code CLI or GitHub Copilot CLI runs the prompt, and the reply lands where the command was. The line shows `⋯` and the status bar names a random breadcrumb plus `ctrl+c to cancel` while it works; every failure — cancelled, no reply, the assistant errored — restores the line exactly as typed. Which assistant to call is detected automatically when only one is installed, or set explicitly with `endpaper config assistant <claude|copilot|none>` (CLI) or `/config assistant <value>` (TUI command bar) — a workspace with neither tool installed keeps every other feature unchanged.
 - **No index, no database** — the markdown files are the only state. endpaper globs and parses the workspace in memory on launch; nothing to corrupt, nothing to reindex.
-- **`AGENTS.md`** — generated at `init`, under ~60 lines, so an assistant landing in the workspace is productive immediately.
+- **`AGENTS.md`** — generated at `init`, under ~100 lines, so an assistant landing in the workspace is productive immediately.
 
 See [REQUIREMENTS.md](REQUIREMENTS.md) for the full v0.0.1 specification, including CLI syntax, frontmatter schema, and acceptance criteria. Not everything above has landed on `main` yet — check [CHANGELOG.md](CHANGELOG.md) for what's actually shipped so far.
 

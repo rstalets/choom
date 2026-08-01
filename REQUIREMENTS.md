@@ -266,7 +266,7 @@ This is a hard requirement, not a preference. The CLI is the assistant's only in
 
 - Generated at `init` at the workspace root.
 - Contains: folder layout, frontmatter schema, the task line format, and the six commands an assistant should reach for. Nothing else.
-- **Kept under roughly 60 lines.** Research on context files is clear that short, human-curated, genuinely non-obvious content helps and that bloated files measurably increase exploration cost and can degrade performance. Do not restate the README. Do not explain what markdown is.
+- **Content is the rule; the line count is its backstop.** Carry nothing an assistant could infer from the workspace itself. Do not restate the README. Do not explain what markdown is. Research on context files is clear that short, human-curated, genuinely non-obvious content helps and that bloated files measurably increase exploration cost and can degrade performance. Roughly 100 lines is the checkable form of that rule, not a budget to fill: a genuine instruction that pushes the file over the cap triggers a review of the whole file for content that has stopped earning its place, never the deletion of whatever was added last.
 
 ### 4.4 Search
 
