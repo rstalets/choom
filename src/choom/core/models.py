@@ -88,6 +88,7 @@ ScanWarningReason = Literal[
     "link_ambiguous",
     "mirror_conflict",
     "mirror_ambiguous",
+    "reply_capture_failed",
 ]
 
 
@@ -305,3 +306,37 @@ class AssistantReply:
     text: str
     message: str
     cancelled: bool
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyLine:
+    """One line of an assistant reply, classified by `parse_reply_lines`.
+
+    `text` is the line exactly as the assistant wrote it, without its line
+    terminator, and is never modified by the classifier. `task` is the parsed
+    task command when the line is eligible for capture -- outside any fenced
+    code block, with no leading whitespace, and naming the `task` command --
+    and `None` for every other line, including an ineligible `/task` mention.
+    A non-`None` `task` may still be unusable (e.g. `/task` with no
+    description); the classifier does not judge that, only `capture_task`
+    does."""
+
+    text: str
+    task: ParsedCommand | None
+
+
+@dataclass(frozen=True, slots=True)
+class ReplyCapture:
+    """The outcome of walking one reply with `capture_reply_tasks`.
+
+    `text` is the reply with every successfully captured line replaced by its
+    mirror line and every other line byte-identical to the input -- the same
+    object as the input when no line was captured (FR-011), so a caller can
+    test identity. `tasks` holds the tasks created, in the order their lines
+    appeared in the reply. `warnings` holds one entry per line that was
+    eligible but could not be captured. `len(tasks) + len(warnings)` equals
+    the number of eligible lines."""
+
+    text: str
+    tasks: tuple[Task, ...]
+    warnings: tuple[ScanWarning, ...]
