@@ -10,7 +10,7 @@ from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.documents import _TOKEN_PATTERN, _validate_token
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
 from endpaper.core.models import ParsedTasks, ScanWarning, Task, TaskBodySpan, TaskFilter, Workspace
-from endpaper.core.text import _split_terminator, new_task_id, parse_tags
+from endpaper.core.text import _split_terminator, matches_terms, new_task_id, parse_tags
 
 _TASK_LINE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<marker>[-*+])[ \t]+\[(?P<state>[ xX])\][ \t]+(?P<rest>.*)$"
@@ -384,9 +384,9 @@ def filter_tasks(tasks: Iterable[Task], f: TaskFilter) -> list[Task]:
 
 
 def match_task(task: Task, query: str) -> bool:
-    """Case-insensitive substring over text, type, and tags. For the TUI's live filter."""
-    haystack = " ".join([task.text, task.type, *task.tags]).lower()
-    return query.lower() in haystack
+    """Case-insensitive over text, type, and tags; every term must appear, order
+    irrelevant. For the TUI's live filter."""
+    return matches_terms(" ".join([task.text, task.type, *task.tags]), query)
 
 
 def _atomic_write(path: Path, lines: Sequence[str]) -> None:

@@ -23,6 +23,21 @@ def _split_terminator(line: str) -> tuple[str, str]:
     return line, ""
 
 
+def matches_terms(haystack: str, query: str) -> bool:
+    """Whether every whitespace-separated term in `query` appears in `haystack`.
+
+    A one-word query behaves exactly like a plain substring test, so this only
+    changes multi-word queries -- which previously required the words to be
+    contiguous and in order, and so matched almost nothing: "research okta"
+    never appears literally in "okta rollout research", even though both words
+    do. An empty query matches everything, which is what a cleared filter means.
+
+    Case-insensitive. Never raises.
+    """
+    lowered = haystack.lower()
+    return all(term in lowered for term in query.lower().split())
+
+
 def slugify(text: str, *, max_length: int = 40) -> str:
     normalized = unicodedata.normalize("NFKD", text)
     without_marks = "".join(ch for ch in normalized if not unicodedata.combining(ch))
