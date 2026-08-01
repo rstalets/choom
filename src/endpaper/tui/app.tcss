@@ -41,6 +41,18 @@ CollectionBar {
     height: auto;
 }
 
+#preview-links-section {
+    dock: bottom;
+    height: auto;
+    max-height: 12;
+    border-top: solid $accent;
+}
+
+#preview-links-list {
+    height: auto;
+    max-height: 10;
+}
+
 #links-section {
     height: auto;
     max-height: 12;

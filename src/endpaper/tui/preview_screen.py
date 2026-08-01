@@ -118,9 +118,13 @@ class PreviewScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield Markdown(id="full-preview", open_links=False)
-        with Vertical(id="links-section"):
-            yield ListView(id="links-list")
+        # The links section lives inside the docked bottom bar, above the status
+        # line, so it is pinned to the bottom of the screen. Composed as a
+        # sibling it merely followed the rendered text, which put it mid-screen
+        # on a short document instead of where the eye expects a panel.
         with Vertical(id="bottom-bar"):
+            with Vertical(id="links-section"):
+                yield ListView(id="links-list")
             yield StatusBar(PREVIEW_HELP, id="status-bar")
 
     def on_mount(self) -> None:

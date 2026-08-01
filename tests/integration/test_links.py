@@ -484,3 +484,38 @@ def test_an_unresolvable_or_empty_destination_is_not_claimed(tmp_workspace: Work
     assert resolve_href(tmp_workspace, note.path, "") is None
     assert resolve_href(tmp_workspace, note.path, "#meeting_does_not_exist") is None
     assert resolve_href(tmp_workspace, note.path, "no/such/file.md") is None
+
+
+# --- the links pane in the list screen's preview pane ---------------------------
+
+
+async def test_backlinks_pane_works_in_the_list_preview(tmp_workspace: Workspace) -> None:
+    """The links pane must exist on the list screen too, not only in the
+    full-screen preview: a later feature makes the preview pane an editing pane
+    and de-prioritises full screen, so this is the surface that matters."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    note.path.write_text(
+        note.path.read_text(encoding="utf-8") + f"\nSee [Q3 planning](#{meeting.id}).\n",
+        encoding="utf-8",
+    )
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test() as pilot:
+        await to_collection(app, pilot, "meetings")
+        section = app.screen.query_one("#preview-links-section")
+        assert section.display is False
+
+        await pilot.press("b")
+        await pilot.pause()
+        assert section.display is True
+
+        rows = app.screen.query_one("#preview-links-list", ListView)
+        rendered = "\n".join(str(label.content) for label in rows.query(Label))
+        assert "Points at" in rendered
+        assert "Points here" in rendered
+        assert "vendor landscape" in rendered
+
+        await pilot.press("b")
+        await pilot.pause()
+        assert section.display is False
