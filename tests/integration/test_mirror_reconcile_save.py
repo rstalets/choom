@@ -113,3 +113,69 @@ async def test_a_tasks_md_write_does_not_cascade_back_into_the_document(
         mtime_settled = meeting_path.stat().st_mtime_ns
         await pilot.pause()
         assert meeting_path.stat().st_mtime_ns == mtime_settled
+
+
+async def test_ticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Workspace) -> None:
+    """Regression: reconciliation wrote tasks.md but left the app's cached task
+    list holding the pre-save state, so the Tasks collection went on showing the
+    followup as open until something else happened to reload it. Asserting only
+    `load_tasks` from disk missed this -- the disk was always right."""
+    task_id = _seed_mirror(tmp_workspace)
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+        assert next(t for t in app.tasks if t.id == task_id).done is False
+
+        _flip_checkbox(editor, done=True)
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+
+        assert next(t for t in app.tasks if t.id == task_id).done is True
+
+
+async def test_unticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Workspace) -> None:
+    task_id = _seed_mirror(tmp_workspace)
+    from endpaper.core.tasks import set_task_state
+
+    set_task_state(tmp_workspace, task_id, done=True)
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        _flip_checkbox(editor, done=False)
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+
+        assert next(t for t in app.tasks if t.id == task_id).done is False
+
+
+async def test_saving_without_touching_a_mirror_does_not_reload_tasks(
+    tmp_workspace: Workspace,
+) -> None:
+    """The reload is conditional on reconciliation actually having written
+    tasks.md -- an ordinary save must not pay for a re-parse it does not need."""
+    _seed_mirror(tmp_workspace)
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        calls: list[int] = []
+        original = app.reload_tasks
+
+        def _counting_reload() -> None:
+            calls.append(1)
+            original()
+
+        app.reload_tasks = _counting_reload  # type: ignore[method-assign]
+
+        editor.text = editor.text + "\nan unrelated line\n"
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+
+        assert calls == []

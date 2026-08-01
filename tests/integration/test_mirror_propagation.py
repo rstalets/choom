@@ -174,3 +174,36 @@ def test_task_with_no_links_reads_no_document(
     written, warnings = propagate_to_documents(tmp_workspace, task)
     assert written == ()
     assert warnings == ()
+
+
+# --- the cached Document behind a spliced file must not go stale ---------------
+
+
+async def test_toggling_refreshes_the_cached_document_it_spliced(
+    tmp_workspace: Workspace,
+) -> None:
+    """Regression, the mirror image of the reconcile-on-save staleness bug:
+    `propagate_to_documents` reports which documents it wrote, and the app was
+    discarding that list. The file on disk was correct while the Document cached
+    behind it still held the old checkbox, so the preview rendered a stale one."""
+    task_id, meeting_path = _capture(tmp_workspace)
+
+    app = EndpaperApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.pause()
+        cached_before = next(d for d in app.visible_documents() if d.path == meeting_path)
+        assert "- [ ] [call Terry]" in cached_before.path.read_text(encoding="utf-8")
+
+        await to_collection(app, pilot, "tasks")
+        await pilot.press("space")
+        await pilot.pause()
+
+        assert next(t for t in app.tasks if t.id == task_id).done is True
+
+        await to_collection(app, pilot, "meetings")
+        await pilot.pause()
+        cached_after = next(d for d in app.visible_documents() if d.path == meeting_path)
+        # The cache entry was rebuilt from the spliced file rather than left
+        # holding the pre-toggle parse.
+        assert cached_after is not cached_before

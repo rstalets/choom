@@ -381,6 +381,11 @@ class EndpaperApp(App[None]):
             for screen in self.screen_stack
             if isinstance(screen, EditScreen) and screen.is_dirty
         )
-        _written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
+        written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
+        for path in written:
+            # The splice changed these files on disk; the cached Document behind
+            # each one still holds the old checkbox and would render it stale in
+            # the preview. Re-parse only what actually changed -- never a rescan.
+            self.refresh_document(path)
         if warnings:
             self.last_task_error = "; ".join(w.message for w in warnings)

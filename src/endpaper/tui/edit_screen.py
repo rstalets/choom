@@ -312,6 +312,14 @@ class EditScreen(Screen[None]):
             for m in find_mirrors(result.saved_text, source=self.target.display_path)
         }
 
+        if any(r.outcome in ("task_written", "conflict") for r in mirror_report.resolutions):
+            # Reconciliation just wrote tasks.md behind the app's cached task
+            # list, which would otherwise keep showing the pre-save state until
+            # something else happened to reload it. Every other path that writes
+            # tasks.md already does this; ticking a mirror in a document is a
+            # write to tasks.md too.
+            self.app.reload_tasks()  # type: ignore[attr-defined]
+
         messages = [w.message for w in result.warnings]
         messages.extend(w.message for w in mirror_report.warnings)
         if self.target.stamps_frontmatter and not result.stamped:
