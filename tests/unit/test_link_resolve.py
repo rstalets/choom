@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from endpaper.core.links import Link, relative_destination, resolve_id, resolve_link
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.core.tasks import add_task
+from choom.core.links import Link, relative_destination, resolve_id, resolve_link
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note
+from choom.core.tasks import add_task
 
 
 def test_id_resolves_regardless_of_wrong_path(tmp_workspace: Workspace) -> None:

@@ -2,16 +2,16 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
 from tests.helpers import open_edit
 
 
 async def test_editor_configuration_matches_contract(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -23,7 +23,7 @@ async def test_editor_configuration_matches_contract(tmp_workspace: Workspace) -
 async def test_gutter_line_one_is_opening_frontmatter_marker(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -39,7 +39,7 @@ async def test_wide_paragraph_wraps_without_horizontal_scroll(tmp_workspace: Wor
         encoding="utf-8",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(40, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -55,7 +55,7 @@ async def test_hundred_body_lines_all_present(tmp_workspace: Workspace) -> None:
         encoding="utf-8",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -66,7 +66,7 @@ async def test_hundred_body_lines_all_present(tmp_workspace: Workspace) -> None:
 async def test_tab_key_does_not_insert_a_tab_character(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -80,11 +80,11 @@ async def test_tab_key_does_not_insert_a_tab_character(tmp_workspace: Workspace)
 
 
 async def test_footer_shows_edit_help(tmp_workspace: Workspace) -> None:
-    from endpaper.tui.status_bar import EDIT_HELP, StatusBar
+    from choom.tui.status_bar import EDIT_HELP, StatusBar
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         status = app.screen.query_one(StatusBar)
@@ -98,7 +98,7 @@ async def test_non_ascii_and_emoji_round_trip_intact(tmp_workspace: Workspace) -
         meeting.path.read_text(encoding="utf-8") + "\n" + extra + "\n", encoding="utf-8"
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)

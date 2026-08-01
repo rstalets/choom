@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from textual.widgets import Label, ListView, TextArea
 
-from endpaper.core.links import (
+from choom.core.links import (
     check_links,
     heal_links,
     inbound_links,
@@ -12,14 +12,14 @@ from endpaper.core.links import (
     resolve_href,
     resolve_id,
 )
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.core.tasks import add_task
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.links_pane import LinkRow
-from endpaper.tui.list_screen import DocumentRow
-from endpaper.tui.status_bar import StatusBar
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note
+from choom.core.tasks import add_task
+from choom.tui.app import ChoomApp
+from choom.tui.links_pane import LinkRow
+from choom.tui.list_screen import DocumentRow
+from choom.tui.status_bar import StatusBar
 from tests.helpers import open_edit, submit_editor_line, to_collection
 
 
@@ -121,7 +121,7 @@ async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Wor
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     create_note(tmp_workspace, "vendor landscape")  # a note to open and edit
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot, collection="notes")
         editor = screen.query_one("#editor", TextArea)
@@ -139,7 +139,7 @@ async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Wor
 async def test_link_zero_matches_leaves_the_line_and_reports(tmp_workspace: Workspace) -> None:
     create_note(tmp_workspace, "vendor landscape")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot, collection="notes")
         editor = screen.query_one("#editor", TextArea)
@@ -158,7 +158,7 @@ async def test_link_several_matches_leaves_the_line_and_names_candidates(
     create_meeting(tmp_workspace, "Q3 planning beta")
     create_note(tmp_workspace, "vendor landscape")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot, collection="notes")
         editor = screen.query_one("#editor", TextArea)
@@ -179,7 +179,7 @@ async def test_link_partial_line_is_ordinary_text_not_a_command(
     note = create_note(tmp_workspace, "vendor landscape")
     before_bytes = note.path.read_bytes()
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot, collection="notes")
         editor = screen.query_one("#editor", TextArea)
@@ -204,7 +204,7 @@ async def test_outbound_links_render_on_expanding_the_section(tmp_workspace: Wor
     text = note.path.read_text(encoding="utf-8")
     note.path.write_text(text + f"\n[Q3 planning]({dest}#{meeting.id})\n", encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "notes")
         await pilot.press("enter")
@@ -228,7 +228,7 @@ async def test_inbound_links_appear_only_once_expanded(tmp_workspace: Workspace)
     text = note.path.read_text(encoding="utf-8")
     note.path.write_text(text + f"\n[Q3 planning](#{meeting.id})\n", encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
@@ -252,7 +252,7 @@ async def test_inbound_links_appear_only_once_expanded(tmp_workspace: Workspace)
 async def test_a_record_nothing_points_at_says_so(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "nothing points here")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
@@ -273,7 +273,7 @@ async def test_opening_a_dead_link_reports_and_does_not_change_the_view(
     text = note.path.read_text(encoding="utf-8")
     note.path.write_text(text + "\n[gone](#meeting_00000000_deadbeef)\n", encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "notes")
         await pilot.press("enter")
@@ -281,7 +281,7 @@ async def test_opening_a_dead_link_reports_and_does_not_change_the_view(
         await pilot.press("b")
         await pilot.pause()
 
-        from endpaper.tui.preview_screen import PreviewScreen
+        from choom.tui.preview_screen import PreviewScreen
 
         assert isinstance(app.screen, PreviewScreen)
         list_view = app.screen.query_one("#links-list", ListView)
@@ -311,9 +311,9 @@ async def test_escape_collapses_the_links_section_without_leaving_preview(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning")
 
-    from endpaper.tui.preview_screen import PreviewScreen
+    from choom.tui.preview_screen import PreviewScreen
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
@@ -334,7 +334,7 @@ async def test_escape_collapses_the_links_section_without_leaving_preview(
         await pilot.pause()
 
         # A second esc, with the section already collapsed, goes back to the list.
-        from endpaper.tui.list_screen import ListScreen
+        from choom.tui.list_screen import ListScreen
 
         assert isinstance(app.screen, ListScreen)
 
@@ -346,7 +346,7 @@ async def test_jk_move_within_the_links_section(tmp_workspace: Workspace) -> Non
     text = note.path.read_text(encoding="utf-8")
     note.path.write_text(text + f"\n[Q3]({dest}#{meeting.id})\n", encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 30)) as pilot:
         await to_collection(app, pilot, "notes")
         await pilot.press("enter")
@@ -462,7 +462,7 @@ def test_a_task_body_link_does_not_disturb_the_links_field(tmp_workspace: Worksp
 def test_a_clicked_workspace_link_resolves_to_its_record(tmp_workspace: Workspace) -> None:
     """`Markdown` sends every href to `app.open_url` unless told otherwise, which
     handed a workspace-relative path and an `#id` fragment to a web browser. A
-    destination endpaper owns must resolve to the record instead."""
+    destination choom owns must resolve to the record instead."""
     meeting = create_meeting(tmp_workspace, "Q3 planning")
     note = create_note(tmp_workspace, "vendor landscape")
     dest = relative_destination(note.path, meeting.path)
@@ -502,7 +502,7 @@ async def test_backlinks_pane_works_in_the_list_preview(tmp_workspace: Workspace
         encoding="utf-8",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test() as pilot:
         await to_collection(app, pilot, "meetings")
         section = app.screen.query_one("#preview-links-section")
@@ -542,7 +542,7 @@ async def test_escaping_a_linked_doc_returns_to_the_record_you_left(
         encoding="utf-8",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test() as pilot:
         await to_collection(app, pilot, "notes")
         list_view = app.screen.query_one("#meeting-list", ListView)

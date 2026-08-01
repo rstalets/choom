@@ -3,8 +3,8 @@ from __future__ import annotations
 import threading
 from datetime import datetime
 
-from endpaper.core.models import Workspace
-from endpaper.core.notes import open_daily_note
+from choom.core.models import Workspace
+from choom.core.notes import open_daily_note
 from tests.conftest import daily_note_path
 
 

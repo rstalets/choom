@@ -6,10 +6,10 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.cli.main import main
-from endpaper.core.documents import _read_document
-from endpaper.core.mirrors import capture_task
-from endpaper.core.workspace import find_workspace
+from choom.cli.main import main
+from choom.core.documents import _read_document
+from choom.core.mirrors import capture_task
+from choom.core.workspace import find_workspace
 
 EXPECTED_KEYS = {"id", "done", "links", "documents_updated", "warnings"}
 
@@ -98,6 +98,6 @@ def test_stream_separation_on_an_unwritable_linked_document(
         assert payload["warnings"] != []
         assert payload["documents_updated"] == []
         assert meeting_path.name in captured.err
-        assert captured.err.startswith("endpaper: ")  # the human-readable form
+        assert captured.err.startswith("choom: ")  # the human-readable form
     finally:
         directory.chmod(original_mode)

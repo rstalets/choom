@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.cli.main import main
-from endpaper.core.models import Workspace
-from endpaper.core.workspace import init_workspace
-from endpaper.tui.app import EndpaperApp
+from choom.cli.main import main
+from choom.core.models import Workspace
+from choom.core.workspace import init_workspace
+from choom.tui.app import ChoomApp
 from tests.helpers import open_bar, type_command
 
 
@@ -27,15 +27,15 @@ async def test_cli_and_tui_produce_the_same_config_file(
     capsys.readouterr()
     assert main(["config", "assistant", "claude"]) == 0
     capsys.readouterr()
-    cli_config = (cli_root / ".endpaper" / "config.toml").read_text(encoding="utf-8")
+    cli_config = (cli_root / ".choom" / "config.toml").read_text(encoding="utf-8")
 
     tui_root = tmp_path / "tui-workspace"
     tui_workspace = init_workspace(tui_root).workspace
-    app = EndpaperApp(tui_workspace)
+    app = ChoomApp(tui_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await type_command(app, pilot, "config assistant claude")
 
-    tui_config = (tui_root / ".endpaper" / "config.toml").read_text(encoding="utf-8")
+    tui_config = (tui_root / ".choom" / "config.toml").read_text(encoding="utf-8")
 
     assert _assistant_block(cli_config) == _assistant_block(tui_config)
 
@@ -45,7 +45,7 @@ async def test_config_predating_this_feature_reads_without_error(
 ) -> None:
     # init_workspace with no `assistant=` kwarg is exactly the shape an older
     # build would have written: no [assistant] table at all.
-    config_path = tmp_workspace.root / ".endpaper" / "config.toml"
+    config_path = tmp_workspace.root / ".choom" / "config.toml"
     assert "[assistant]" not in config_path.read_text(encoding="utf-8")
 
     monkeypatch.chdir(tmp_workspace.root)
@@ -53,7 +53,7 @@ async def test_config_predating_this_feature_reads_without_error(
     out = capsys.readouterr().out
     assert "configured\t-" in out
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         bar = await open_bar(app, pilot)
         bar.value = "config assistant"

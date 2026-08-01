@@ -7,12 +7,12 @@ from pathlib import Path
 import pytest
 from textual.widgets import TextArea
 
-from endpaper.core.config import set_assistant
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.status_bar import EDIT_HELP, StatusBar
+from choom.core.config import set_assistant
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
+from choom.tui.status_bar import EDIT_HELP, StatusBar
 from tests.conftest import STUB_REPLY_TEXT
 from tests.helpers import open_edit, submit_editor_line
 
@@ -23,7 +23,7 @@ async def test_reply_replaces_the_command_line(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("reply")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -56,7 +56,7 @@ async def test_reply_containing_a_slash_ai_line_is_inserted_as_literal_text(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("reply_with_slash")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -79,7 +79,7 @@ async def test_cancel_restores_the_line_and_kills_the_process(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("sleep")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -110,7 +110,7 @@ async def test_non_zero_exit_shows_a_message_and_restores_the_line(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("fail")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -140,7 +140,7 @@ async def test_empty_reply_shows_a_message_and_restores_the_line(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("empty")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -165,7 +165,7 @@ async def test_no_assistant_available_reports_and_restores_the_line(
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -194,7 +194,7 @@ async def test_configured_but_missing_binary_names_the_assistant(
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -212,7 +212,7 @@ async def test_configured_but_missing_binary_names_the_assistant(
 async def test_bare_ai_reports_a_prompt_is_needed(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -242,7 +242,7 @@ async def test_both_assistants_installed_nothing_configured_reports_ambiguous(
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -264,7 +264,7 @@ async def test_resize_mid_request_updates_the_breadcrumb_display(
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
     stub_assistant("sleep")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -298,7 +298,7 @@ async def test_save_failure_never_invokes_the_assistant(
 
     directory.chmod(stat.S_IRUSR | stat.S_IXUSR)
     try:
-        app = EndpaperApp(tmp_workspace)
+        app = ChoomApp(tmp_workspace)
         async with app.run_test(size=(80, 24)) as pilot:
             screen = await open_edit(app, pilot)
             editor = screen.query_one("#editor", TextArea)

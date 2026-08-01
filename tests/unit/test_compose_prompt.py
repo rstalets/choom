@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.assistants import compose_prompt
+from choom.core.assistants import compose_prompt
 
 _INSTRUCTION_CLAUSES = [
     "Answer directly. No preamble, no restating the question, no sign-off.",

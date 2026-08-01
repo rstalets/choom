@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.commands import VERB_TABLE
-from endpaper.tui.help_screen import HelpScreen
-from endpaper.tui.list_screen import ListScreen
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.commands import VERB_TABLE
+from choom.tui.help_screen import HelpScreen
+from choom.tui.list_screen import ListScreen
 from tests.helpers import list_view, to_collection
 
 
@@ -18,7 +18,7 @@ async def _open_help(pilot) -> None:  # type: ignore[no-untyped-def]
 
 
 async def test_help_pane_lists_every_verb_with_a_description(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await _open_help(pilot)
         assert isinstance(app.screen, HelpScreen)
@@ -32,7 +32,7 @@ async def test_help_pane_lists_every_verb_with_a_description(tmp_workspace: Work
 async def test_help_pane_lists_the_in_editor_task_command(tmp_workspace: Workspace) -> None:
     # FR-010: /task's discoverability comes entirely from being registered in
     # EDITOR_COMMANDS -- no help text is written by hand in a second place.
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await _open_help(pilot)
         body = str(app.screen.query_one("#help-body").content)  # type: ignore[attr-defined]
@@ -41,7 +41,7 @@ async def test_help_pane_lists_the_in_editor_task_command(tmp_workspace: Workspa
 
 
 async def test_help_pane_names_e_for_a_tasks_details(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await _open_help(pilot)
         body = str(app.screen.query_one("#help-body").content)  # type: ignore[attr-defined]
@@ -49,7 +49,7 @@ async def test_help_pane_names_e_for_a_tasks_details(tmp_workspace: Workspace) -
 
 
 async def test_help_pane_leaves_the_list_visible_underneath(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await _open_help(pilot)
         # The list screen is never popped -- it's still in the stack, just
@@ -58,11 +58,11 @@ async def test_help_pane_leaves_the_list_visible_underneath(tmp_workspace: Works
 
 
 async def test_escape_dismisses_and_leaves_state_unchanged(tmp_workspace: Workspace) -> None:
-    from endpaper.core.meetings import create_meeting
+    from choom.core.meetings import create_meeting
 
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         highlighted_before = list_view(app).highlighted_child.document.id  # type: ignore[union-attr]

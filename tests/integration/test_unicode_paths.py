@@ -3,15 +3,15 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from endpaper.core.assistants import compose_prompt, resolve_assistant, start_request
-from endpaper.core.config import get_assistant, set_assistant
-from endpaper.core.editing import load_for_edit, save_buffer
-from endpaper.core.links import relative_destination
-from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.mirrors import capture_task, propagate_to_documents, reconcile_on_open
-from endpaper.core.notes import create_note, open_daily_note, scan_notes
-from endpaper.core.tasks import set_task_state
-from endpaper.core.workspace import init_workspace
+from choom.core.assistants import compose_prompt, resolve_assistant, start_request
+from choom.core.config import get_assistant, set_assistant
+from choom.core.editing import load_for_edit, save_buffer
+from choom.core.links import relative_destination
+from choom.core.meetings import create_meeting, scan_meetings
+from choom.core.mirrors import capture_task, propagate_to_documents, reconcile_on_open
+from choom.core.notes import create_note, open_daily_note, scan_notes
+from choom.core.tasks import set_task_state
+from choom.core.workspace import init_workspace
 
 
 def test_workspace_path_with_spaces_and_non_ascii_works(tmp_path: Path) -> None:
@@ -98,7 +98,7 @@ def test_a_destination_with_a_space_uses_the_angle_bracket_form(tmp_path: Path) 
     workspace_root.mkdir()
     workspace = init_workspace(workspace_root).workspace
 
-    # A file placed by hand with a space and parens in its name -- endpaper's own
+    # A file placed by hand with a space and parens in its name -- choom's own
     # generated filenames never need escaping, but a user's hand-placed file
     # legitimately can, and the workspace explicitly permits this.
     target = workspace.notes_dir / "Q3 (draft) notes.md"

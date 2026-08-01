@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.text import slugify
+from choom.core.text import slugify
 
 
 @pytest.mark.parametrize(

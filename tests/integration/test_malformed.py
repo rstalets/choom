@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import json
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks
 
 
 def test_malformed_file_is_skipped_warned_and_left_byte_identical(cli) -> None:

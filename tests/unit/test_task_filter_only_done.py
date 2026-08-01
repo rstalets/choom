@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from endpaper.core.models import Task, TaskFilter
-from endpaper.core.tasks import filter_tasks
+from choom.core.models import Task, TaskFilter
+from choom.core.tasks import filter_tasks
 
 
 def _task(text: str, *, done: bool) -> Task:

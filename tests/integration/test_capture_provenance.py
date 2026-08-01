@@ -6,13 +6,13 @@ from pathlib import Path
 import pytest
 from textual.widgets import Label, ListView
 
-from endpaper.cli.main import main
-from endpaper.core.links import inbound_links
-from endpaper.core.meetings import create_meeting
-from endpaper.core.mirrors import capture_task
-from endpaper.core.models import Task, Workspace
-from endpaper.core.tasks import set_task_state
-from endpaper.tui.app import EndpaperApp
+from choom.cli.main import main
+from choom.core.links import inbound_links
+from choom.core.meetings import create_meeting
+from choom.core.mirrors import capture_task
+from choom.core.models import Task, Workspace
+from choom.core.tasks import set_task_state
+from choom.tui.app import ChoomApp
 from tests.helpers import to_collection
 
 
@@ -44,7 +44,7 @@ def test_captured_task_is_an_inbound_link_of_the_meeting_cli(
     main(["init"])
     capsys.readouterr()
 
-    from endpaper.core.workspace import find_workspace
+    from choom.core.workspace import find_workspace
 
     workspace = find_workspace(tmp_path)
     _task, meeting_id = _capture(workspace)
@@ -70,7 +70,7 @@ def test_link_still_resolves_after_the_source_document_moves(tmp_workspace: Work
     new_path = new_dir / meeting_path.name
     meeting_path.rename(new_path)
 
-    from endpaper.core.links import resolve_id
+    from choom.core.links import resolve_id
 
     target, warnings = resolve_id(tmp_workspace, meeting_id)
     assert target is not None
@@ -88,7 +88,7 @@ def test_deleted_source_document_produces_a_dead_link_warning(tmp_workspace: Wor
     meeting_path = next(tmp_workspace.meetings_dir.rglob("*.md"))
     meeting_path.unlink()
 
-    from endpaper.core.links import outbound_for_target, resolve_id
+    from choom.core.links import outbound_for_target, resolve_id
 
     target, _warnings = resolve_id(tmp_workspace, task.id)
     assert target is not None
@@ -113,7 +113,7 @@ def test_deleted_source_document_produces_a_dead_link_warning(tmp_workspace: Wor
 async def test_task_preview_names_the_meeting_and_opens_it(tmp_workspace: Workspace) -> None:
     task, _meeting_id = _capture(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "tasks")
 
@@ -125,7 +125,7 @@ async def test_task_preview_names_the_meeting_and_opens_it(tmp_workspace: Worksp
         assert "Points at" in rendered
         assert "Q3 planning" in rendered
 
-        from endpaper.tui.links_pane import LinkRow
+        from choom.tui.links_pane import LinkRow
 
         link_rows = [child for child in rows.children if isinstance(child, LinkRow)]
         outbound = next(row for row in link_rows if row.direction == "out")
@@ -133,7 +133,7 @@ async def test_task_preview_names_the_meeting_and_opens_it(tmp_workspace: Worksp
         await pilot.press("enter")
         await pilot.pause()
 
-        from endpaper.tui.preview_screen import PreviewScreen
+        from choom.tui.preview_screen import PreviewScreen
 
         assert isinstance(app.screen, PreviewScreen)
         assert app.screen.document is not None

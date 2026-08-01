@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core import mirrors as mirrors_module
-from endpaper.core.mirrors import reconcile_on_open
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks, render_task_line
-from endpaper.core.workspace import init_workspace
+from choom.core import mirrors as mirrors_module
+from choom.core.mirrors import reconcile_on_open
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks, render_task_line
+from choom.core.workspace import init_workspace
 
 _SOURCE = Path("meetings/2026/07/2026-07-28-q3-planning.md")
 

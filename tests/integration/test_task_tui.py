@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.core.tasks import load_tasks
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.collection_bar import CollectionBar
-from endpaper.tui.list_screen import TaskRow
-from endpaper.tui.status_bar import StatusBar
+from choom.core.meetings import create_meeting, scan_meetings
+from choom.core.models import Workspace
+from choom.core.notes import create_note
+from choom.core.tasks import load_tasks
+from choom.tui.app import ChoomApp
+from choom.tui.collection_bar import CollectionBar
+from choom.tui.list_screen import TaskRow
+from choom.tui.status_bar import StatusBar
 from tests.helpers import list_view, row_titles, type_command
 
 
 async def test_command_bar_creates_task_and_lands_on_tasks_selected(
     tmp_workspace: Workspace,
 ) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "task.followup send the vendor comparison #procurement")
@@ -28,7 +28,7 @@ async def test_command_bar_creates_task_and_lands_on_tasks_selected(
 
 
 async def test_bare_task_command_shows_error(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "task")
@@ -40,7 +40,7 @@ async def test_bare_task_command_shows_error(tmp_workspace: Workspace) -> None:
 async def test_space_is_noop_on_meetings_and_notes(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("tab", "tab")  # tasks -> notes -> meetings
@@ -56,7 +56,7 @@ async def test_space_is_noop_on_meetings_and_notes(tmp_workspace: Workspace) -> 
 
 
 async def test_footer_advertises_space_only_on_tasks(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -81,7 +81,7 @@ async def test_task_created_from_another_collection_does_not_change_the_view(
     # capture -- it must never change which collection is displayed.
     create_note(tmp_workspace, "an idea")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("tab")  # tasks -> notes

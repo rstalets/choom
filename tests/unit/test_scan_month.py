@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.documents import scan_documents, scan_month, scan_unfiled
-from endpaper.core.meetings import MEETINGS, create_meeting
-from endpaper.core.models import Workspace, YearMonth
-from endpaper.core.notes import NOTES, create_note
+from choom.core.documents import scan_documents, scan_month, scan_unfiled
+from choom.core.meetings import MEETINGS, create_meeting
+from choom.core.models import Workspace, YearMonth
+from choom.core.notes import NOTES, create_note
 
 
 def test_scan_month_reads_only_that_month(tmp_workspace: Workspace) -> None:

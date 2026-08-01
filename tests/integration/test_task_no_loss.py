@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import random
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, load_tasks, set_task_body, set_task_state
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, load_tasks, set_task_body, set_task_state
 
 
 def test_thousand_random_operations_lose_nothing(tmp_workspace: Workspace) -> None:

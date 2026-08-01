@@ -4,8 +4,8 @@ from datetime import date
 
 import pytest
 
-from endpaper.core.errors import UsageError
-from endpaper.core.tasks import render_task_line
+from choom.core.errors import UsageError
+from choom.core.tasks import render_task_line
 
 
 def test_field_order_and_all_present() -> None:

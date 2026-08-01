@@ -16,8 +16,8 @@ from typing import Any
 
 from textual.widgets import Input, TextArea
 
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import DocumentRow, ListView, TaskRow
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import DocumentRow, ListView, TaskRow
 
 #: Collection verbs, in the order the collection bar cycles with `tab` from launch.
 COLLECTIONS = ("tasks", "notes", "meetings")

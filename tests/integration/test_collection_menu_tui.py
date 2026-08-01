@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.collection_bar import CollectionBar
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import ListScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note
+from choom.tui.app import ChoomApp
+from choom.tui.collection_bar import CollectionBar
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListScreen
 from tests.helpers import row_titles, to_collection, type_command
 
 
@@ -15,7 +15,7 @@ async def test_creating_a_note_while_viewing_meetings_lands_on_notes_after_close
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         assert app.active == "meetings"
@@ -39,7 +39,7 @@ async def test_creating_a_meeting_while_viewing_notes_lands_on_meetings_after_cl
 ) -> None:
     create_note(tmp_workspace, "an idea")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "notes")
         assert app.active == "notes"
@@ -55,7 +55,7 @@ async def test_creating_a_meeting_while_viewing_notes_lands_on_meetings_after_cl
 
 
 async def test_bare_daily_note_lands_on_notes_view_after_close(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note")

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from endpaper.tui.status_bar import BREADCRUMBS, in_flight_status, pick_breadcrumb
+from choom.tui.status_bar import BREADCRUMBS, in_flight_status, pick_breadcrumb
 
 
 def test_pick_breadcrumb_is_a_member_of_the_tuple() -> None:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 
 def test_claude_md_created_in_empty_directory_and_names_agents_md(

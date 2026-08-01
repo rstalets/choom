@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.mirrors import reconcile_on_save
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, get_task
+from choom.core.mirrors import reconcile_on_save
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, get_task
 
 _SOURCE = Path("/ws/meetings/2026/07/2026-07-28-q3-planning.md")
 
@@ -45,7 +45,7 @@ def test_mirror_ticked_writes_tasks_md(tmp_workspace: Workspace) -> None:
 def test_task_completed_elsewhere_corrects_the_mirror(tmp_workspace: Workspace) -> None:
     task = add_task(tmp_workspace, "call Terry")
     assert task.id is not None
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     set_task_state(tmp_workspace, task.id, done=True)
 
@@ -61,7 +61,7 @@ def test_task_completed_elsewhere_corrects_the_mirror(tmp_workspace: Workspace) 
 def test_both_changed_writes_and_warns(tmp_workspace: Workspace) -> None:
     task = add_task(tmp_workspace, "call Terry")
     assert task.id is not None
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     set_task_state(tmp_workspace, task.id, done=True)  # task changed elsewhere
 

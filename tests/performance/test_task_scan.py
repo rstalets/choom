@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.tasks import load_tasks
-from endpaper.core.workspace import init_workspace
+from choom.core.tasks import load_tasks
+from choom.core.workspace import init_workspace
 
 
 @pytest.mark.performance

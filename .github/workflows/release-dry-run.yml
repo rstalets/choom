@@ -54,8 +54,8 @@ jobs:
 
       - name: Assert the installed package reports the proposed version
         run: |
-          actual="$(/tmp/release-dry-run-venv/bin/endpaper --version)"
-          expected="endpaper ${{ inputs.version }}"
+          actual="$(/tmp/release-dry-run-venv/bin/choom --version)"
+          expected="choom ${{ inputs.version }}"
           if [ "$actual" != "$expected" ]; then
             echo "::error::expected '$expected', got '$actual'"
             exit 1

@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from endpaper.core.editing import load_for_edit, save_buffer
+from choom.core.editing import load_for_edit, save_buffer
 
 _MASKED_UPDATED = re.compile(r"^updated:.*$", re.MULTILINE)
 

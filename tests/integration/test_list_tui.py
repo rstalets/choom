@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note, open_daily_note
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import ListView, MeetingRow
-from endpaper.tui.preview_screen import PreviewScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note, open_daily_note
+from choom.tui.app import ChoomApp
+from choom.tui.list_screen import ListView, MeetingRow
+from choom.tui.preview_screen import PreviewScreen
 from tests.helpers import in_scope_month, row_titles, to_collection, type_command
 
 _CREATE = {"meetings": create_meeting, "notes": create_note}
@@ -20,7 +20,7 @@ async def test_documents_listed_date_descending(tmp_workspace: Workspace, collec
     create(tmp_workspace, "middle", now=in_scope_month(25, 9))
     create(tmp_workspace, "newest", now=in_scope_month(28, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, collection)
         assert row_titles(app) == ["newest", "middle", "oldest"]
@@ -33,7 +33,7 @@ async def test_daily_and_typed_notes_appear_together_sorted_date_descending(
     open_daily_note(tmp_workspace, now=in_scope_month(25, 9))
     create_note(tmp_workspace, "newest", now=in_scope_month(28, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "notes")
         daily_title = in_scope_month(25).strftime("%Y-%m-%d")
@@ -44,7 +44,7 @@ async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspac
     for i in range(3):
         create_meeting(tmp_workspace, f"meeting {i}", now=in_scope_month(20 + i, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         list_view = app.screen.query_one("#meeting-list", ListView)
@@ -62,7 +62,7 @@ async def test_navigation_stops_at_ends_without_wrapping(tmp_workspace: Workspac
 async def test_list_reflects_meeting_created_while_in_preview(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "existing meeting", now=in_scope_month(20, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
 
@@ -85,7 +85,7 @@ async def test_selection_preserved_across_preview_when_nothing_created(
     create_meeting(tmp_workspace, "first", now=in_scope_month(20, 9))
     create_meeting(tmp_workspace, "second", now=in_scope_month(21, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         list_view = app.screen.query_one("#meeting-list", ListView)
@@ -107,7 +107,7 @@ async def test_selection_preserved_across_preview_when_nothing_created(
 async def test_enter_opens_rendered_note_preview(tmp_workspace: Workspace) -> None:
     create_note(tmp_workspace, "vendor renewal", type="research")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "notes")
 
@@ -124,7 +124,7 @@ async def test_switching_between_collections_shows_current_content_including_new
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         assert row_titles(app) == ["Q3 planning"]
@@ -148,7 +148,7 @@ async def test_single_meeting_row_is_visually_highlighted(tmp_workspace: Workspa
     # widget. With exactly one row, there was no down/up workaround available.
     create_meeting(tmp_workspace, "only one", now=in_scope_month(20, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         list_view = app.screen.query_one("#meeting-list", ListView)
@@ -167,7 +167,7 @@ async def test_top_row_highlighted_after_refocusing_list_without_moving_cursor(
     create_meeting(tmp_workspace, "one", now=in_scope_month(20, 9))
     create_meeting(tmp_workspace, "two", now=in_scope_month(21, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("left")

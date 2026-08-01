@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.collection_bar import CollectionBar
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.collection_bar import CollectionBar
 from tests.helpers import to_collection
 
 
@@ -15,7 +15,7 @@ async def test_narrow_terminal_does_not_crash_and_keeps_active_collection_visibl
     # the highlighted collection must remain identifiable.
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(20, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
 
@@ -26,7 +26,7 @@ async def test_narrow_terminal_does_not_crash_and_keeps_active_collection_visibl
 
 
 async def test_extremely_narrow_terminal_still_boots(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(10, 24)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"

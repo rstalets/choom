@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
 from tests.helpers import open_edit, submit_editor_line
 
 
 async def test_capture_creates_a_task_and_leaves_a_mirror(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -49,7 +49,7 @@ async def test_capture_creates_a_task_and_leaves_a_mirror(tmp_workspace: Workspa
 async def test_capture_records_the_source_document_as_a_link(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -68,7 +68,7 @@ async def test_promoting_a_line_uses_its_own_words_as_the_description(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -91,7 +91,7 @@ async def test_promoted_line_with_a_tag_extracts_it_like_a_fresh_description(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -108,13 +108,13 @@ async def test_a_bare_task_dot_followup_with_no_description_reports_and_writes_n
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
         line_index = await submit_editor_line(pilot, editor, "/task.followup")
 
-        from endpaper.tui.status_bar import StatusBar
+        from choom.tui.status_bar import StatusBar
 
         status = screen.query_one(StatusBar)
         assert "needs a description" in str(status.content)
@@ -127,7 +127,7 @@ async def test_a_bare_task_dot_followup_with_no_description_reports_and_writes_n
 async def test_prose_mentioning_task_creates_nothing(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -144,7 +144,7 @@ async def test_prose_mentioning_task_creates_nothing(tmp_workspace: Workspace) -
 async def test_undo_removes_the_mirror_but_keeps_the_task(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)

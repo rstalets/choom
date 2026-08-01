@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
 
 
 def test_collision_creates_numeric_suffix_and_leaves_first_untouched(

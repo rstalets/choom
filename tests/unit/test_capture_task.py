@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.errors import UsageError
-from endpaper.core.meetings import create_meeting
-from endpaper.core.mirrors import capture_task
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks
+from choom.core.errors import UsageError
+from choom.core.meetings import create_meeting
+from choom.core.mirrors import capture_task
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks
 
 
 def test_empty_description_raises_before_anything_is_written(tmp_workspace: Workspace) -> None:

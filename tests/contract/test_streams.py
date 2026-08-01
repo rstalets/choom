@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 
 def test_scan_warnings_go_to_stderr_and_stdout_stays_clean_json(

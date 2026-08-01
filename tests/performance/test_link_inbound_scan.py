@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.links import inbound_links
-from endpaper.core.workspace import init_workspace
+from choom.core.links import inbound_links
+from choom.core.workspace import init_workspace
 
 _TARGET_ID = "meeting_20260728_a1b2c3d4"
 

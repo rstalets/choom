@@ -4,11 +4,11 @@ from datetime import datetime
 
 import pytest
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace, YearMonth
-from endpaper.core.notes import create_note
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import DocumentRow, ListView
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace, YearMonth
+from choom.core.notes import create_note
+from choom.tui.app import ChoomApp
+from choom.tui.list_screen import DocumentRow, ListView
 from tests.helpers import row_titles, to_collection, type_command, type_literally
 
 _CREATE = {"meetings": create_meeting, "notes": create_note}
@@ -24,7 +24,7 @@ async def test_filter_narrows_live(tmp_workspace: Workspace, collection: str) ->
     create(tmp_workspace, "vendor renewal", tags=("procurement",))
     create(tmp_workspace, "standup", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, collection)
         await pilot.press("/")
@@ -39,7 +39,7 @@ async def test_filter_alias_f_narrows_identically(tmp_workspace: Workspace) -> N
     create_meeting(tmp_workspace, "vendor renewal", tags=("procurement",))
     create_meeting(tmp_workspace, "standup", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await type_command(app, pilot, "f vendor")
@@ -54,7 +54,7 @@ async def test_empty_term_clears_and_restores_the_displayed_month(
     create_meeting(tmp_workspace, "vendor renewal", now=now)
     create_meeting(tmp_workspace, "standup", type="standup", now=now)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         month = YearMonth(now.year, now.month)
@@ -81,7 +81,7 @@ async def test_escape_clears_the_filter_and_restores_the_month(tmp_workspace: Wo
     now = datetime.now()
     create_meeting(tmp_workspace, "vendor renewal", now=now)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         month = YearMonth(now.year, now.month)

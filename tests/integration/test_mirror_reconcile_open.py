@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.mirrors import capture_task
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
-from endpaper.core.tasks import set_task_state
-from endpaper.tui.app import EndpaperApp
+from choom.core.meetings import create_meeting
+from choom.core.mirrors import capture_task
+from choom.core.models import Workspace
+from choom.core.notes import create_note
+from choom.core.tasks import set_task_state
+from choom.tui.app import ChoomApp
 from tests.helpers import open_edit
 
 
@@ -32,7 +32,7 @@ async def test_a_task_completed_outside_the_app_is_reflected_on_open(
 ) -> None:
     _task_id, _line = _seed_mirror(tmp_workspace, done_on_disk=True)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -47,7 +47,7 @@ async def test_a_pasted_mirror_reflects_the_tasks_real_state_when_opened(
     text = note.path.read_text(encoding="utf-8")
     note.path.write_text(text + line + "\n", encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await open_edit(app, pilot, collection="notes")
         editor = app.screen.query_one("#editor", TextArea)
@@ -65,7 +65,7 @@ async def test_reconciliation_that_changes_nothing_writes_nothing(
     meeting_path = next(tmp_workspace.meetings_dir.rglob("*.md"))
     mtime_before = meeting_path.stat().st_mtime_ns
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         assert screen.is_dirty is False
@@ -91,7 +91,7 @@ async def test_reconciliation_that_changes_something_writes_only_that_document(
     updated_match_before = re.search(r"^updated: (.+)$", updated_before, re.MULTILINE)
     assert updated_match_before is not None
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await open_edit(app, pilot)
 

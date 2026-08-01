@@ -5,9 +5,9 @@ import stat
 
 import pytest
 
-from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks, set_task_body
+from choom.core.errors import NotFoundError, UsageError, WorkspaceError
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks, set_task_body
 from tests.conftest import tasks_file, write_raw, write_tasks
 
 # --- writer behaviour (T013) --------------------------------------------------

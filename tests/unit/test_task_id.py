@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 
-from endpaper.core.tasks import new_task_id
+from choom.core.tasks import new_task_id
 
 
 def test_format() -> None:

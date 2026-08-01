@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from endpaper.core.text import parse_tags
+from choom.core.text import parse_tags
 
 
 def test_tag_at_start() -> None:

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.links import relative_destination
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note, open_daily_note
+from choom.core.links import relative_destination
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note, open_daily_note
 
 
 def test_worst_case_generated_path_is_within_120_chars_of_workspace_root(

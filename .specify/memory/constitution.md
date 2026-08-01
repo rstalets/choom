@@ -76,10 +76,6 @@ Non-template files, amendment 2:
      act on it, and no note was added to REQUIREMENTS.md saying so.
 
 Follow-up TODOs:
-  - README.md names the project "cairn" while REQUIREMENTS.md, the command
-    name, and this constitution use "endpaper". Carried over from 1.1.0, not
-    changed here (outside the constitution workflow's scope); resolve before
-    first public release.
   - (Dropped) REQUIREMENTS.md §4.3's stale "six commands" count was logged
     here mid-amendment, then withdrawn: the file is being retired, so a TODO
     pointing at it would never be actioned.
@@ -123,13 +119,13 @@ Modified principles:
     assistants began editing markdown bodies directly, which the shipped
     CLAUDE.md.tmpl already instructs them to do. It now states what the CLI is
     actually for — creating records and reading structured output, the operations
-    where endpaper's conventions have to hold. No rule under II changes.
+    where choom's conventions have to hold. No rule under II changes.
   - III. Simplicity Is the Default — gains the directory-layout invariant: date is
     the only axis the tree encodes, and `type` is carried in frontmatter and the
     filename, never as a directory. Stated only in docs/REQUIREMENTS.md until now, and
     therefore ungated, while violating it means migrating every user's vault.
   - IV. Never Lose the User's Words — gains two invariants, both previously
-    ungated: endpaper never moves a user's file to match its partition, and a tag
+    ungated: choom never moves a user's file to match its partition, and a tag
     MUST NEVER silently vanish (the reason `--tag` is the supported CLI form, since
     `#` opens a comment in bash and zsh).
   - VI. Readable Python, Enforced Automatically — the changelog mandate is removed.
@@ -185,7 +181,7 @@ Follow-up TODOs:
   - (Resolved) docs/REQUIREMENTS.md's stale "six commands" count — logged during 1.2.0
     and then withdrawn on the grounds that the file was going away — is fixed here.
   - (Resolved) The "cairn" naming TODO carried from 1.1.0 is withdrawn: README
-    names the project "endpaper" throughout, so there is nothing to reconcile.
+    names the project "choom" throughout, so there is nothing to reconcile.
 
 Note on 1.2.0's AGENTS.md cap arithmetic:
   - It cited two inputs this PR removes — docs/REQUIREMENTS.md §4.2's promise of `read`,
@@ -207,13 +203,13 @@ Migration path:
     whether to retire it is tracked separately.
 -->
 
-# endpaper Constitution
+# choom Constitution
 
 ## Core Principles
 
 ### I. Core Is the Product
 
-`endpaper.core` holds all logic: vault resolution, frontmatter parsing, file creation,
+`choom.core` holds all logic: vault resolution, frontmatter parsing, file creation,
 markdown scanning, search, and task toggling. Core MUST contain no I/O formatting, no
 widget code, and no argument parsing. Every core function MUST be callable and testable
 without a terminal, a TTY, or an event loop.
@@ -240,14 +236,14 @@ The CLI serves AI assistants, and that is a hard requirement:
   renaming or removing one is breaking. The registry lives in `docs/REQUIREMENTS.md`.
 
 **Rationale**: The CLI is how an assistant creates records and reads structured output —
-the operations where endpaper's conventions have to hold, and the ones it cannot safely
+the operations where choom's conventions have to hold, and the ones it cannot safely
 reproduce by hand. A single interactive prompt or a stray escape sequence on a non-TTY
 turns a working automation into a hang or a corrupt parse, and the failure is silent from
 the assistant's side.
 
 ### III. Simplicity Is the Default (NON-NEGOTIABLE)
 
-Markdown files are the only state endpaper has. Introducing a second source of truth —
+Markdown files are the only state choom has. Introducing a second source of truth —
 an index, a database, a cache — requires a documented justification in the plan's
 Complexity Tracking table, naming the simpler alternative and why it fails.
 
@@ -270,7 +266,7 @@ hazard, and the simplest way to avoid it is to not have one.
 
 ### IV. Never Lose the User's Words
 
-Users hand-edit their files, in endpaper and elsewhere. Every parser and writer MUST
+Users hand-edit their files, in choom and elsewhere. Every parser and writer MUST
 treat that as the normal case:
 
 - Malformed input is skipped and logged, never fatal. A broken metadata comment on one
@@ -281,10 +277,10 @@ treat that as the normal case:
 - Files stay valid CommonMark. Metadata rides in HTML comments and frontmatter so that
   any markdown viewer renders the file correctly.
 - Writes preserve `created` and update `updated`. Never the reverse.
-- endpaper MUST NEVER move a user's file to match its partition. A file the user has filed
+- choom MUST NEVER move a user's file to match its partition. A file the user has filed
   under the wrong month still lists — its date comes from frontmatter, never from its path.
 - A tag MUST NEVER silently vanish. `#` opens a comment in bash and zsh, so an unquoted
-  `#tag` is discarded by the shell before endpaper sees it; `--tag` is therefore the
+  `#tag` is discarded by the shell before choom sees it; `--tag` is therefore the
   supported CLI form, and both `--help` and `AGENTS.md` MUST state it explicitly.
 
 **Rationale**: The vault is the user's own notes in their own directory. Data loss is not
@@ -397,7 +393,7 @@ implementation plan, and pull request review. Reviewers MUST cite the principle 
 when requesting a change on constitutional grounds. Complexity that cannot be justified
 in writing is removed rather than merged.
 
-`docs/REQUIREMENTS.md` holds endpaper's design intent and its living conventions — the
+`docs/REQUIREMENTS.md` holds choom's design intent and its living conventions — the
 frontmatter schema, the id scheme, the file layout, the task line format, link semantics,
 the exit code registry, and the target terminals — and is expected to change as features
 ship. `AGENTS.md` in a workspace holds runtime guidance for AI assistants. Neither

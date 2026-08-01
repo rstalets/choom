@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.mirrors import capture_task
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import load_tasks
-from endpaper.tui.app import EndpaperApp
+from choom.core.meetings import create_meeting
+from choom.core.mirrors import capture_task
+from choom.core.models import Workspace
+from choom.core.tasks import load_tasks
+from choom.tui.app import ChoomApp
 from tests.helpers import open_edit
 
 
@@ -34,7 +34,7 @@ def _flip_checkbox(editor: TextArea, *, done: bool) -> None:
 async def test_ticking_a_mirror_and_saving_marks_the_task_done(tmp_workspace: Workspace) -> None:
     task_id = _seed_mirror(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -49,11 +49,11 @@ async def test_ticking_a_mirror_and_saving_marks_the_task_done(tmp_workspace: Wo
 
 async def test_unticking_and_saving_reopens_the_task(tmp_workspace: Workspace) -> None:
     task_id = _seed_mirror(tmp_workspace)
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     set_task_state(tmp_workspace, task_id, done=True)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -74,7 +74,7 @@ async def test_saving_with_no_mirror_change_writes_nothing_to_tasks_md(
     _seed_mirror(tmp_workspace)
     tasks_mtime_before = tmp_workspace.tasks_file.stat().st_mtime_ns
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -90,7 +90,7 @@ async def test_a_tasks_md_write_does_not_cascade_back_into_the_document(
 ) -> None:
     task_id = _seed_mirror(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -122,7 +122,7 @@ async def test_ticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Work
     `load_tasks` from disk missed this -- the disk was always right."""
     task_id = _seed_mirror(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -137,11 +137,11 @@ async def test_ticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Work
 
 async def test_unticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Workspace) -> None:
     task_id = _seed_mirror(tmp_workspace)
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     set_task_state(tmp_workspace, task_id, done=True)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
@@ -160,7 +160,7 @@ async def test_saving_without_touching_a_mirror_does_not_reload_tasks(
     tasks.md -- an ordinary save must not pay for a re-parse it does not need."""
     _seed_mirror(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)

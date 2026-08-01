@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import date
 from pathlib import Path
 
-from endpaper.core.mirrors import mirror_line
-from endpaper.core.models import Task
+from choom.core.mirrors import mirror_line
+from choom.core.models import Task
 
 _TASKS_FILE = Path("/ws/tasks.md")
 

@@ -1,22 +1,22 @@
 ---
 name: "demo"
-description: "Create a throwaway endpaper workspace under /tmp, populate it with realistic meetings, notes, and tasks -- including cross-record links -- and hand back ready-to-use prompts for exercising an AI assistant against it."
-argument-hint: "[path] (default: a fresh /tmp/endpaper-demo-<timestamp> directory)"
+description: "Create a throwaway choom workspace under /tmp, populate it with realistic meetings, notes, and tasks -- including cross-record links -- and hand back ready-to-use prompts for exercising an AI assistant against it."
+argument-hint: "[path] (default: a fresh /tmp/choom-demo-<timestamp> directory)"
 metadata:
-  author: "endpaper"
+  author: "choom"
 user-invocable: true
 disable-model-invocation: false
 ---
 
 ## Purpose
 
-Stand up a disposable endpaper workspace populated with enough realistic, varied content to
+Stand up a disposable choom workspace populated with enough realistic, varied content to
 demonstrate every shipped feature at once -- multiple meeting/note types, multi-month history,
 tagging, open and completed tasks with bodies, and cross-record markdown links -- so it can be
 used for screenshots, docs, or a live walkthrough without hand-typing sample data.
 
 It also has a second job: this workspace is a natural test bed for an AI assistant working
-non-interactively in an endpaper vault (the whole point of `AGENTS.md`, `--json`, and the
+non-interactively in a choom vault (the whole point of `AGENTS.md`, `--json`, and the
 CLI-first design). So the skill's last step hands back a list of prompts -- referencing the
 actual names, dates, and topics it just created -- that someone can paste into an assistant
 session to watch it search, cross-reference, and write into the vault.
@@ -24,9 +24,9 @@ session to watch it search, cross-reference, and write into the vault.
 This workspace lives under `/tmp`. It is scratch content, not part of the repo -- don't create it
 inside a git worktree, and don't commit anything from it.
 
-**This skill must not hardcode endpaper's feature set.** endpaper ships fast, and whatever
+**This skill must not hardcode choom's feature set.** choom ships fast, and whatever
 commands, frontmatter fields, or conventions this file describes are a snapshot from whenever it
-was last written -- they will drift. `endpaper init` regenerates `AGENTS.md` fresh, for exactly
+was last written -- they will drift. `choom init` regenerates `AGENTS.md` fresh, for exactly
 the version installed, every time. Read that file (Step 3) and treat it as the authoritative
 spec for this run; treat anything below that conflicts with it as stale and defer to the file.
 The goal is that a new feature landing (a new command, a new frontmatter field, a new way to
@@ -34,32 +34,32 @@ capture content -- e.g. a `/task` capture triggered from inside a note or meetin
 didn't exist when this skill was first written) should make the demo richer automatically,
 without anyone having to edit this file.
 
-## Step 1 — Find the `endpaper` executable
+## Step 1 — Find the `choom` executable
 
-Don't assume `endpaper` is on `PATH`, and don't assume any particular worktree path -- other
+Don't assume `choom` is on `PATH`, and don't assume any particular worktree path -- other
 people (and other worktrees) will run this skill too.
 
-1. Try `endpaper --version`. If it works, use `endpaper` directly for every command below.
-2. Otherwise, find an endpaper source checkout to run against: starting from the current
+1. Try `choom --version`. If it works, use `choom` directly for every command below.
+2. Otherwise, find a choom source checkout to run against: starting from the current
    directory and walking up, then checking common locations, look for a directory containing
-   `pyproject.toml` whose `[project] name = "endpaper"`. Use
-   `uv run --project <that-path> endpaper` in place of `endpaper` for every command below.
-3. If neither resolves, stop and tell the user endpaper isn't available to run.
+   `pyproject.toml` whose `[project] name = "choom"`. Use
+   `uv run --project <that-path> choom` in place of `choom` for every command below.
+3. If neither resolves, stop and tell the user choom isn't available to run.
 
 ## Step 2 — Create and init the workspace
 
 ```bash
-WORKDIR="${1:-/tmp/endpaper-demo-$(date +%Y%m%d-%H%M%S)}"
+WORKDIR="${1:-/tmp/choom-demo-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$WORKDIR" && cd "$WORKDIR"
-endpaper init
+choom init
 ```
 
-If the path was user-supplied and already contains a workspace (`.endpaper/config.toml`
+If the path was user-supplied and already contains a workspace (`.choom/config.toml`
 exists), ask before reusing/overwriting it rather than assuming.
 
 ## Step 3 — Learn this build's feature set from AGENTS.md
 
-`endpaper init` (Step 2) just wrote a fresh `AGENTS.md` at the workspace root, generated for
+`choom init` (Step 2) just wrote a fresh `AGENTS.md` at the workspace root, generated for
 whatever version is actually installed. Read it in full before populating anything -- it is kept
 deliberately short (~60 lines) precisely so an assistant can absorb it in one read and be
 productive immediately, which is exactly the job here. Pull out:
@@ -72,7 +72,7 @@ productive immediately, which is exactly the job here. Pull out:
 - **Commands** -- the full current command list and flags, including anything not mentioned
   anywhere in this skill.
 
-Then run `endpaper --help` and `endpaper <subcommand> --help` for each subcommand, to fill in any
+Then run `choom --help` and `choom <subcommand> --help` for each subcommand, to fill in any
 flag-level detail `AGENTS.md` doesn't spell out (it documents the concepts and common invocation,
 not necessarily every flag).
 
@@ -88,17 +88,17 @@ for it in Step 9 instead of trying to fake the artifact statically.
 The CLI only stamps "today." To demonstrate month-scoped browsing (the top collection bar,
 `/filter` across months, etc.), most content needs to be spread across at least 3-4 different
 months, which means hand-writing some files directly rather than only shelling out to the CLI --
-this is intentional and safe: endpaper's own docs describe these files as plain, hand-editable
+this is intentional and safe: choom's own docs describe these files as plain, hand-editable
 markdown with no index or database, so a well-formed hand-written file is indistinguishable from
 a CLI-generated one.
 
 For **today's** content, use the real CLI so ids/timestamps are authentic:
 
 ```bash
-endpaper meeting new "Q3 planning" --type standup --tag platform
-endpaper meeting new "Acme Corp renewal" --type vendor --tag procurement
-endpaper note new "vendor landscape" --type research --tag procurement
-endpaper note today
+choom meeting new "Q3 planning" --type standup --tag platform
+choom meeting new "Acme Corp renewal" --type vendor --tag procurement
+choom note new "vendor landscape" --type research --tag procurement
+choom note today
 ```
 
 For **past months**, hand-write additional files following the schema from Step 3's `AGENTS.md`
@@ -155,11 +155,11 @@ everywhere.
 ## Step 6 — Tasks: open, done, with bodies, and tagged
 
 ```bash
-endpaper task add "send the vendor comparison" --type followup --tag procurement
-endpaper task add "buy milk" --type personal
-endpaper task add "write onboarding doc" --type followup --tag onboarding
+choom task add "send the vendor comparison" --type followup --tag procurement
+choom task add "buy milk" --type personal
+choom task add "write onboarding doc" --type followup --tag onboarding
 # ...several more, spanning a few --type values and reusing Step 4's tags
-endpaper task done <id-of-one-or-two>
+choom task done <id-of-one-or-two>
 ```
 
 `task add` prints the new task's id. For a task that should carry a body (per `AGENTS.md`: a
@@ -190,15 +190,15 @@ files are plain markdown, so linking works either way:
 ## Step 8 — Verify and summarize
 
 ```bash
-endpaper meeting list --json
-endpaper note list --json
-endpaper task list --all --json
+choom meeting list --json
+choom note list --json
+choom task list --all --json
 ```
 
 Confirm counts look right (multiple months represented, a mix of types/tags, at least one done
 task, at least one task with a body). Then tell the user:
 
-- The workspace path, and that `cd <path> && endpaper` opens the TUI.
+- The workspace path, and that `cd <path> && choom` opens the TUI.
 - A quick tally: meetings/notes per month, task counts (open/done), which records carry links.
 - That the directory is scratch and safe to delete when they're done with it.
 

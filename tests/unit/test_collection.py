@@ -4,12 +4,12 @@ from datetime import date
 
 import pytest
 
-from endpaper.core.errors import UsageError
-from endpaper.core.meetings import MEETINGS, create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import NOTES, create_note, open_daily_note
-from endpaper.core.tasks import add_task
-from endpaper.core.text import new_document_id
+from choom.core.errors import UsageError
+from choom.core.meetings import MEETINGS, create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import NOTES, create_note, open_daily_note
+from choom.core.tasks import add_task
+from choom.core.text import new_document_id
 
 
 def test_new_document_id_honours_its_prefix() -> None:

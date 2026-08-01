@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 
 def _assert_clean(text: str) -> None:
