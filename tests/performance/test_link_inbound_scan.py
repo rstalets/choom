@@ -5,7 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from choom.core.links import inbound_links
+from choom.core import links as links_module
+from choom.core.links import Link, inbound_links
 from choom.core.workspace import init_workspace
 
 _TARGET_ID = "meeting_20260728_a1b2c3d4"
@@ -35,7 +36,9 @@ def _write_document(path: Path, *, doc_id: str, body: str) -> None:
 
 
 @pytest.mark.performance
-def test_inbound_links_under_500ms_on_6000_document_workspace(tmp_path: Path) -> None:
+def test_inbound_links_under_500ms_on_6000_document_workspace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workspace = init_workspace(tmp_path).workspace
 
     # One real inbound link, buried in the middle of the corpus.
@@ -66,10 +69,31 @@ def test_inbound_links_under_500ms_on_6000_document_workspace(tmp_path: Path) ->
             month = 1
             year += 1
 
+    corpus_parses = 0
+    real_find_links = links_module.find_links
+
+    def _counting_find_links(text: str, *, source: Path) -> tuple[Link, ...]:
+        nonlocal corpus_parses
+        # tasks.md (empty here, via init_workspace's `.touch()`) is parsed
+        # unconditionally once by `_tasks_file_links` -- a constant cost
+        # unrelated to the corpus candidate-filter this test protects.
+        if source != workspace.tasks_file:
+            corpus_parses += 1
+        return real_find_links(text, source=source)
+
+    monkeypatch.setattr(links_module, "find_links", _counting_find_links)
+
     start = time.perf_counter()
     results = inbound_links(workspace, _TARGET_ID)
     elapsed = time.perf_counter() - start
 
     assert len(results) == 1
     assert results[0].source == linking_note
+    # Deterministic form of the same claim the timing budget below protects: the
+    # candidate substring filter runs before parsing, so only the one file whose
+    # bytes actually contain the id gets parsed -- not all 6000 (see docstring
+    # on inbound_links). Immune to CI noise, unlike the timing assertion.
+    assert corpus_parses == 1, (
+        f"find_links parsed {corpus_parses} corpus files, want 1 (candidate filter skipped)"
+    )
     assert elapsed < 0.5, f"inbound_links took {elapsed:.3f}s, budget is 0.5s (SC-006)"
