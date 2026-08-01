@@ -68,6 +68,16 @@ alternative and the reason.
    to FR-039–FR-043. The Assumptions entry records that the source issue asked for the bottom bar and
    that this was a deliberate revision, not a misreading.
 
+**Iteration 4** — one dependency settled, not a defect:
+
+`010-read-on-load` (#51) is confirmed to land **before** this feature, so the session-lifetime snapshot
+is gone by the time this is built. Recorded in a new "Sequenced after" line in the header, in
+Dependencies and Relationships, and in Assumptions: a delete has no cache to invalidate, and FR-011's
+refresh is for immediate feedback rather than correctness. The one genuine interaction it creates — a
+periodic re-read landing while a confirmation is on screen — is now covered by FR-010 (the confirmation
+acts on the record it named when raised) and an edge case. Dependencies also records the gate: #51's
+implementation is merged into this branch and the spec re-checked against it before `/speckit-plan`.
+
 Note: the Functional Requirements are grouped by theme, so the delete requirements still appear before
 the confirmation ones. That is deliberate — renumbering 27 requirements to mirror story order would
 invalidate every existing cross-reference. Build order is carried by the story priorities, the sequencing

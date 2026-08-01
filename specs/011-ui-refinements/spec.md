@@ -20,6 +20,10 @@ and the status bar with its version indicator), and `003-tasks`/`009-inline-task
 format, task bodies, and the mirror checkboxes a task can have in a document). It adds no new record
 type and no new stored state.
 
+**Sequenced after**: `010-read-on-load` (issue #51), which lands first and retires the session-lifetime
+snapshot. This spec is written for the codebase that exists once it has landed — see Dependencies and
+Relationships for what that changes here, and for the gate on planning.
+
 ---
 
 ## Overview
@@ -298,6 +302,9 @@ empty line one blank line below the last content, then type a character and conf
 
 - **Deleting while a filter is active**: the record is deleted and the filtered list refreshes with the
   filter still applied; the highlight lands on the next record that still matches.
+- **A background re-read lands while a confirmation is on screen**: the confirmation stays up, keeps its
+  wording, and still refers to the record it named. Confirming deletes that record; declining leaves the
+  refreshed list as it is.
 - **Deleting the record whose links pane is open**: the links pane closes with the record and does not
   keep showing a deleted record's links.
 - **A document that is linked to by other documents**: it deletes. Inbound links become dead and are
@@ -350,7 +357,9 @@ empty line one blank line below the last content, then type a character and conf
   the record that will be deleted. That confirmation MUST be the one specified in FR-021–FR-026, not a
   second dialog of its own.
 - **FR-010**: Confirming MUST delete the record; declining MUST leave the record, the list, and the
-  highlight exactly as they were.
+  highlight exactly as they were. The confirmation MUST act on the record it named when it was raised,
+  so a list re-read that happens while it is on screen cannot redirect the delete onto a different
+  record.
 - **FR-011**: After a successful delete, the list MUST refresh, the deleted row MUST be gone, and the
   highlight MUST move to the next record in the list, or to the previous one when the deleted record was
   last.
@@ -503,6 +512,10 @@ empty line one blank line below the last content, then type a character and conf
   adding a workspace scan to every delete would trade a real cost for a warning the user can already get.
 - **Existing bindings are unaffected.** `ctrl+d` is not currently bound in the list, and `ctrl+c` and
   `ctrl+q` remain reserved.
+- **There is no session-lifetime cache by the time this is built.** `010-read-on-load` lands first, so a
+  delete does not have to invalidate a snapshot, evict a record, or tell any view that something is
+  gone — the next load reads the files. The list refresh FR-011 requires is for immediate feedback, not
+  for correctness, and it is a re-read of what is on disk.
 
 ## Dependencies and Relationships
 
@@ -519,9 +532,22 @@ empty line one blank line below the last content, then type a character and conf
   removal behaviour should be shared rather than written twice.
 - **Issue #47 (workspace in the terminal tab strip)** answers the same "which workspace is this?"
   question from outside the app. Distinct surface, no shared behaviour; both are worth having.
-- **Issue #51 (read from disk on view load)**, specified as `010-read-on-load`, changes what the preview
-  and list do on resume — the same refresh path a delete triggers. Both are in flight for v0.0.3 and
-  should be sequenced rather than developed in parallel.
+- **Issue #51 (read from disk on view load)**, specified as `010-read-on-load`, **lands before this
+  feature** — this is settled, not a preference. It retires the session-lifetime snapshot: every list
+  load, and every return to a list from another screen, reads the workspace files at that moment, and a
+  displayed list re-reads periodically on its own. Two consequences for this spec:
+  - There is no in-memory cache for a delete to invalidate. FR-011's refresh is a re-read, not cache
+    surgery, and no code path needs to notify a view that a record has gone.
+  - A periodic re-read can land while a confirmation is on screen. `010-read-on-load` requires a refresh
+    not to dismiss an open dialog; this spec requires the confirmation to act on the record it named when
+    it was raised (FR-010), so the two together mean a background refresh can never redirect a delete
+    onto a different record.
+
+  **Gate on planning**: when `010-read-on-load` is fully implemented, its work is merged into this
+  branch and this spec is re-checked against the merged code *before* `/speckit-plan` runs. Anything in
+  the delete-refresh path or the list-load path that the merge changes is reconciled here first, so the
+  plan is written against the code that will actually exist rather than against today's snapshot
+  behaviour.
 - **Existing mirror resolution** already has a `dead` outcome for a mirror whose task cannot be found.
   Story 4 depends on that outcome existing and reuses it rather than introducing a new one.
 - **Existing exit-code registry** (`docs/REQUIREMENTS.md` §4.1) covers everything the delete commands
