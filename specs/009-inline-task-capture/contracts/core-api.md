@@ -11,8 +11,21 @@ New module: **`endpaper/core/mirrors.py`**. It owns the edge between a checkbox 
 grammar; `tasks.py` owns `tasks.md`; this owns neither and depends on both. See
 [plan.md](../plan.md#project-structure) for why it is a third module.
 
-**Depends on `008-document-links`** for `find_links`, `resolve_id`, `relative_destination`, `Task.links`,
-`render_task_line(links=…)`, and `ScanWarningReason`. None of it is reimplemented here.
+**Depends on `008-document-links`**, now merged. Verified against the shipped code rather than the
+contract: `find_links(text, *, source)`, `find_task_links`, `resolve_id`, `relative_destination`,
+`format_link`, `Task.links`, `render_task_line(links=…)`, `_RECOGNIZED_KEYS` already containing `links`,
+and `ScanWarningReason` already carrying `link_dead` and `link_ambiguous`. None of it is reimplemented here.
+
+Two shipped details differ from what 008's own contract document described, and this feature follows the
+code:
+
+- `find_links` takes no `in_tasks_field` argument. `in_tasks_field` is a field on `Link`, and links inside
+  a task's metadata comment come from `find_task_links(value, *, source, line, text)`.
+- `add_task` did **not** gain `links`; only `render_task_line` did. Adding it is this feature's job (T004).
+
+008 also landed `core/atomic_write.py`, which did not exist when this plan was drafted. It consolidates the
+same-directory-temp-file-plus-`os.replace` sequence that had been written out four times. Every write below
+goes through it.
 
 ---
 
@@ -48,9 +61,13 @@ The prefix rule and the full set of what does and does not qualify are in
 def mirror_line(task: Task, *, source: Path, tasks_file: Path) -> str:
     """The checklist line to leave in `source` for `task`.
 
-    The destination path comes from `links.relative_destination(source, tasks_file)`,
-    so it is correct from any depth the layout produces and is never assembled here.
-    The link text is the task's description as stored -- tags already extracted.
+    Builds the link through `links.format_link(source, target, text)` with a
+    LinkTarget of kind "task", so destination escaping -- spaces, parentheses,
+    angle brackets -- is decided in exactly one place and the editor, the healer,
+    and `/link` can never disagree about it. The path inside comes from
+    `relative_destination`, correct from any depth the layout produces.
+
+    The link text is the task's description as stored, tags already extracted.
 
     Pure string arithmetic. Touches no filesystem. Never raises.
     """
@@ -167,9 +184,11 @@ def write_document(path: Path, text: str, file: EditableFile) -> SaveResult:
     The distinction is the whole of FR-029: ticking a box in the tasks list is not an edit
     to the meeting note.
 
-    Same-directory temp file plus os.replace, exactly as `save_buffer` and
-    `tasks._atomic_write` already do. Never raises on a write failure -- returns
-    SaveResult(ok=False) with a user-facing message, leaving the target byte-identical.
+    Writes through `core.atomic_write.write_text_atomic` -- the shared primitive 008
+    landed -- rather than repeating the temp-file sequence a fifth time. That function
+    raises WorkspaceError; this catches it and returns SaveResult(ok=False) with a
+    user-facing message, leaving the target byte-identical, because every caller here is
+    a propagation path that must warn and continue rather than raise.
     """
 ```
 

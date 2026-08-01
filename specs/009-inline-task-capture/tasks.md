@@ -30,11 +30,26 @@ Single Python package at the repository root: `src/endpaper/{core,cli,tui}/`, te
 
 ---
 
-## ⚠️ Hard prerequisite
+## ✅ Prerequisite met
 
-`008-document-links` must be merged before any task below is started. This feature consumes `find_links`,
-`resolve_id`, `relative_destination`, `Task.links`, `render_task_line(links=…)`, and `ScanWarningReason`
-from it, and reimplements none of them. T001 is the gate.
+`008-document-links` merged into `main` (PR #40) and is merged into this branch. The surface it landed was
+checked against the code, not against its own contract document, and four things differ from what this plan
+assumed when it was drafted. They are folded into the tasks below; the summary is here so nobody rediscovers
+them:
+
+| What shipped | Effect |
+|---|---|
+| `core/atomic_write.py` with `write_text_atomic` — a shared primitive replacing four hand-rolled copies | T035 uses it rather than writing a fifth. It raises `WorkspaceError`; the sync writer catches and returns a `SaveResult`. |
+| `links.format_link(source, target, text)` | T012 builds the mirror through it, so destination escaping is decided in one place and the editor, the healer, and `/link` cannot disagree. |
+| `find_links(text, *, source)` takes no `in_tasks_field` argument | It is a field on `Link`; task-comment links come from `find_task_links`. Nothing here needs the latter. |
+| `add_task` did **not** gain `links`; only `render_task_line` did | T004 stands exactly as written and is genuinely required. |
+
+Already present, so **not** to be re-added: `Task.links`, `links` in `_RECOGNIZED_KEYS`, `link_dead` and
+`link_ambiguous` in `ScanWarningReason`, `save_buffer(workspace=…)`, `SaveResult.warnings`, and the preview
+pane's Links section with its `open_link` action.
+
+Still absent, so genuinely this feature's work: the dotted verb suffix in `parse_line`, `accepts_suffix` on
+`EditorCommand`, `suffix` on `ParsedCommand`, and the whole of `core/mirrors.py`.
 
 ---
 
@@ -42,7 +57,7 @@ from it, and reimplements none of them. T001 is the gate.
 
 **Purpose**: Confirm the dependency landed and create the module this feature lives in.
 
-- [ ] T001 Confirm `008-document-links` is merged into this branch and its surface is importable: `find_links`, `resolve_id`, `relative_destination` from `src/endpaper/core/links.py`, plus `Task.links` and `render_task_line(links=…)` in `src/endpaper/core/tasks.py`. If any is absent, stop — nothing below can be built on a partial link primitive.
+- [x] T001 Confirm `008-document-links` is merged into this branch and its surface is importable: `find_links`, `format_link`, `resolve_id`, `relative_destination` from `src/endpaper/core/links.py`, `write_text_atomic` from `src/endpaper/core/atomic_write.py`, plus `Task.links` and `render_task_line(links=…)` in `src/endpaper/core/tasks.py`. **Done** — merged at `e166ae8`; the four deltas from the drafted assumptions are recorded above.
 - [ ] T002 Create `src/endpaper/core/mirrors.py` with a module docstring stating its scope: the edge between a checkbox in a document and a task in `tasks.md`, owning recognition, splicing, conflict resolution, and the non-stamping write — and owning neither the link grammar (`links.py`) nor `tasks.md` itself (`tasks.py`).
 
 ---
@@ -53,7 +68,7 @@ from it, and reimplements none of them. T001 is the gate.
 
 **⚠️ CRITICAL**: No user story work can begin until this phase is complete.
 
-- [ ] T003 Add `Mirror`, `MirrorResolution`, and `MirrorReport` frozen dataclasses to `src/endpaper/core/models.py` per [data-model.md](data-model.md#in-memory); add `"mirror_conflict"` and `"mirror_ambiguous"` to `ScanWarningReason`; add `suffix: str = ""` to `ParsedCommand` and `accepts_suffix: bool = False` to `EditorCommand`. Dead mirrors reuse 008's `"link_dead"` rather than gaining a third reason.
+- [ ] T003 Add `Mirror`, `MirrorResolution`, and `MirrorReport` frozen dataclasses to `src/endpaper/core/models.py` per [data-model.md](data-model.md#in-memory); add `"mirror_conflict"` and `"mirror_ambiguous"` to `ScanWarningReason` (which already carries `link_dead` and `link_ambiguous` from 008 — do not re-add those); add `suffix: str = ""` to `ParsedCommand` and `accepts_suffix: bool = False` to `EditorCommand`. Dead mirrors reuse `"link_dead"` rather than gaining a third reason.
 - [ ] T004 [P] Add `links: Sequence[str] = ()` to `add_task` in `src/endpaper/core/tasks.py`, passed straight through to `render_task_line`. A call without it must produce a line identical to today's.
 - [ ] T005 [P] Unit test in `tests/unit/test_task_add_links.py`: a task added with links renders the field between `tags` and `created`; a task added without them is byte-identical in shape to what `add_task` writes today (FR-019).
 - [ ] T006 Teach `parse_line` the dotted verb suffix in `src/endpaper/core/editor_commands.py` — one `partition(".")` on the verb before the table lookup, mirroring `src/endpaper/tui/command_bar.py:114` so the editor and the command bar never disagree about what `/task.followup` means. A suffix on a command whose `accepts_suffix` is `False` parses and is rejected by the dispatcher with a message, never silently discarded.
@@ -81,7 +96,7 @@ not move.
 
 ### Implementation for User Story 1
 
-- [ ] T012 [US1] Implement `mirror_line(task, *, source, tasks_file)` in `src/endpaper/core/mirrors.py`. The destination comes from `links.relative_destination`; the link text is the task's stored description with tags already extracted. Pure string arithmetic, touches no filesystem.
+- [ ] T012 [US1] Implement `mirror_line(task, *, source, tasks_file)` in `src/endpaper/core/mirrors.py`, building the link through `links.format_link(source, target, text)` with a `LinkTarget(id=task.id, path=tasks_file, title=task.text, kind="task", line=task.line)` — so destination escaping is decided in one place and the editor, the healer, and `/link` cannot disagree about it. The link text is the task's stored description with tags already extracted. Pure string arithmetic, touches no filesystem.
 - [ ] T013 [US1] Implement `capture_task(workspace, description, *, type, source, source_id, now)` in `src/endpaper/core/mirrors.py`, returning `(Task, mirror_line)`. Everything about the task's shape goes through `tasks.add_task` (FR-004); this adds the link and the mirror and nothing else. It deliberately does not save `source` — the caller does, because only the caller knows whether the buffer is dirty.
 - [ ] T014 [US1] Register `EditorCommand(name="task", argument="<description>", requires_argument=True, accepts_suffix=True)` in `EDITOR_COMMANDS` in `src/endpaper/core/editor_commands.py`, with a description that says the line becomes a link to the task.
 - [ ] T015 [US1] Dispatch `/task` in `EditScreen._on_editor_command_submitted` in `src/endpaper/tui/edit_screen.py`, alongside the existing `/ai` branch.
@@ -169,7 +184,7 @@ largest phase for that reason.
 
 - [ ] T033 [US4] Implement `find_mirrors(text, *, source)` in `src/endpaper/core/mirrors.py`: the checklist prefix match plus `links.find_links`, returning `Mirror` records carrying the character offset of the single state character. Where a line holds several task-id links, the first is the mirror. Never raises.
 - [ ] T034 [US4] Implement the one-character splice helper in `src/endpaper/core/mirrors.py` — `text[:offset] + state_char + text[offset+1:]` — and make it return the input object unchanged when the state already matches, so callers can test identity (FR-030).
-- [ ] T035 [US4] Implement `write_document(path, text, file)` in `src/endpaper/core/mirrors.py`: same-directory temp file plus `os.replace`, restoring the read line-ending and trailing-newline policy, and **not** calling `stamp_updated` (FR-029). This is the sync path; `editing.save_buffer` remains the user-save path and is not modified.
+- [ ] T035 [US4] Implement `write_document(path, text, file)` in `src/endpaper/core/mirrors.py`: restore the read line-ending and trailing-newline policy, write through `core.atomic_write.write_text_atomic` (the shared primitive 008 landed — do not repeat the temp-file sequence a fifth time), catch its `WorkspaceError` and return `SaveResult(ok=False)` so propagation can warn and continue, and **do not** call `stamp_updated` (FR-029). This is the sync path; `editing.save_buffer` remains the user-save path and is not modified.
 - [ ] T036 [US4] Implement `propagate_to_documents(workspace, task, *, skip)` in `src/endpaper/core/mirrors.py` per [contracts/mirror-format.md](contracts/mirror-format.md#propagation--from-the-tasks-list-outward): resolve each of the task's link ids, read, splice, write without stamping; warn and continue on every failure; skip documents the caller names as open with unsaved changes. Never raises.
 - [ ] T037 [US4] Call `propagate_to_documents` from `toggle_task_and_track` in `src/endpaper/tui/app.py`, after `set_task_state` succeeds and never before, passing the paths of any document currently open with unsaved changes as `skip` (FR-033). Surface warnings through the existing `last_task_error` channel rather than adding a reporting surface.
 - [ ] T038 [US4] Call `propagate_to_documents` from `_cmd_task_done` and `_cmd_task_undone` in `src/endpaper/cli/main.py`, printing warnings to stderr and exiting 0 when `tasks.md` was written ([research R11](research.md#r11-propagation-warnings-never-fail-the-operation)).
@@ -225,9 +240,9 @@ holding its mirror and confirm the checkbox is now ticked.
 ### Implementation for User Story 6
 
 - [ ] T052 [US6] Implement `reconcile_on_open(workspace, text, *, source)` in `src/endpaper/core/mirrors.py`: the task is authoritative, a dead mirror is left byte-identical and warned about, and the input object is returned unchanged when nothing needed correcting. Return before reading `tasks.md` at all when `find_mirrors` finds none.
-- [ ] T053 [US6] Call `reconcile_on_open` in `open_editor` in `src/endpaper/tui/edit_screen.py`, before the buffer is handed to `EditScreen`, so the buffer and the file agree from the first keystroke. Write the corrected text through `write_document` (not `save_buffer`) when it changed.
+- [ ] T053 [US6] Call `reconcile_on_open` in `open_editor` in `src/endpaper/tui/edit_screen.py`, after `load_for_edit` and before the buffer is handed to `EditScreen`, so the buffer and the file agree from the first keystroke. Write the corrected text through `write_document` (not `save_buffer`) when it changed. Preserve the function's shipped contract: it returns `bool`, reports a read failure in the caller's status bar rather than raising, and builds an `EditTarget` that now carries `stamps_frontmatter` — a reconcile failure must not turn a successful open into a `False`.
 - [ ] T054 [US6] Call `reconcile_on_open` in `open_task_editor` in `src/endpaper/tui/edit_screen.py` on the same terms.
-- [ ] T055 [US6] Call `reconcile_on_open` in `PreviewScreen` on mount and on resume in `src/endpaper/tui/preview_screen.py`, before rendering — the preview is the most common way a document is looked at, and FR-026 requires that what is displayed is never a stale checkbox.
+- [ ] T055 [US6] Call `reconcile_on_open` in `PreviewScreen` in `src/endpaper/tui/preview_screen.py`, before `_update_content` renders — the preview is the most common way a document is looked at, and FR-026 requires that what is displayed is never a stale checkbox. 008 rebuilt this screen around a Links pane (`LinkRow`, `_collapse_links`, `action_open_link`); hook the existing `on_mount` and the resume path without disturbing that pane's focus handling.
 - [ ] T056 [US6] Seed `EditScreen`'s baseline from the reconciled text at open, in `src/endpaper/tui/edit_screen.py`, so a correction applied at open is not mistaken at save time for an edit the user made.
 
 **Checkpoint**: Every convergence case in the spec is handled, with no background process and no repair

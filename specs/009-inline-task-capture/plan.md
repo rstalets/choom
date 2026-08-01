@@ -54,9 +54,17 @@ round-trips from every depth the layout produces.
 **Scale/Scope**: hundreds to low thousands of documents; a `tasks.md` of hundreds of lines; zero to a
 handful of links per task.
 
-**Hard dependency**: `008-document-links` must merge first. This feature consumes `find_links`,
-`resolve_id`, `relative_destination`, the `links` field on task lines and on `Task`, and the
-`ScanWarningReason` additions. None of that is reimplemented here.
+**Dependency, now satisfied**: `008-document-links` merged into `main` (PR #40) and into this branch at
+`e166ae8`. This feature consumes `find_links`, `format_link`, `resolve_id`, `relative_destination`, the
+`links` field on task lines and on `Task`, the `ScanWarningReason` additions, and the `write_text_atomic`
+primitive 008 landed in `core/atomic_write.py`. None of that is reimplemented here.
+
+Four things in the shipped code differ from what this plan assumed while 008 was still in flight, and the
+tasks follow the code: `find_links` takes no `in_tasks_field` argument (it is a field on `Link`);
+`add_task` did **not** gain `links`, so adding it is still this feature's job; `format_link` exists and the
+mirror is built through it rather than assembled by hand; and `write_text_atomic` replaces the temp-file
+sequence the sync writer would otherwise have repeated. The full delta is at the head of
+[tasks.md](tasks.md#-prerequisite-met).
 
 ## Constitution Check
 
