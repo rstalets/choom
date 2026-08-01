@@ -18,6 +18,7 @@ from endpaper.core.documents import (
 )
 from endpaper.core.errors import EndpaperError, UsageError
 from endpaper.core.meetings import MEETINGS, create_meeting
+from endpaper.core.mirrors import propagate_to_documents
 from endpaper.core.models import (
     Collection,
     DailyNote,
@@ -356,6 +357,12 @@ class EndpaperApp(App[None]):
         return None
 
     def toggle_task_and_track(self, task_id: str) -> None:
+        """Flip one task's state and, once that write has succeeded, push it
+        into every document the task links to (FR-021, FR-032). `tasks.md` is
+        written first and is never reversed by a document failure; a document
+        open with unsaved changes is skipped and picked up at the user's next
+        save instead (FR-033) -- the screen stack is what knows which those
+        are, so this supplies `skip` rather than core discovering it."""
         current = next((t for t in self.tasks if t.id == task_id), None)
         try:
             updated = set_task_state(
@@ -366,3 +373,14 @@ class EndpaperApp(App[None]):
             return
         self.last_task_error = None
         self.tasks = [updated if t.id == task_id else t for t in self.tasks]
+
+        from endpaper.tui.edit_screen import EditScreen
+
+        skip = tuple(
+            screen.target.display_path
+            for screen in self.screen_stack
+            if isinstance(screen, EditScreen) and screen.is_dirty
+        )
+        _written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
+        if warnings:
+            self.last_task_error = "; ".join(w.message for w in warnings)

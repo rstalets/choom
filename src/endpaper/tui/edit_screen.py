@@ -20,10 +20,18 @@ from endpaper.core.assistants import (
     start_request,
 )
 from endpaper.core.config import get_assistant
+from endpaper.core.documents import _read_document
 from endpaper.core.editing import load_for_edit, save_buffer
 from endpaper.core.editor_commands import parse_line
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
 from endpaper.core.links import find_link_targets, format_link
+from endpaper.core.mirrors import (
+    capture_task,
+    find_mirrors,
+    reconcile_on_open,
+    reconcile_on_save,
+    write_document,
+)
 from endpaper.core.models import (
     AssistantReply,
     ParsedCommand,
@@ -64,7 +72,14 @@ def open_editor(app: App[None], path: Path) -> bool:
     """Push the editor for `path` -- the one route into `EditScreen` for a whole
     file, used by list `e`, preview `e`, and every create path (research R10).
     Returns False and reports the reason in the caller's status bar if the file
-    cannot be read, leaving the caller's screen in place rather than raising."""
+    cannot be read, leaving the caller's screen in place rather than raising.
+
+    Reconciles every mirror in the file against tasks.md before the buffer is
+    handed to `EditScreen` (research R6, FR-026), so the buffer and the file
+    agree from the first keystroke. A reconcile failure is best-effort and never
+    turns a successful open into a `False` -- 009's own contract on top of the
+    one this function already carried.
+    """
     try:
         file = load_for_edit(path)
     except OSError as exc:
@@ -76,6 +91,12 @@ def open_editor(app: App[None], path: Path) -> bool:
             status.update(f"⚠ could not open {path.name}: {exc}")
         return False
 
+    workspace = app.workspace  # type: ignore[attr-defined]
+    report = reconcile_on_open(workspace, file.text, source=path)
+    text = report.text
+    if text is not file.text:
+        write_document(path, text, file)
+
     def _save(text: str) -> SaveResult:
         workspace = app.workspace  # type: ignore[attr-defined]
         result = save_buffer(file.path, text, file, workspace=workspace)
@@ -84,7 +105,7 @@ def open_editor(app: App[None], path: Path) -> bool:
         return result
 
     target = EditTarget(
-        text=file.text,
+        text=text,
         display_path=path,
         save=_save,
         ai_line_offset=0,
@@ -117,10 +138,25 @@ def open_task_editor(app: App[None], task: Task) -> None:
     open: the buffer is the dedented body text already held in memory, so
     there is no file read on the way in -- only the save can fail, and that is
     reported in the status bar without discarding what the user typed
-    (FR-023)."""
+    (FR-023).
+
+    Reconciles any mirror inside the body against tasks.md first, on the same
+    terms as `open_editor` (FR-026): the task is authoritative, since the user
+    has not acted on this body yet."""
     assert task.id is not None
     task_id = task.id
     workspace = app.workspace  # type: ignore[attr-defined]
+
+    body = task.body
+    report = reconcile_on_open(workspace, body, source=workspace.tasks_file)
+    if report.text is not body:
+        try:
+            set_task_body(workspace, task_id, report.text)
+        except (NotFoundError, UsageError, WorkspaceError):
+            pass
+        else:
+            body = report.text
+            app.reload_tasks()  # type: ignore[attr-defined]
 
     def _save(text: str) -> SaveResult:
         try:
@@ -131,7 +167,7 @@ def open_task_editor(app: App[None], task: Task) -> None:
         return SaveResult(ok=True, saved_text=text, stamped=False, message="")
 
     target = EditTarget(
-        text=task.body,
+        text=body,
         display_path=workspace.tasks_file,
         save=_save,
         ai_line_offset=_task_ai_line_offset(app, task_id),
@@ -196,6 +232,14 @@ class EditScreen(Screen[None]):
         self.original_text = target.text
         self._request: AssistantRequest | None = None
         self._breadcrumb: str | None = None
+        # What each mirror in `target.text` read at open (or last reconciled) --
+        # "since they last agreed", held for the life of this screen and never
+        # persisted (research R4). Seeded from the already-reconciled text the
+        # screen was constructed with, so a correction applied at open is never
+        # mistaken at save time for an edit the user made (US5/US6).
+        self._mirror_baseline: dict[str, bool] = {
+            m.task_id: m.done for m in find_mirrors(target.text, source=target.display_path)
+        }
 
     @property
     def is_dirty(self) -> bool:
@@ -230,7 +274,24 @@ class EditScreen(Screen[None]):
 
     def _save(self) -> bool:
         editor = self.query_one("#editor", TextArea)
-        result = self.target.save(editor.text)
+        text = editor.text
+
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        mirror_report = reconcile_on_save(
+            workspace,
+            text,
+            source=self.target.display_path,
+            baseline=self._mirror_baseline,
+        )
+        if mirror_report.text is not text:
+            # A correction flowed from tasks.md into this buffer -- the user
+            # sees it land before the save that is about to stamp `updated`.
+            cursor = editor.cursor_location
+            editor.text = mirror_report.text
+            editor.cursor_location = cursor
+            text = mirror_report.text
+
+        result = self.target.save(text)
         if not result.ok:
             self._render_status(result.message)
             return False
@@ -246,10 +307,17 @@ class EditScreen(Screen[None]):
             editor.cursor_location = cursor
 
         self.original_text = result.saved_text
+        self._mirror_baseline = {
+            m.task_id: m.done
+            for m in find_mirrors(result.saved_text, source=self.target.display_path)
+        }
+
+        messages = [w.message for w in result.warnings]
+        messages.extend(w.message for w in mirror_report.warnings)
         if self.target.stamps_frontmatter and not result.stamped:
             self._render_status("frontmatter's updated: field could not be found; saved as typed")
-        elif result.warnings:
-            self._render_status("; ".join(w.message for w in result.warnings))
+        elif messages:
+            self._render_status("; ".join(messages))
         else:
             self._render_status(None)
         return True
@@ -282,6 +350,59 @@ class EditScreen(Screen[None]):
             self._start_ai_request(message.parsed, message.line_index)
         elif message.parsed.command.name == "link":
             self._insert_link(message.parsed, message.line_index)
+        elif message.parsed.command.name == "task":
+            self._capture_task(message.parsed, message.line_index)
+
+    def _capture_task(self, parsed: ParsedCommand, line_index: int) -> None:
+        """`/task <description>` and `/task.<type> <description>` (contracts/tui.md):
+        validate, save the document in its pre-command state, capture through
+        `core.mirrors.capture_task`, then replace the typed line with the mirror
+        as one undo step and land the cursor at its end. No screen push, no
+        collection change, no scroll change (FR-006)."""
+        if not parsed.argument:
+            self._render_status(f"/{parsed.command.name} needs a description")
+            return
+
+        if not self.target.stamps_frontmatter:
+            # A task's own body has no document identity of its own to link
+            # from -- only `open_editor` targets are documents.
+            self._render_status("/task is only available while editing a document")
+            return
+
+        if not self._save():
+            return  # save error already reported; capture does not proceed
+
+        document = _read_document(self.target.display_path)
+        if document is None:
+            self._render_status("/task could not identify this document")
+            return
+
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        try:
+            task, line = capture_task(
+                workspace,
+                parsed.argument,
+                type=parsed.suffix,
+                source=self.target.display_path,
+                source_id=document.id,
+            )
+        except (UsageError, WorkspaceError) as exc:
+            self._render_status(str(exc))
+            return
+
+        editor = self.query_one("#editor", EditorTextArea)
+        original_line = editor.get_line(line_index).plain
+        editor.replace(
+            line,
+            (line_index, 0),
+            (line_index, len(original_line)),
+            maintain_selection_offset=False,
+        )
+        editor.cursor_location = (line_index, len(line))
+        assert task.id is not None
+        self._mirror_baseline[task.id] = False
+        self.app.reload_tasks()  # type: ignore[attr-defined]
+        self._render_status(None)
 
     def _insert_link(self, parsed: ParsedCommand, line_index: int) -> None:
         if not parsed.argument:
