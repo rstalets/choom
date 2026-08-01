@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task
+from choom.core.models import Workspace
+from choom.core.tasks import add_task
 
 
 def test_task_added_with_links_renders_the_field_between_tags_and_created(

@@ -3,7 +3,7 @@ requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
-name = "endpaper"
+name = "choom"
 dynamic = ["version"]
 description = "A corporate-friendly Markdown notes engine that makes your AI happy."
 readme = "README.md"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-endpaper = "endpaper.cli.main:main"
+choom = "choom.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
@@ -38,11 +38,11 @@ fallback-version = "0.0.0"
 # dev-version _version.py, which would defeat the 0.0.0-from-a-checkout guarantee (FR-043). Real
 # builds opt in with HATCH_BUILD_HOOKS_ENABLE=1 (see publish.yml, release-dry-run.yml).
 [tool.hatch.build.hooks.vcs]
-version-file = "src/endpaper/_version.py"
+version-file = "src/choom/_version.py"
 enable-by-default = false
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/endpaper"]
+packages = ["src/choom"]
 
 [tool.ruff]
 line-length = 100
@@ -58,8 +58,8 @@ select = ["E", "F", "I", "UP", "B", "TID"]
 "rich".msg = "core must stay adapter-agnostic; rich belongs in tui/"
 
 [tool.ruff.lint.per-file-ignores]
-"src/endpaper/cli/*" = ["TID251"]
-"src/endpaper/tui/*" = ["TID251"]
+"src/choom/cli/*" = ["TID251"]
+"src/choom/tui/*" = ["TID251"]
 "tests/*" = ["TID251"]
 
 [tool.ruff.format]

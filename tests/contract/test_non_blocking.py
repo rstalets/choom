@@ -7,7 +7,7 @@ from pathlib import Path
 
 def _run(args: list[str], cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, "-m", "endpaper", *args],
+        [sys.executable, "-m", "choom", *args],
         cwd=cwd,
         stdin=subprocess.DEVNULL,
         capture_output=True,
@@ -45,6 +45,6 @@ def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> 
 def test_init_with_assistant_flag_terminates_promptly_with_stdin_closed(tmp_path: Path) -> None:
     result = _run(["init", "--assistant", "copilot"], tmp_path)
     assert result.returncode == 0
-    assert (tmp_path / ".endpaper" / "config.toml").read_text(encoding="utf-8").count(
+    assert (tmp_path / ".choom" / "config.toml").read_text(encoding="utf-8").count(
         'name = "copilot"'
     ) == 1

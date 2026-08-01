@@ -5,12 +5,12 @@ from datetime import datetime
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import DocumentRow
-from endpaper.tui.preview_screen import PreviewScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import DocumentRow
+from choom.tui.preview_screen import PreviewScreen
 from tests.helpers import (
     in_scope_month,
     list_view,
@@ -28,7 +28,7 @@ async def test_e_opens_raw_markdown_including_frontmatter(tmp_workspace: Workspa
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     original_text = meeting.path.read_text(encoding="utf-8")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -39,7 +39,7 @@ async def test_e_opens_raw_markdown_including_frontmatter(tmp_workspace: Workspa
 async def test_ctrl_o_writes_and_preserves_cursor_position(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -58,7 +58,7 @@ async def test_ctrl_o_writes_and_preserves_cursor_position(tmp_workspace: Worksp
 async def test_ctrl_s_behaves_identically_to_ctrl_o(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -77,7 +77,7 @@ async def test_ctrl_x_saves_and_returns_to_preview_with_new_content(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -100,7 +100,7 @@ async def test_title_change_appears_in_list_row_with_no_other_row_moved(
     create_meeting(tmp_workspace, "second meeting", now=in_scope_month(21, 9))
     create_meeting(tmp_workspace, "third meeting", now=in_scope_month(22, 9))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         list_view(app).index = 1  # "second meeting" (newest-first: third, second, first)
@@ -130,7 +130,7 @@ async def test_updated_advances_while_created_stays_fixed(tmp_workspace: Workspa
     )
     original_created = meeting.created
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -155,7 +155,7 @@ async def test_esc_without_editing_leaves_bytes_and_mtime_untouched(
     before_bytes = meeting.path.read_bytes()
     before_mtime = meeting.path.stat().st_mtime_ns
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
 
@@ -172,7 +172,7 @@ async def test_resize_while_editing_preserves_buffer_cursor_and_dirty_state(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -196,7 +196,7 @@ async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining
     create_meeting(tmp_workspace, "vendor renewal", tags=("procurement",))
     create_meeting(tmp_workspace, "standup", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("/")

@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import endpaper.core
+import choom.core
 
 
 def _core_source_files() -> list[Path]:
-    core_dir = Path(endpaper.core.__file__).parent
+    core_dir = Path(choom.core.__file__).parent
     return sorted(core_dir.rglob("*.py"))
 
 
@@ -19,8 +19,8 @@ def test_core_does_not_reference_sys_stdout() -> None:
 
 
 def test_all_names_are_actually_importable() -> None:
-    for name in endpaper.core.__all__:
-        assert hasattr(endpaper.core, name), f"{name} is in __all__ but not importable"
+    for name in choom.core.__all__:
+        assert hasattr(choom.core, name), f"{name} is in __all__ but not importable"
 
 
 def test_links_public_surface_is_exported() -> None:
@@ -41,8 +41,8 @@ def test_links_public_surface_is_exported() -> None:
         "resolve_id",
         "resolve_link",
     ):
-        assert name in endpaper.core.__all__, f"{name} missing from endpaper.core.__all__"
-        assert hasattr(endpaper.core, name)
+        assert name in choom.core.__all__, f"{name} missing from choom.core.__all__"
+        assert hasattr(choom.core, name)
 
 
 def test_mirrors_public_surface_is_exported() -> None:
@@ -58,5 +58,5 @@ def test_mirrors_public_surface_is_exported() -> None:
         "reconcile_on_save",
         "write_document",
     ):
-        assert name in endpaper.core.__all__, f"{name} missing from endpaper.core.__all__"
-        assert hasattr(endpaper.core, name)
+        assert name in choom.core.__all__, f"{name} missing from choom.core.__all__"
+        assert hasattr(choom.core, name)

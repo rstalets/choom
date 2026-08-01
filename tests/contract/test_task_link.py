@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.cli.main import main
-from endpaper.core.mirrors import mirror_line
-from endpaper.core.tasks import get_task
-from endpaper.core.workspace import find_workspace
+from choom.cli.main import main
+from choom.core.mirrors import mirror_line
+from choom.core.tasks import get_task
+from choom.core.workspace import find_workspace
 
 
 @pytest.fixture
@@ -26,7 +26,7 @@ def test_link_with_a_resolvable_id_records_it(
     main(["meeting", "new", "Q3 planning"])
     meeting_path = capsys.readouterr().out.strip()
     workspace = find_workspace(cli_root)
-    from endpaper.core.documents import _read_document
+    from choom.core.documents import _read_document
 
     meeting_id = _read_document(workspace.root / meeting_path).id  # type: ignore[union-attr]
 
@@ -47,7 +47,7 @@ def test_link_supplied_twice_records_both_in_order(
     second_path = capsys.readouterr().out.strip()
 
     workspace = find_workspace(cli_root)
-    from endpaper.core.documents import _read_document
+    from choom.core.documents import _read_document
 
     first_id = _read_document(workspace.root / first_path).id  # type: ignore[union-attr]
     second_id = _read_document(workspace.root / second_path).id  # type: ignore[union-attr]
@@ -65,8 +65,8 @@ def test_cli_linked_task_line_matches_the_editors_shape(
     main(["meeting", "new", "Q3 planning"])
     meeting_path = capsys.readouterr().out.strip()
     workspace = find_workspace(cli_root)
-    from endpaper.core.documents import _read_document
-    from endpaper.core.mirrors import capture_task
+    from choom.core.documents import _read_document
+    from choom.core.mirrors import capture_task
 
     meeting_id = _read_document(workspace.root / meeting_path).id  # type: ignore[union-attr]
 

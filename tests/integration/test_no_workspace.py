@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 
-def test_bare_endpaper_outside_workspace_exits_3_with_guidance(
+def test_bare_choom_outside_workspace_exits_3_with_guidance(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -17,7 +17,7 @@ def test_bare_endpaper_outside_workspace_exits_3_with_guidance(
     captured = capsys.readouterr()
     assert captured.out == ""
     assert "no workspace found" in captured.err
-    assert "endpaper init" in captured.err
+    assert "choom init" in captured.err
 
 
 def test_meeting_list_outside_workspace_exits_3(tmp_path: Path, monkeypatch, capsys) -> None:

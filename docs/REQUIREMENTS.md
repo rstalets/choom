@@ -1,6 +1,6 @@
-# endpaper — Design Intent & Conventions
+# choom — Design Intent & Conventions
 
-**What this file is.** The living record of what endpaper is for and the conventions every
+**What this file is.** The living record of what choom is for and the conventions every
 feature must honour — the frontmatter schema, the id scheme, the file layout and why it is
 frozen, the task line format, link semantics, and the registries that shift as features
 ship. It is expected to change when a feature changes one of them.
@@ -23,7 +23,7 @@ Almost nobody at a large company can do this. Markdown-first tools — Obsidian,
 
 The workarounds fail in predictable ways. Copy-pasting into a chat window loses everything the moment the session ends. Personal markdown folders become unnavigable within weeks because nothing enforces structure or provides search. Full note-taking apps demand installation rights, a server, or a cloud account.
 
-**endpaper is a local-only, Python, terminal-based tool for capturing and organizing meeting notes, general notes, and tasks as plain markdown files** — structured enough for a human to navigate through a TUI, and legible enough that an AI assistant can read and edit the vault directly, without any integration work. It installs without admin rights, stores nothing outside a directory the user already has, and works on a OneDrive-synced folder so a team can share a workspace without a server.
+**choom is a local-only, Python, terminal-based tool for capturing and organizing meeting notes, general notes, and tasks as plain markdown files** — structured enough for a human to navigate through a TUI, and legible enough that an AI assistant can read and edit the vault directly, without any integration work. It installs without admin rights, stores nothing outside a directory the user already has, and works on a OneDrive-synced folder so a team can share a workspace without a server.
 
 ---
 
@@ -41,7 +41,7 @@ The whole surface is a filterable list and a preview pane. There is exactly one 
 
 ### The AI assistant
 
-An assistant that lands in an endpaper workspace should be productive without instruction.
+An assistant that lands in a choom workspace should be productive without instruction.
 It reads `AGENTS.md` at the root, learns the folder layout and the commands that matter,
 and works from there.
 
@@ -49,11 +49,11 @@ and works from there.
 what puts a file in the right partition, with correct frontmatter and a generated id — the
 conventions in §3.2 that an assistant would otherwise have to reproduce by hand. Once the
 file exists, it is an ordinary markdown file and the assistant edits it the same way it
-edits source. That follows from everything endpaper writes being hand-editable: if a human
+edits source. That follows from everything choom writes being hand-editable: if a human
 can safely open the file in any editor, so can an assistant.
 
-The commands it does reach for are non-interactive and machine-readable. `endpaper meeting
-list --json` returns structured results; `endpaper links check` reports what has gone
+The commands it does reach for are non-interactive and machine-readable. `choom meeting
+list --json` returns structured results; `choom links check` reports what has gone
 stale. Nothing opens an editor, nothing waits for a keypress, nothing pages output.
 
 The two interfaces are peers. Neither is a wrapper around the other; both call the same
@@ -66,16 +66,16 @@ core library.
 ### 3.1 Tagging
 
 Applies to every create command. The `#tag` shorthand works inline in the TUI, where
-endpaper controls the input. It cannot be relied on in the CLI, because `#` begins a
+choom controls the input. It cannot be relied on in the CLI, because `#` begins a
 comment in bash and zsh and an unquoted tag is silently discarded by the shell before
-endpaper ever sees it. Therefore:
+choom ever sees it. Therefore:
 
 - **TUI:** `#tag` inline, anywhere in the description. Repeatable.
 - **CLI:** `--tag <tag>` is the supported form. Repeatable.
-- **CLI, additionally:** if a `#tag` appears inside a *quoted* description, endpaper parses
-  it out and strips it from the title, so `endpaper task add "send the report
+- **CLI, additionally:** if a `#tag` appears inside a *quoted* description, choom parses
+  it out and strips it from the title, so `choom task add "send the report
   #procurement"` works as expected.
-- A tag silently vanishing is the worst possible outcome. `endpaper --help` and `AGENTS.md`
+- A tag silently vanishing is the worst possible outcome. `choom --help` and `AGENTS.md`
   must both state the `--tag` form explicitly.
 
 ### 3.2 File and data layout
@@ -119,7 +119,7 @@ updated: 2026-07-28T09:41:00
 - **`type` is carried in frontmatter and in the filename only. Never as a directory.** Types are free-form and user-invented, so directory-per-type would fragment the vault into a long tail of one-file folders and complicate cross-workspace scanning. Date is the only axis the directory tree encodes, because date is the only attribute every file has exactly one of.
 - **The set of collections is fixed** — `meetings/`, `notes/`, `notes/daily/`, `tasks.md` — and does not grow. Only date partitions inside them grow, and only by year and month.
 - **Partitions are created on demand and never pruned.** Writing the first file of a month creates its directory; nothing creates directories in advance, and an empty partition left behind by a deleted file is harmless and is left alone.
-- **Scans are recursive.** Reading a collection means walking its whole subtree, not listing one directory. A file the user has filed under the wrong month still lists — its date comes from frontmatter, never from its path. endpaper never moves a file to match its partition.
+- **Scans are recursive.** Reading a collection means walking its whole subtree, not listing one directory. A file the user has filed under the wrong month still lists — its date comes from frontmatter, never from its path. choom never moves a file to match its partition.
 - Paths must stay well under the Windows 260-character limit — assume the root is already something like `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\`. The partition adds 8 characters (`/YYYY/MM`), taking the worst-case generated path from 107 to 115 characters below the workspace root.
 
 ### 3.3 Document links
@@ -130,11 +130,11 @@ Any record may point at any other, as an ordinary CommonMark inline link: `[text
 See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20260728_a1b2c3d4).
 ```
 
-- **The `#id` fragment is authoritative and permanent.** It is what endpaper resolves against; the path is never consulted when the id resolves.
-- **The path is derived, not authored.** It is the relative path from the linking file to the target, computed by endpaper and repaired whenever it goes stale — a link may be written with no path at all (`[text](#id)`), and gains the correct one on the next save.
+- **The `#id` fragment is authoritative and permanent.** It is what choom resolves against; the path is never consulted when the id resolves.
+- **The path is derived, not authored.** It is the relative path from the linking file to the target, computed by choom and repaired whenever it goes stale — a link may be written with no path at all (`[text](#id)`), and gains the correct one on the next save.
 - **Repair is a byte-level splice.** Only the destination between `(` and `)` changes; link text, surrounding prose, and line endings are untouched. A link is never rewritten by re-rendering the document.
-- **A link that cannot be resolved is dead, not an error.** It is left byte-identical and reported — `endpaper links check` and `endpaper links heal` distinguish *stale* (id resolves, path wrong — mechanically fixable) from *dead* (id resolves to nothing — needs a human decision).
-- **Inbound links are never stored.** `endpaper links <id>` and the preview pane's Links section answer "what points at this record" by scanning the workspace at the moment they are asked, the same way `meeting list` scans a collection. No index, no cache, no back-reference written into any target.
+- **A link that cannot be resolved is dead, not an error.** It is left byte-identical and reported — `choom links check` and `choom links heal` distinguish *stale* (id resolves, path wrong — mechanically fixable) from *dead* (id resolves to nothing — needs a human decision).
+- **Inbound links are never stored.** `choom links <id>` and the preview pane's Links section answer "what points at this record" by scanning the workspace at the moment they are asked, the same way `meeting list` scans a collection. No index, no cache, no back-reference written into any target.
 - Text inside a fenced code block or an inline code span is never treated as a link — a note that documents link syntax is not rewritten.
 - A task may carry links too, via the `links:` field on its checkbox line — bare ids, never paths, since a task line is already one line of metadata.
 
@@ -150,7 +150,7 @@ See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20
 - **Syncing an item does not stamp the document's `updated`.** Ticking a box in the tasks list is not an edit to the meeting note, and must not reorder every list sorted by recency.
 - **A document that cannot be written never blocks a completion.** `tasks.md` is written first, a warning names the document, and the item is reconciled next time it is opened.
 - An item whose id resolves to no task is dead in exactly the sense above: left byte-identical, reported, never removed.
-- An ordinary checkbox with no link, and an ordinary link with no checkbox, are both left alone. Only the two together are a control surface — endpaper does not adopt checkboxes a person wrote in their own notes.
+- An ordinary checkbox with no link, and an ordinary link with no checkbox, are both left alone. Only the two together are a control surface — choom does not adopt checkboxes a person wrote in their own notes.
 
 ### 3.4 The CLI contract
 
@@ -179,7 +179,7 @@ must never behave like an interactive program.
 
 ### 3.6 Search
 
-**There is no index and no database.** The markdown files are the only state endpaper has.
+**There is no index and no database.** The markdown files are the only state choom has.
 
 - On launch, `core` globs the workspace recursively, walking the `YYYY/MM/` partitions
   described in §3.2, parses frontmatter from each file, and holds the result in memory as a
@@ -191,7 +191,7 @@ must never behave like an interactive program.
 
 Semantic search is out of scope. AI assistants perform semantic retrieval by searching,
 reading, and refining against the live filesystem — the agentic-search pattern — and never
-touch endpaper's search path at all.
+touch choom's search path at all.
 
 **Revisit only if** startup scan time becomes noticeable in practice. The first remedy is a
 small JSON metadata cache keyed by file mtime, not a database.
@@ -249,7 +249,7 @@ PuTTY, and inside tmux.
 Two areas that were once described here are stated once, in
 `.specify/memory/constitution.md`, rather than twice:
 
-- **Architecture** — `endpaper.core` holds all logic, the CLI and TUI are peers over it,
+- **Architecture** — `choom.core` holds all logic, the CLI and TUI are peers over it,
   and core is testable without a terminal. Principle I, and Principle II for the peer rule.
 - **Platform and environment** — supported operating systems, no admin rights, no network,
   Windows path limits, spaces and non-ASCII in paths, per-user state. The Platform &

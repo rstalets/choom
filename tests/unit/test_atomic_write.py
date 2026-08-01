@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.atomic_write import write_text_atomic
-from endpaper.core.errors import WorkspaceError
+from choom.core.atomic_write import write_text_atomic
+from choom.core.errors import WorkspaceError
 
 
 def test_writes_the_target_and_leaves_no_temp_file(tmp_path: Path) -> None:

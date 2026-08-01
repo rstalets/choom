@@ -3,7 +3,7 @@ name: "changed"
 description: "Walk every closed issue and merged PR in a milestone and produce a markdown draft of release notes for it."
 argument-hint: "<milestone-name-or-number>"
 metadata:
-  author: "endpaper"
+  author: "choom"
 user-invocable: true
 disable-model-invocation: false
 ---

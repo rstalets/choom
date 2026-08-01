@@ -10,21 +10,21 @@ from __future__ import annotations
 
 from textual.widgets import Input
 
-import endpaper
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.collection_bar import COLLECTIONS, CollectionBar
-from endpaper.tui.command_bar import CommandBar
-from endpaper.tui.list_screen import ListView
-from endpaper.tui.status_bar import StatusBar, render_version
+import choom
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.collection_bar import COLLECTIONS, CollectionBar
+from choom.tui.command_bar import CommandBar
+from choom.tui.list_screen import ListView
+from choom.tui.status_bar import StatusBar, render_version
 from tests.helpers import type_literally
 
 
 async def test_command_bar_prefix_undeletable_and_input_not_clipped(
     tmp_workspace: Workspace,
 ) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
 
@@ -67,7 +67,7 @@ async def test_command_bar_prefix_undeletable_and_input_not_clipped(
 async def test_collection_bar_lists_three_and_tab_cycles_with_wraparound(
     tmp_workspace: Workspace,
 ) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert COLLECTIONS == ("tasks", "notes", "meetings")
@@ -102,7 +102,7 @@ async def test_collection_bar_lists_three_and_tab_cycles_with_wraparound(
 
 
 async def test_tab_inert_while_command_bar_open(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -124,12 +124,12 @@ async def test_version_indicator_renders_on_list_preview_and_edit_screens(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         status = app.screen.query_one(StatusBar)
         assert render_version() in str(status.content)
-        assert f"v{endpaper.__version__}" in str(status.content)
+        assert f"v{choom.__version__}" in str(status.content)
 
         await pilot.press("tab", "tab")  # tasks -> notes -> meetings
         await pilot.pause()

@@ -2,18 +2,18 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import DocumentRow, ListScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import DocumentRow, ListScreen
 from tests.helpers import list_view, to_collection
 
 
 async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
 
@@ -32,7 +32,7 @@ async def test_save_and_exit_returns_to_list_with_the_row_updated(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
 
@@ -51,11 +51,11 @@ async def test_save_and_exit_returns_to_list_with_the_row_updated(
 
 
 async def test_e_opens_the_task_editor_on_a_highlighted_task(tmp_workspace: Workspace) -> None:
-    from endpaper.core.tasks import add_task
+    from choom.core.tasks import add_task
 
     add_task(tmp_workspace, "buy milk")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -69,7 +69,7 @@ async def test_e_opens_the_task_editor_on_a_highlighted_task(tmp_workspace: Work
 
 
 async def test_e_is_a_noop_on_the_tasks_empty_state(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -81,7 +81,7 @@ async def test_e_is_a_noop_on_the_tasks_empty_state(tmp_workspace: Workspace) ->
 
 
 async def test_e_is_a_noop_on_the_empty_state(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
 
@@ -96,7 +96,7 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    from_list = EndpaperApp(tmp_workspace)
+    from_list = ChoomApp(tmp_workspace)
     async with from_list.run_test(size=(80, 24)) as pilot:
         await to_collection(from_list, pilot, "meetings")
         await pilot.press("e")
@@ -105,7 +105,7 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
         assert type(list_screen) is EditScreen
         list_text = list_screen.query_one("#editor", TextArea).text
 
-    from_preview = EndpaperApp(tmp_workspace)
+    from_preview = ChoomApp(tmp_workspace)
     async with from_preview.run_test(size=(80, 24)) as pilot:
         await to_collection(from_preview, pilot, "meetings")
         await pilot.press("enter")

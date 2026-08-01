@@ -4,13 +4,13 @@ import tomllib
 
 import pytest
 
-from endpaper.core.config import get_assistant, set_assistant
-from endpaper.core.errors import UsageError
-from endpaper.core.models import Workspace
+from choom.core.config import get_assistant, set_assistant
+from choom.core.errors import UsageError
+from choom.core.models import Workspace
 
 
 def _config_path(workspace: Workspace):
-    return workspace.root / ".endpaper" / "config.toml"
+    return workspace.root / ".choom" / "config.toml"
 
 
 def test_key_created_when_no_assistant_table_exists(tmp_workspace: Workspace) -> None:

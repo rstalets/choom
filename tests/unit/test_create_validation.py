@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.errors import UsageError
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
+from choom.core.errors import UsageError
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
 
 
 def test_empty_slug_falls_back_to_untitled(tmp_workspace: Workspace) -> None:

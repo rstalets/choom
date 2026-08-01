@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.assistants import PROFILES, compose_prompt, start_request
+from choom.core.assistants import PROFILES, compose_prompt, start_request
 
 _CLAUDE = next(p for p in PROFILES if p.name == "claude")
 

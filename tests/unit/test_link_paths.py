@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.links import relative_destination
+from choom.core.links import relative_destination
 
 WORKSPACE = Path("/tmp/ep-workspace")
 

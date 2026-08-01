@@ -7,10 +7,10 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.documents import scan_month
-from endpaper.core.meetings import MEETINGS
-from endpaper.core.models import Collection, Workspace, YearMonth
-from endpaper.core.notes import NOTES
+from choom.core.documents import scan_month
+from choom.core.meetings import MEETINGS
+from choom.core.models import Collection, Workspace, YearMonth
+from choom.core.notes import NOTES
 from tests.fixtures.generate import generate, generate_notes
 
 
@@ -65,12 +65,12 @@ def test_filter_reads_each_month_at_most_once_per_session(
 ) -> None:
     """FR-035: once a filter has loaded every month into the session cache, a
     second, different filter term must not re-read any file (research R7)."""
-    from endpaper.tui.app import EndpaperApp
+    from choom.tui.app import ChoomApp
 
     now = datetime.now()
     workspace = generate(tmp_path, 60, spread_months=6, now=now, current_month_count=5)
 
-    app = EndpaperApp(workspace)
+    app = ChoomApp(workspace)
     app.active = "meetings"
 
     with _counting_read_text(monkeypatch) as read_paths:

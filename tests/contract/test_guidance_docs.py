@@ -8,9 +8,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.models import Workspace
+from choom.core.models import Workspace
 
-_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "src" / "endpaper" / "core" / "templates"
+_TEMPLATES_DIR = Path(__file__).resolve().parents[2] / "src" / "choom" / "core" / "templates"
 
 # CLAUDE.md points at AGENTS.md; it must not restate any convention, or the two
 # drift apart and the assistant gets two answers.
@@ -19,9 +19,9 @@ _FORBIDDEN_IN_CLAUDE_MD = (
     "notes/",
     "tasks.md",
     "frontmatter",
-    "endpaper meeting",
-    "endpaper note",
-    "endpaper task",
+    "choom meeting",
+    "choom note",
+    "choom task",
 )
 
 _REQUIRED_IN_AGENTS_MD = (
@@ -42,7 +42,7 @@ _REQUIRED_IN_AGENTS_MD = (
     "links:",
     "meeting_",
     "note_",
-    "endpaper links",
+    "choom links",
     "links check",
     "links heal",
     "blank line",

@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from textual.widgets import Markdown, TextArea
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, load_tasks
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.discard_dialog import DiscardDialog
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import ListScreen
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, load_tasks
+from choom.tui.app import ChoomApp
+from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListScreen
 from tests.conftest import tasks_file, write_tasks
 from tests.helpers import list_view
 
@@ -31,7 +31,7 @@ async def test_hand_written_body_renders_and_clears_on_a_body_less_task(
         "- [ ] book the room <!-- id:t_c3d4 -->\n",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert "call the vendor" in _preview_text(app)
@@ -53,7 +53,7 @@ async def test_completed_task_body_renders_the_same_way_in_done_category(
         "- [x] send the invoice <!-- id:t_c3d4 -->\n\n  Paid on the 30th.\n",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("h")
@@ -74,7 +74,7 @@ async def test_completed_task_body_renders_the_same_way_in_done_category(
 async def test_e_on_a_body_less_task_opens_an_empty_buffer(tmp_workspace: Workspace) -> None:
     add_task(tmp_workspace, "buy milk")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("e")
@@ -91,7 +91,7 @@ async def test_e_on_a_task_with_a_body_opens_exactly_that_body(tmp_workspace: Wo
         "- [ ] call the vendor <!-- id:t_a1b2 -->\n\n  Need the Q3 comparison.\n",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("e")
@@ -108,7 +108,7 @@ async def test_save_lands_in_file_and_pane_with_same_task_highlighted(
     add_task(tmp_workspace, "buy milk")
     task = add_task(tmp_workspace, "call the vendor")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("j")  # highlight "call the vendor" (oldest-first order)
@@ -141,7 +141,7 @@ async def test_discard_leaves_tasks_file_unchanged(tmp_workspace: Workspace) -> 
     write_tasks(tmp_workspace, "- [ ] call the vendor <!-- id:t_a1b2 -->\n")
     before = tasks_file(tmp_workspace).read_bytes()
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("e")
@@ -170,7 +170,7 @@ async def test_no_op_save_leaves_the_file_byte_identical(tmp_workspace: Workspac
     )
     before = tasks_file(tmp_workspace).read_bytes()
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("e")
@@ -192,7 +192,7 @@ async def test_toggling_done_preserves_the_body(tmp_workspace: Workspace) -> Non
         "- [ ] call the vendor <!-- id:t_a1b2 -->\n\n  Need the Q3 comparison.\n",
     )
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("space")

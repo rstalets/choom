@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Task, Workspace
-from endpaper.tui.rendering import render_preview_markdown, render_task_markdown
+from choom.core.meetings import create_meeting
+from choom.core.models import Task, Workspace
+from choom.tui.rendering import render_preview_markdown, render_task_markdown
 
 
 def test_preview_markdown_strips_frontmatter_and_headings_the_title(

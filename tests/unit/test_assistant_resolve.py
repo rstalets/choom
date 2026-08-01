@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-import endpaper.core.assistants as assistants
-from endpaper.core.assistants import resolve_assistant
+import choom.core.assistants as assistants
+from choom.core.assistants import resolve_assistant
 
 
 def _patch_available(monkeypatch: pytest.MonkeyPatch, names: tuple[str, ...]) -> None:

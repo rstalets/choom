@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, set_task_state
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import ListView, TaskRow
-from endpaper.tui.scope_pane import CategoryRow
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, set_task_state
+from choom.tui.app import ChoomApp
+from choom.tui.list_screen import ListView, TaskRow
+from choom.tui.scope_pane import CategoryRow
 from tests.helpers import list_view, task_rows, type_command
 
 
 async def test_todo_is_the_default_category(tmp_workspace: Workspace) -> None:
     add_task(tmp_workspace, "open task")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -26,7 +26,7 @@ async def test_todo_is_the_default_category(tmp_workspace: Workspace) -> None:
 async def test_toggling_moves_a_task_between_categories(tmp_workspace: Workspace) -> None:
     task = add_task(tmp_workspace, "buy milk", type="errand", tags=("home",))
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert any(r.record.id == task.id for r in task_rows(app))
@@ -65,7 +65,7 @@ async def test_preview_pane_renders_the_highlighted_task(tmp_workspace: Workspac
     add_task(tmp_workspace, "buy milk")
     add_task(tmp_workspace, "call the vendor")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         preview = app.screen.query_one("#preview", Markdown)
@@ -86,7 +86,7 @@ async def test_done_category_lists_only_completed_and_survives_collection_switch
     done_task = add_task(tmp_workspace, "done task")
     set_task_state(tmp_workspace, done_task.id, done=True)  # type: ignore[arg-type]
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
@@ -118,7 +118,7 @@ async def test_creating_a_task_from_done_returns_to_todo(tmp_workspace: Workspac
     existing = add_task(tmp_workspace, "existing done task")
     set_task_state(tmp_workspace, existing.id, done=True)  # type: ignore[arg-type]
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await pilot.press("h")

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.meetings import create_meeting, scan_meetings
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note, open_daily_note, scan_notes
-from endpaper.tui.app import EndpaperApp
+from choom.core.meetings import create_meeting, scan_meetings
+from choom.core.models import Workspace
+from choom.core.notes import create_note, open_daily_note, scan_notes
+from choom.tui.app import ChoomApp
 
 
 async def test_collection_menu_pane_is_gone_and_its_width_returned_to_the_content_panes(
@@ -14,7 +14,7 @@ async def test_collection_menu_pane_is_gone_and_its_width_returned_to_the_conten
     # FR-006: the vertical collection menu is removed; the 14 columns it used
     # go to the scope pane (fixed 14, for `YYYY-MM` + padding) and the freed
     # width goes to the list/preview split, which keeps its 2fr/3fr ratio.
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
 

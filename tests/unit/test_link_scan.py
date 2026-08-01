@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.links import find_links, find_task_links
+from choom.core.links import find_links, find_task_links
 
 SOURCE = Path("notes/2026/07/2026-07-30-example.md")
 

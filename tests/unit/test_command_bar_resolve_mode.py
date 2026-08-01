@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.tui.command_bar import resolve_mode
+from choom.tui.command_bar import resolve_mode
 
 
 @pytest.mark.parametrize(

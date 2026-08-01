@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace, YearMonth
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import ListScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace, YearMonth
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListScreen
 from tests.helpers import list_view, to_collection, type_command
 
 
@@ -17,7 +17,7 @@ def _one_month_before(dt: datetime) -> datetime:
 
 
 async def test_creating_a_meeting_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "meeting.standup Q3 planning")
@@ -26,7 +26,7 @@ async def test_creating_a_meeting_opens_the_editor_directly(tmp_workspace: Works
 
 
 async def test_creating_a_note_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note.research vendor landscape")
@@ -35,7 +35,7 @@ async def test_creating_a_note_opens_the_editor_directly(tmp_workspace: Workspac
 
 
 async def test_creating_the_daily_note_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note")
@@ -48,7 +48,7 @@ async def test_create_moves_scope_to_new_month(tmp_workspace: Workspace) -> None
     last_month = _one_month_before(now)
     create_meeting(tmp_workspace, "an older meeting", now=last_month)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("h")
@@ -76,7 +76,7 @@ async def test_create_moves_scope_to_new_month(tmp_workspace: Workspace) -> None
 async def test_exiting_after_create_lands_on_the_list_in_the_new_documents_month(
     tmp_workspace: Workspace,
 ) -> None:
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note.research vendor landscape")

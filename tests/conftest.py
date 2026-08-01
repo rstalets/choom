@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.cli.main import main
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.workspace import init_workspace
+from choom.cli.main import main
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.workspace import init_workspace
 
 #: The fixed reply `stub_assistant`'s "reply" mode prints, so integration tests can
 #: assert on insertion, ordering, and line endings without duplicating the text.
@@ -24,7 +24,7 @@ import os
 import sys
 import time
 
-mode = os.environ.get("ENDPAPER_STUB_MODE", "echo")
+mode = os.environ.get("CHOOM_STUB_MODE", "echo")
 
 if mode == "echo":
     for arg in sys.argv[1:]:
@@ -62,10 +62,10 @@ def stub_assistant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[
     script.write_text(_STUB_SOURCE, encoding="utf-8")
     script.chmod(0o755)
     monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ["PATH"])
-    monkeypatch.setenv("ENDPAPER_STUB_MODE", "echo")
+    monkeypatch.setenv("CHOOM_STUB_MODE", "echo")
 
     def _set_mode(mode: str) -> None:
-        monkeypatch.setenv("ENDPAPER_STUB_MODE", mode)
+        monkeypatch.setenv("CHOOM_STUB_MODE", mode)
 
     return _set_mode
 

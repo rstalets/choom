@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import endpaper.cli.main as cli_main
-from endpaper.cli.main import main
-from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
+import choom.cli.main as cli_main
+from choom.cli.main import main
+from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 
 
 def test_error_hierarchy_exit_codes() -> None:
@@ -145,8 +145,8 @@ def test_config_assistant_no_workspace_exits_3(tmp_path: Path, monkeypatch, caps
 
 def test_not_found_error_maps_to_exit_code_1(monkeypatch, capsys) -> None:
     # No command in this feature raises NotFoundError yet -- there is no "not found"
-    # surface until `endpaper find`/`read` (out of scope here). This verifies main()'s
-    # generic EndpaperError -> exit_code mapping is wired for it regardless.
+    # surface until `choom find`/`read` (out of scope here). This verifies main()'s
+    # generic ChoomError -> exit_code mapping is wired for it regardless.
     def _boom(namespace: object) -> int:
         raise NotFoundError("nothing to see here")
 

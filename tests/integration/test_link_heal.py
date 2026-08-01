@@ -3,11 +3,11 @@ from __future__ import annotations
 import os
 import time
 
-from endpaper.core.editing import load_for_edit, save_buffer
-from endpaper.core.links import check_links, heal_links, relative_destination
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note
+from choom.core.editing import load_for_edit, save_buffer
+from choom.core.links import check_links, heal_links, relative_destination
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note
 
 
 def test_fragment_only_link_gains_a_path_on_save(tmp_workspace: Workspace) -> None:

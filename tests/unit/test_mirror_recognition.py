@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.mirrors import find_mirrors
+from choom.core.mirrors import find_mirrors
 
 _SOURCE = Path("/ws/meetings/2026/07/2026-07-28-q3-planning.md")
 

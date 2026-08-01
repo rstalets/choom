@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import ListView
-from endpaper.tui.scope_pane import SuspendedRow
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.list_screen import ListView
+from choom.tui.scope_pane import SuspendedRow
 from tests.helpers import row_titles, to_collection, type_command
 
 
@@ -19,7 +19,7 @@ async def test_filter_matches_documents_from_other_months_newest_first(
     create_meeting(tmp_workspace, "vendor followup", now=now)
     create_meeting(tmp_workspace, "standup", type="standup", now=now)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await type_command(app, pilot, "filter vendor")
@@ -32,7 +32,7 @@ async def test_scope_pane_shows_suspended_while_filter_is_active(
 ) -> None:
     create_meeting(tmp_workspace, "vendor renewal")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await type_command(app, pilot, "filter vendor")
@@ -48,7 +48,7 @@ async def test_opening_a_cross_month_match_and_returning_keeps_the_results(
     older = now.replace(year=now.year - 1) if now.month != 2 or now.day < 29 else now
     create_meeting(tmp_workspace, "vendor renewal", now=older)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await type_command(app, pilot, "filter vendor")

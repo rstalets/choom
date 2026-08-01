@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.editing import load_for_edit, save_buffer
+from choom.core.editing import load_for_edit, save_buffer
 
 
 def test_failed_replace_leaves_target_untouched_and_no_temp_left(

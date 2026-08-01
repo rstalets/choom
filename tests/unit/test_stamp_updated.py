@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from endpaper.core.editing import stamp_updated
+from choom.core.editing import stamp_updated
 
 _TIMESTAMP = "2026-07-28T09:14:00"
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.text import matches_terms
+from choom.core.text import matches_terms
 
 # Regression: a multi-word query used to be tested as one contiguous substring,
 # so "research Okta" matched nothing even when a note titled "Okta rollout" of

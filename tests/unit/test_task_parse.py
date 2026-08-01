@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.tasks import parse_tasks
+from choom.core.tasks import parse_tasks
 
 
 @pytest.mark.parametrize(

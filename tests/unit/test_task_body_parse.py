@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from endpaper.core.tasks import parse_tasks
+from choom.core.tasks import parse_tasks
 
 # --- span boundaries (T006) --------------------------------------------------
 

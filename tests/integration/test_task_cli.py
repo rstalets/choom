@@ -111,7 +111,7 @@ def _seed_tasks(cli) -> Path:
     return path
 
 
-# filter_tasks() (src/endpaper/core/tasks.py) always sorts oldest-first, so every
+# filter_tasks() (src/choom/core/tasks.py) always sorts oldest-first, so every
 # case's expected order is fully determined by the seed's `created` dates, not just
 # by the case's own filter -- task_0005 (07-19), task_0001 (07-20), task_0002 (07-21),
 # task_0003 (07-22), task_0004 (07-23).

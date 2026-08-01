@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from endpaper.core.editor_commands import EDITOR_COMMANDS, parse_line
-from endpaper.core.models import ParsedCommand
+from choom.core.editor_commands import EDITOR_COMMANDS, parse_line
+from choom.core.models import ParsedCommand
 
 
 def test_mid_line_slash_ai_is_text() -> None:

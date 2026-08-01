@@ -4,11 +4,11 @@ import argparse
 from datetime import date, datetime, timedelta
 from pathlib import Path
 
-from endpaper.core.errors import WorkspaceError
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.core.notes import create_note, open_daily_note
-from endpaper.core.workspace import find_workspace, init_workspace
+from choom.core.errors import WorkspaceError
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.core.notes import create_note, open_daily_note
+from choom.core.workspace import find_workspace, init_workspace
 
 
 def _months_before(base: date, n: int) -> tuple[int, int]:

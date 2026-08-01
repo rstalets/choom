@@ -39,7 +39,7 @@ def test_generated_tasks_file_parses_as_commonmark_task_list(cli) -> None:
 
 def test_tasks_file_with_bodies_renders_as_a_nested_checklist(cli) -> None:
     """SC-008: a tasks.md containing bodies still renders as a correct nested
-    checklist in a markdown viewer that knows nothing about endpaper."""
+    checklist in a markdown viewer that knows nothing about choom."""
     cli("task", "add", "call the vendor", "--type", "followup", "--tag", "procurement")
     cli("task", "add", "book the room")
 

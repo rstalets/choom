@@ -1,8 +1,8 @@
 from __future__ import annotations
 
-import endpaper.tui.command_bar as command_bar_module
-from endpaper.tui.command_bar import resolve_mode
-from endpaper.tui.commands import VERB_TABLE, resolve_verb
+import choom.tui.command_bar as command_bar_module
+from choom.tui.command_bar import resolve_mode
+from choom.tui.commands import VERB_TABLE, resolve_verb
 
 
 def test_verb_table_has_the_alias_documented_in_the_contract() -> None:

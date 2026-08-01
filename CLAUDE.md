@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Repo-specific instructions for Claude Code sessions working on endpaper.
+Repo-specific instructions for Claude Code sessions working on choom.
 
 ## Pull requests
 

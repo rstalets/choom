@@ -6,11 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.cli.main import main
-from endpaper.core.workspace import init_workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import ListView, TaskRow
+from choom.cli.main import main
+from choom.core.workspace import init_workspace
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListView, TaskRow
 from tests.helpers import type_command
 
 _MASKED_FIELDS = re.compile(r"^(id|created|updated):.*$", re.MULTILINE)
@@ -21,7 +21,7 @@ def _normalize(text: str) -> str:
 
 
 async def _create_via_tui(workspace, command_text: str) -> Path:  # type: ignore[no-untyped-def]
-    app = EndpaperApp(workspace)
+    app = ChoomApp(workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, command_text)
@@ -69,7 +69,7 @@ _SEED = "- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup create
 
 
 async def _toggle_via_tui(workspace) -> None:  # type: ignore[no-untyped-def]
-    app = EndpaperApp(workspace)
+    app = ChoomApp(workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"

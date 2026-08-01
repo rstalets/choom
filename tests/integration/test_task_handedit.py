@@ -4,8 +4,8 @@ import json
 import os
 import stat
 
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, load_tasks, set_task_state
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, load_tasks, set_task_state
 from tests.conftest import tasks_file, write_raw, write_tasks
 
 

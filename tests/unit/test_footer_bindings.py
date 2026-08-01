@@ -3,10 +3,10 @@ from __future__ import annotations
 import pytest
 from textual.binding import Binding
 
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.list_screen import ListScreen
-from endpaper.tui.preview_screen import PreviewScreen
-from endpaper.tui.status_bar import (
+from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListScreen
+from choom.tui.preview_screen import PreviewScreen
+from choom.tui.status_bar import (
     EDIT_HELP,
     LINKS_SECTION_HELP,
     LIST_HELP,

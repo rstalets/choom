@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.meetings import filter_meetings, match_meeting, scan_meetings
-from endpaper.core.models import MeetingFilter
+from choom.core.meetings import filter_meetings, match_meeting, scan_meetings
+from choom.core.models import MeetingFilter
 from tests.fixtures.generate import generate
 
 

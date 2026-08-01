@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace, YearMonth
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.list_screen import ListView
-from endpaper.tui.scope_pane import MonthRow
-from endpaper.tui.status_bar import StatusBar
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace, YearMonth
+from choom.tui.app import ChoomApp
+from choom.tui.list_screen import ListView
+from choom.tui.scope_pane import MonthRow
+from choom.tui.status_bar import StatusBar
 from tests.helpers import list_view, row_titles, to_collection
 
 
@@ -21,7 +21,7 @@ async def test_current_month_is_highlighted_on_selection(tmp_workspace: Workspac
     now = datetime.now()
     create_meeting(tmp_workspace, "this month", now=now)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         scope_list = app.screen.query_one("#scope-list", ListView)
@@ -38,7 +38,7 @@ async def test_moving_the_month_highlight_refills_list_and_preview_without_movin
     create_meeting(tmp_workspace, "this month meeting", now=now)
     create_meeting(tmp_workspace, "last month meeting", now=last_month)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         assert row_titles(app) == ["this month meeting"]
@@ -61,7 +61,7 @@ async def test_empty_current_month_shows_a_month_scoped_empty_state(
     last_month = _one_month_before(now)
     create_meeting(tmp_workspace, "last month meeting", now=last_month)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         labels = [str(item.children[0].content) for item in list_view(app).children]  # type: ignore[attr-defined]
@@ -79,7 +79,7 @@ async def test_warning_count_is_per_month(tmp_workspace: Workspace) -> None:
     (bad_dir / "broken.md").write_text("no frontmatter here", encoding="utf-8")
     create_meeting(tmp_workspace, "this month meeting", now=now)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         status = app.screen.query_one(StatusBar)
@@ -102,7 +102,7 @@ async def test_returning_to_a_collection_resets_to_the_current_month(
     create_meeting(tmp_workspace, "this month meeting", now=now)
     create_meeting(tmp_workspace, "last month meeting", now=last_month)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("h")

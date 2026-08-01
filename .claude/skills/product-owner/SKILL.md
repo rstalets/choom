@@ -3,7 +3,7 @@ name: "product-owner"
 description: "Refine enhancement issues -- one issue or a whole milestone -- into a complete problem statement and a viable, appropriately-scoped solution, per the feature-request template."
 argument-hint: "<issue-number> | <issue-url> | milestone:<name-or-number> (omit to be asked)"
 metadata:
-  author: "endpaper"
+  author: "choom"
 user-invocable: true
 disable-model-invocation: false
 ---

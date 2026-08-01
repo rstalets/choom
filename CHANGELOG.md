@@ -4,6 +4,20 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Project renamed: endpaper → choom
+
+**CLI and TUI, user-visible**
+
+The project is renamed from `endpaper` to `choom`. In Cyberpunk 2077 slang, a *choom* is a good
+friend, which is the idea: a tool that has your back, keeping you organized and your AI fed with
+context. The CLI command is now `choom` (was `endpaper`), and the PyPI distribution name is now
+`choom` (was `endpaper`) -- reinstall with `uv tool install choom`.
+
+**Breaking: the workspace marker directory changed from `.endpaper/` to `.choom/`.** An existing
+workspace keeps working once you rename its marker directory -- `mv .endpaper .choom` from the
+workspace root is the whole fix. Nothing else about a workspace's layout, frontmatter, or file
+contents changes.
+
 ### Inline task capture
 
 **CLI and TUI, user-visible**
@@ -18,7 +32,7 @@ captured from as an ordinary link (`links:`), so it appears in that document's i
 opens in one keystroke from the task's preview.
 
 The checklist item is a control surface onto the task's state, not a copy of it: ticking either
-end and saving updates the other. Completing a task from the tasks list (`space`, or `endpaper
+end and saving updates the other. Completing a task from the tasks list (`space`, or `choom
 task done`/`undone`) splices every mirror in the documents the task links to, without stamping
 those documents' `updated` -- ticking a box in a different collection is not an edit to the
 meeting note. Opening a document reconciles every mirror in it against `tasks.md` first, so a
@@ -30,22 +44,22 @@ silently picking a winner; two disagreeing mirrors for the same task leave `task
 for it, and a warning names the problem either way. A mirror whose task no longer exists is left
 untouched and reported, never rewritten.
 
-`endpaper task add "<description>" --link <id>` records the same relationship from the command
+`choom task add "<description>" --link <id>` records the same relationship from the command
 line -- repeatable, and validated before anything is written (an unresolvable id exits 1 and
-creates nothing). `endpaper task done`/`undone --json` gain `documents_updated` (paths actually
+creates nothing). `choom task done`/`undone --json` gain `documents_updated` (paths actually
 written) and `warnings`; a document that could not be updated is a warning on stderr, never a
 non-zero exit, since the task's own completion already succeeded.
 
 **Public API**
 
-- `endpaper.core.mirrors` (new module): `find_mirrors`, `mirror_line`, `capture_task`,
+- `choom.core.mirrors` (new module): `find_mirrors`, `mirror_line`, `capture_task`,
   `reconcile_on_open`, `reconcile_on_save`, `propagate_to_documents`, `write_document`.
-- `endpaper.core.models`: new `Mirror`, `MirrorReport`, `MirrorResolution`; `ScanWarningReason`
+- `choom.core.models`: new `Mirror`, `MirrorReport`, `MirrorResolution`; `ScanWarningReason`
   gains `"mirror_conflict"` / `"mirror_ambiguous"`; `EditorCommand` gains `accepts_suffix: bool =
   False`; `ParsedCommand` gains `suffix: str = ""`.
-- `endpaper.core.tasks.add_task()`: gains `links: Sequence[str] = ()`, passed through to
+- `choom.core.tasks.add_task()`: gains `links: Sequence[str] = ()`, passed through to
   `render_task_line()`; a call without it is unchanged.
-- `endpaper.core.editor_commands.parse_line()`: now splits a dotted verb suffix (`/task.followup`)
+- `choom.core.editor_commands.parse_line()`: now splits a dotted verb suffix (`/task.followup`)
   before the command-table lookup; `EDITOR_COMMANDS` gains `task`.
 - CLI: `task add` gains `--link <id>` (repeatable) and `--json`; `task done`/`undone` gain
   `--json`, and both now propagate to every linked document's mirrors after writing `tasks.md`.
@@ -56,14 +70,14 @@ non-zero exit, since the task's own completion already succeeded.
 
 Any record can now point at any other. A link is an ordinary CommonMark inline link,
 `[text](path#id)` -- the `#id` fragment is authoritative and permanent, and the path is derived,
-computed by endpaper, and repaired whenever it goes stale. Write a link by hand with just the
+computed by choom, and repaired whenever it goes stale. Write a link by hand with just the
 fragment (`[Q3 planning](#meeting_20260728_a1b2c3d4)`) and the correct relative path is filled in
 on the next save; move the target and the path is corrected the same way. Nothing about a link is
 indexed, cached, or persisted beyond the markdown itself.
 
-`endpaper links <id> [--json] [--direction out|in|both]` answers what a record points at and what
-points at it, computed by scanning on demand. `endpaper links check` reports stale and dead links
-as two distinct classes; `endpaper links heal [--dry-run]` repairs every stale link and never
+`choom links <id> [--json] [--direction out|in|both]` answers what a record points at and what
+points at it, computed by scanning on demand. `choom links check` reports stale and dead links
+as two distinct classes; `choom links heal [--dry-run]` repairs every stale link and never
 touches a dead one, and never opens a file for writing when nothing in it is stale. In the editor,
 `/link <search terms>` on its own line becomes a correct markdown link to the one matching record;
 zero or several matches leave the line untouched and report in the status bar. The preview pane
@@ -83,21 +97,21 @@ key on the metadata comment made the whole line `malformed`).
 
 **Public API**
 
-- `endpaper.core.links` (new module): `find_links`, `resolve_id`, `resolve_link`,
+- `choom.core.links` (new module): `find_links`, `resolve_id`, `resolve_link`,
   `relative_destination`, `format_link`, `heal_text`, `check_links`, `heal_links`,
   `inbound_links`, `outbound_links`, `outbound_for_target`, `links_for_id`, `find_link_targets`.
-- `endpaper.core.models`: new `Link`, `LinkTarget`, `LinkReport`, `LinkStatus`, `LinkDirection`;
+- `choom.core.models`: new `Link`, `LinkTarget`, `LinkReport`, `LinkStatus`, `LinkDirection`;
   `ScanWarningReason` gains `"link_dead"` / `"link_ambiguous"`; `Task` gains `links: tuple[str,
   ...] = ()`; `SaveResult` gains `warnings: tuple[ScanWarning, ...] = ()`.
-- `endpaper.core.editing.save_buffer()`: new keyword-only `workspace: Workspace | None = None`;
+- `choom.core.editing.save_buffer()`: new keyword-only `workspace: Workspace | None = None`;
   when given, heals stale links in the body before stamping `updated` and reports dead links via
   `SaveResult.warnings`. Defaulted, so every existing call site keeps compiling unchanged.
-- `endpaper.core.tasks`: `render_task_line()` / `_render_comment()` gain `links: Sequence[str] =
+- `choom.core.tasks`: `render_task_line()` / `_render_comment()` gain `links: Sequence[str] =
   ()`, emitted between `tags` and `created`.
-- `endpaper.core.meetings.MEETINGS` / `endpaper.core.notes.NOTES`: `id_prefix` changed from
+- `choom.core.meetings.MEETINGS` / `choom.core.notes.NOTES`: `id_prefix` changed from
   `"m_"` / `"n_"` to `"meeting_"` / `"note_"`.
-- `endpaper.core.editor_commands.EDITOR_COMMANDS`: gains `link`.
-- CLI: new `endpaper links <id>` / `links check` / `links heal` subcommands. `task list --json`
+- `choom.core.editor_commands.EDITOR_COMMANDS`: gains `link`.
+- CLI: new `choom links <id>` / `links check` / `links heal` subcommands. `task list --json`
   gains a `links` key.
 - **New JSON schema**: the link report object -- `file`, `line`, `text`, `target_id`, `old_path`,
   `new_path`, `status` -- shared by `links <id>`, `links check`, and `links heal`.
@@ -129,37 +143,37 @@ read, in non-interactive `-p` mode by default. Nothing beyond `Read` is granted.
 
 **New configuration surface**
 
-- `endpaper config assistant [<value>] [--json]` — get or set which assistant `/ai` calls.
+- `choom config assistant [<value>] [--json]` — get or set which assistant `/ai` calls.
   `<value>` is one of `claude`, `copilot`, `none`. With no value, prints the configured value,
   the resolved one, its source, and the assistants detected on this machine (`--json`: exactly
   those four keys, `available` never `null`). Exit codes: `0` success, `2` an unrecognised
   value (nothing written), `3` outside a workspace.
-- `endpaper init --assistant <claude|copilot|none>` — record the choice as part of workspace
+- `choom init --assistant <claude|copilot|none>` — record the choice as part of workspace
   creation. Still never prompts.
 - `/config assistant [<value>]` — the TUI command-bar peer, on the list screen. Effective for
   the next `/ai` immediately, no restart.
-- Stored as `[assistant].name` in `.endpaper/config.toml`. Absent means "detect": exactly one
+- Stored as `[assistant].name` in `.choom/config.toml`. Absent means "detect": exactly one
   assistant found is used automatically; the schema version is unchanged (no bump).
 
 **Public API**
 
-- `endpaper.core.editor_commands`: new module — `EDITOR_COMMANDS`, `parse_line()`, the in-editor
+- `choom.core.editor_commands`: new module — `EDITOR_COMMANDS`, `parse_line()`, the in-editor
   command grammar (a second, separate command surface from the command bar's `VERB_TABLE`).
-- `endpaper.core.assistants`: new module — `PROFILES`, `available_assistants()`,
+- `choom.core.assistants`: new module — `PROFILES`, `available_assistants()`,
   `resolve_assistant()`, `compose_prompt()`, `start_request()`, `AssistantRequest`.
-- `endpaper.core.config`: new module — `get_assistant()` / `set_assistant()`, a line-targeted
+- `choom.core.config`: new module — `get_assistant()` / `set_assistant()`, a line-targeted
   edit of `config.toml` that preserves comments, key order, and unknown keys.
-- `endpaper.core.models`: new `EditorCommand`, `ParsedCommand`, `AssistantProfile`,
+- `choom.core.models`: new `EditorCommand`, `ParsedCommand`, `AssistantProfile`,
   `ResolvedAssistant`, `AssistantReply`.
-- `endpaper.core.errors`: new `AssistantError` (exit_code 1).
-- `endpaper.core.workspace.init_workspace()`: new keyword-only `assistant: str | None = None`.
+- `choom.core.errors`: new `AssistantError` (exit_code 1).
+- `choom.core.workspace.init_workspace()`: new keyword-only `assistant: str | None = None`.
 - `tui/commands.py::VERB_TABLE`: gains `config`.
 
 ### UI layout refresh
 
 **TUI, user-visible**
 
-The three collections now live on one top-line bar (`Endpaper >>  Tasks  Notes  Meetings`);
+The three collections now live on one top-line bar (`Choom >>  Tasks  Notes  Meetings`);
 `tab`/`shift+tab` cycle between them and the panes refill immediately, focus landing on the
 middle pane. The vertical collection menu is gone; the 14 columns it used go back to the
 list/preview split. The tool now **opens on Tasks** at launch (was Meetings).
@@ -183,27 +197,27 @@ screen. The running version now renders in the bottom-right of every screen.
 
 **Public API**
 
-- `endpaper.core.models`: new `YearMonth`, `MonthListing`; `TaskFilter` gains `only_done: bool =
+- `choom.core.models`: new `YearMonth`, `MonthListing`; `TaskFilter` gains `only_done: bool =
   False` (completed-only selection; wins over `include_done`).
-- `endpaper.core.documents`: new `list_months()`, `scan_month()`, `scan_unfiled()` — month-scoped
+- `choom.core.documents`: new `list_months()`, `scan_month()`, `scan_unfiled()` — month-scoped
   counterparts to `scan_documents()`, which keeps its full-collection semantics unchanged.
-- `endpaper.core.meetings` / `endpaper.core.notes`: new `list_meeting_months()` /
+- `choom.core.meetings` / `choom.core.notes`: new `list_meeting_months()` /
   `scan_meeting_month()` and `list_note_months()` / `scan_note_month()` thin wrappers.
-- `endpaper.core.tasks.filter_tasks()`: honours `TaskFilter.only_done`.
-- CLI: new `endpaper task list --done` (completed tasks only; wins if combined with `--all`).
+- `choom.core.tasks.filter_tasks()`: honours `TaskFilter.only_done`.
+- CLI: new `choom task list --done` (completed tasks only; wins if combined with `--all`).
 
 ### Versioning
 
-`__version__` is no longer a hardcoded literal. It is stamped into `src/endpaper/_version.py` at
+`__version__` is no longer a hardcoded literal. It is stamped into `src/choom/_version.py` at
 build time by `hatch-vcs`'s build hook (`fallback-version` is now `0.0.0`, was `0.0.1`), and
-`endpaper/__init__.py` falls back to `0.0.0` when that file is absent — the case for a source
+`choom/__init__.py` falls back to `0.0.0` when that file is absent — the case for a source
 checkout, including an editable (`pip install -e .`) install. The build hook is disabled by
 default (`enable-by-default = false`) precisely so an editable install does not stamp a
 development version; real builds (`publish.yml`, the new `release-dry-run.yml`) opt in with
 `HATCH_BUILD_HOOKS_ENABLE=1`. A new `workflow_dispatch` workflow,
 `.github/workflows/release-dry-run.yml`, rehearses a release end to end — quality gate, build
 with a proposed version via `SETUPTOOLS_SCM_PRETEND_VERSION`, install, and assert
-`endpaper --version` matches — and uploads `dist/` to the workflow run. It has no PyPI
+`choom --version` matches — and uploads `dist/` to the workflow run. It has no PyPI
 credentials and cannot publish.
 
 ### Test suite
@@ -254,28 +268,28 @@ existing vault's task list unchanged and is the one deliberate limit on what a b
 
 **Command-line surface**
 
-- `endpaper task show <id> [--json]` — print one task and its body. Human form is the same
+- `choom task show <id> [--json]` — print one task and its body. Human form is the same
   columns `task list` prints, then the body verbatim after a blank line; a task with no body
   prints the summary line alone. `--json` emits one object, identical in shape to a `task list
   --json` entry. Exit codes: `0` found (including no body), `1` unknown id, `2` ambiguous id
   (names the conflicting line numbers), `3` no workspace or unreadable file.
-- `endpaper task list --json` gains a `"body"` key on every entry — the dedented body text, `""`
+- `choom task list --json` gains a `"body"` key on every entry — the dedented body text, `""`
   when a task has none. Every key the command emitted before keeps its name and meaning. The
   human-readable `task list` table is unchanged: still one line per task, since a multi-line body
   would break its column layout.
 
 **Public API**
 
-- `endpaper.core.models.Task`: new `body: str = ""` field. Every existing construction site keeps
+- `choom.core.models.Task`: new `body: str = ""` field. Every existing construction site keeps
   working; a task without a body stays indistinguishable from one before this feature.
-- `endpaper.core.models`: new internal `TaskBodySpan` (`start`, `end`, `indent`); `ParsedTasks`
+- `choom.core.models`: new internal `TaskBodySpan` (`start`, `end`, `indent`); `ParsedTasks`
   gains `bodies: tuple[TaskBodySpan, ...] = ()`, positionally aligned with `tasks`.
-- `endpaper.core.tasks`: new `get_task(workspace, task_id) -> Task` and
+- `choom.core.tasks`: new `get_task(workspace, task_id) -> Task` and
   `set_task_body(workspace, task_id, body) -> Task`. `parse_tasks()` keeps its existing contract
   (never raises, `"".join(result.lines) == text`) and now also populates bodies.
-- `endpaper.tui.rendering.render_task_markdown(task) -> str`: the task preview pane's renderer,
+- `choom.tui.rendering.render_task_markdown(task) -> str`: the task preview pane's renderer,
   mirroring `render_preview_markdown` for documents.
-- `endpaper.tui.edit_screen`: `EditScreen` is generalised from "a file" to an `EditTarget` (buffer
+- `choom.tui.edit_screen`: `EditScreen` is generalised from "a file" to an `EditTarget` (buffer
   text, a `save(text) -> SaveResult` callable, a display path, an `/ai` line offset, and a
   `stamps_frontmatter` flag) so it can edit a task's body without ever seeing a whole file. New
   `open_task_editor(app, task)`. The file-backed path (`open_editor`) behaves exactly as before.

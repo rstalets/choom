@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.discard_dialog import DiscardDialog
-from endpaper.tui.edit_screen import EditScreen
-from endpaper.tui.preview_screen import PreviewScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.edit_screen import EditScreen
+from choom.tui.preview_screen import PreviewScreen
 from tests.helpers import open_edit
 
 
@@ -16,7 +16,7 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
 ) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         edit_screen = await open_edit(app, pilot)
         path = edit_screen.target.display_path
@@ -35,7 +35,7 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
 async def test_cancel_returns_with_buffer_and_cursor_intact(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         edit_screen = await open_edit(app, pilot)
         editor = edit_screen.query_one("#editor", TextArea)
@@ -61,7 +61,7 @@ async def test_discard_leaves_file_byte_identical(tmp_workspace: Workspace) -> N
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     before_bytes = meeting.path.read_bytes()
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -82,7 +82,7 @@ async def test_discard_leaves_file_byte_identical(tmp_workspace: Workspace) -> N
 async def test_no_changes_means_no_dialog(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
 
@@ -95,7 +95,7 @@ async def test_no_changes_means_no_dialog(tmp_workspace: Workspace) -> None:
 async def test_no_dialog_after_ctrl_o_save(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await open_edit(app, pilot)
         editor = app.screen.query_one("#editor", TextArea)
@@ -114,7 +114,7 @@ async def test_no_dialog_after_ctrl_o_save(tmp_workspace: Workspace) -> None:
 async def test_no_dialog_after_retyping_original_text_by_hand(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         edit_screen = await open_edit(app, pilot)
         editor = edit_screen.query_one("#editor", TextArea)

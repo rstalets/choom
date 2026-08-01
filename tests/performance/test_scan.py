@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.meetings import scan_meetings
-from endpaper.core.notes import scan_notes
+from choom.core.meetings import scan_meetings
+from choom.core.notes import scan_notes
 from tests.fixtures.generate import generate, generate_notes
 
 

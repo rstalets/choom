@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.core.documents import list_months
-from endpaper.core.meetings import MEETINGS, create_meeting
-from endpaper.core.models import Workspace, YearMonth
-from endpaper.core.notes import NOTES, create_note, open_daily_note
+from choom.core.documents import list_months
+from choom.core.meetings import MEETINGS, create_meeting
+from choom.core.models import Workspace, YearMonth
+from choom.core.notes import NOTES, create_note, open_daily_note
 
 
 def test_current_month_always_present_even_with_no_documents(tmp_workspace: Workspace) -> None:

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.frontmatter import read_frontmatter, render_frontmatter
-from endpaper.core.models import Meeting
+from choom.core.frontmatter import read_frontmatter, render_frontmatter
+from choom.core.models import Meeting
 
 
 def _block(body: str) -> str:

@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 EXPECTED_KEYS = {"id", "path", "title", "type", "tags", "created", "updated"}
 EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line", "body"}

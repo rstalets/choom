@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from endpaper.cli.main import main
-from endpaper.core.meetings import create_meeting
-from endpaper.core.mirrors import capture_task, propagate_to_documents
-from endpaper.core.models import Workspace
-from endpaper.core.tasks import add_task, load_tasks
-from endpaper.core.workspace import find_workspace
-from endpaper.tui.app import EndpaperApp
+from choom.cli.main import main
+from choom.core.meetings import create_meeting
+from choom.core.mirrors import capture_task, propagate_to_documents
+from choom.core.models import Workspace
+from choom.core.tasks import add_task, load_tasks
+from choom.core.workspace import find_workspace
+from choom.tui.app import ChoomApp
 from tests.helpers import to_collection
 
 _UPDATED = re.compile(r"^updated: (.+)$", re.MULTILINE)
@@ -69,7 +69,7 @@ async def test_tui_space_splices_the_mirror_and_leaves_updated_unchanged(
     before_updated = _UPDATED.search(meeting_path.read_text(encoding="utf-8"))
     assert before_updated is not None
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "tasks")
         await pilot.press("space")
@@ -98,7 +98,7 @@ def test_a_reworded_and_reindented_mirror_is_still_found_by_id(
     text = text.replace("- [ ] [ring Terry", "  - [ ] [ring Terry")
     meeting_path.write_text(text, encoding="utf-8")
 
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     set_task_state(tmp_workspace, task_id, done=True)
     written, _warnings = propagate_to_documents(
@@ -119,7 +119,7 @@ def test_missing_document_produces_a_warning_but_tasks_md_still_updates(
     task_id, meeting_path = _capture(tmp_workspace)
     meeting_path.unlink()
 
-    from endpaper.core.tasks import set_task_state
+    from choom.core.tasks import set_task_state
 
     task = set_task_state(tmp_workspace, task_id, done=True)
     written, warnings = propagate_to_documents(tmp_workspace, task)
@@ -143,7 +143,7 @@ def test_unwritable_document_warns_and_does_not_reverse_the_toggle(
     original_mode = directory.stat().st_mode
     directory.chmod(stat.S_IRUSR | stat.S_IXUSR)
     try:
-        from endpaper.core.tasks import set_task_state
+        from choom.core.tasks import set_task_state
 
         task = set_task_state(tmp_workspace, task_id, done=True)
         _written, warnings = propagate_to_documents(tmp_workspace, task)
@@ -164,7 +164,7 @@ def test_task_with_no_links_reads_no_document(
     task = add_task(tmp_workspace, "buy milk")
     assert task.links == ()
 
-    from endpaper.core import mirrors as mirrors_module
+    from choom.core import mirrors as mirrors_module
 
     def _boom(*args: object, **kwargs: object) -> None:
         raise AssertionError("load_for_edit must not be called for a task with no links")
@@ -188,7 +188,7 @@ async def test_toggling_refreshes_the_cached_document_it_spliced(
     behind it still held the old checkbox, so the preview rendered a stale one."""
     task_id, meeting_path = _capture(tmp_workspace)
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.pause()

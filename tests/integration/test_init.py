@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.cli.main import main
+from choom.cli.main import main
 
 
 def test_init_creates_all_five_paths_and_exits_0(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -10,7 +10,7 @@ def test_init_creates_all_five_paths_and_exits_0(tmp_path: Path, monkeypatch, ca
     exit_code = main(["init"])
     assert exit_code == 0
 
-    assert (tmp_path / ".endpaper" / "config.toml").is_file()
+    assert (tmp_path / ".choom" / "config.toml").is_file()
     assert (tmp_path / "AGENTS.md").is_file()
     assert (tmp_path / "meetings").is_dir()
     assert (tmp_path / "notes" / "daily").is_dir()
@@ -24,7 +24,7 @@ def test_reinit_exits_3_and_modifies_nothing(tmp_path: Path, monkeypatch, capsys
     monkeypatch.chdir(tmp_path)
     main(["init"])
 
-    config_path = tmp_path / ".endpaper" / "config.toml"
+    config_path = tmp_path / ".choom" / "config.toml"
     before = config_path.read_text()
 
     exit_code = main(["init"])

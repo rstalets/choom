@@ -4,15 +4,15 @@ from pathlib import Path
 
 from textual.widgets import TextArea
 
-from endpaper.core.meetings import create_meeting
-from endpaper.core.models import Workspace
-from endpaper.tui.app import EndpaperApp
-from endpaper.tui.edit_screen import EditScreen
+from choom.core.meetings import create_meeting
+from choom.core.models import Workspace
+from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import EditScreen
 from tests.helpers import to_collection
 
 
 def _rewrite_externally(path: Path) -> None:
-    """Simulate a file touched outside endpaper: field order shuffled, single-quoted
+    """Simulate a file touched outside choom: field order shuffled, single-quoted
     values, CRLF line endings, no trailing newline. Still schema-valid -- exactly the
     six required keys -- so it still shows up in the list like any other document."""
     externally_written = (
@@ -39,7 +39,7 @@ async def test_externally_modified_document_opens_edits_and_saves_indistinguisha
     _rewrite_externally(meeting.path)
     before_bytes = meeting.path.read_bytes()
 
-    app = EndpaperApp(tmp_workspace)
+    app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.press("enter")
