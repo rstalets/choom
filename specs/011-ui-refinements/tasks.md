@@ -179,17 +179,22 @@ start at the same column on every row and empty cells stay empty.
 
 **Independent of** every other phase.
 
-- [ ] T022 [P] [US5] Unit tests `tests/unit/test_columns.py`: widths at 80 and at narrow terminals, drop
+- [X] T022 [P] [US5] Unit tests `tests/unit/test_columns.py`: widths at 80 and at narrow terminals, drop
       order tags-then-type with headers, date and title always kept, ellipsis truncation, empty cells
       holding position. Must fail first
-- [ ] T023 [US5] Create `src/choom/tui/columns.py` with `column_widths`, `render_row`, and
+- [X] T023 [US5] Create `src/choom/tui/columns.py` with `column_widths`, `render_row`, and
       `render_header` — pure functions, no widget imports (research R8)
-- [ ] T024 [US5] Add a non-scrolling header `Static` above `#meeting-list` inside `#list-pane` in
+- [X] T024 [US5] Add a non-scrolling header `Static` above `#meeting-list` inside `#list-pane` in
       `src/choom/tui/list_screen.py`, with its CSS rule in `src/choom/tui/app.tcss`
-- [ ] T025 [US5] Rewrite `DocumentRow._row_text` and `TaskRow._row_text` to call `render_row`, keeping
+- [X] T025 [US5] Rewrite `DocumentRow._row_text` and `TaskRow._row_text` to call `render_row`, keeping
       `document`/`record` attribute names, the task's leading done marker, and the struck-through style;
-      re-render header and rows on `Resize` (depends on T023)
-- [ ] T026 [US5] Integration test `tests/integration/test_list_columns_tui.py`: header present, alignment
+      re-render header and rows on `Resize` (depends on T023). Found and fixed a latent pre-existing bug
+      while doing this: `TaskRow`'s done marker `"[x]"`/`"[ ]"` is Label content parsed as Rich console
+      markup, and an unescaped `"[x]"` opens a style tag Rich silently drops, making the marker invisible
+      on every completed task even before this feature. Now escaped (`"\[x]"`/`"\[ ]"`) so FR-033's "done
+      state stays distinguishable at a glance" actually holds for the marker itself, not only the
+      strikethrough style
+- [X] T026 [US5] Integration test `tests/integration/test_list_columns_tui.py`: header present, alignment
       holds across records with and without type and tags, in both documents and tasks
 
 **Checkpoint**: The list is a table; `row_titles` in `tests/helpers.py` still passes untouched

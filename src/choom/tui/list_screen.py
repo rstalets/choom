@@ -3,13 +3,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from textual import on, work
+from textual import events, on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Label, ListItem, ListView, Markdown
+from textual.widgets import Label, ListItem, ListView, Markdown, Static
 from textual.worker import Worker, WorkerCancelled, WorkerFailed
 
 from choom.core.deletion import delete_by_id
@@ -18,6 +19,7 @@ from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
+from choom.tui.columns import ColumnLayout, column_widths, render_header, render_row
 from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.help_screen import HelpScreen
@@ -81,8 +83,8 @@ def _empty_state_message(app: object) -> str:
 
 
 class DocumentRow(ListItem):
-    def __init__(self, document: Document) -> None:
-        super().__init__(Label(self._row_text(document)))
+    def __init__(self, document: Document, layout: ColumnLayout) -> None:
+        super().__init__(Label(self._row_text(document, layout)))
         self.document = document
 
     @property
@@ -91,38 +93,48 @@ class DocumentRow(ListItem):
         return self.document
 
     @staticmethod
-    def _row_text(document: Document) -> str:
-        parts = [document.created[:10]]
-        if document.type:
-            parts.append(document.type)
-        parts.append(document.title)
-        if document.tags:
-            parts.append(",".join(document.tags))
-        return "  ".join(parts)
+    def _row_text(document: Document, layout: ColumnLayout) -> str:
+        cells = (document.created[:10], document.type, document.title, ",".join(document.tags))
+        return render_row(cells, layout)
+
+    def update_layout(self, layout: ColumnLayout) -> None:
+        """Re-render this row's text for a new column layout (a resize),
+        without re-reading anything -- `self.document` is already in hand."""
+        self.query_one(Label).update(self._row_text(self.document, layout))
 
 
 MeetingRow = DocumentRow  # alias, feature 001 compatibility
 
 
 class TaskRow(ListItem):
-    def __init__(self, task: Task) -> None:
-        text = self._row_text(task)
-        if task.done:
-            text = f"[strike]{text}[/strike]"
-        super().__init__(Label(text))
+    def __init__(self, task: Task, layout: ColumnLayout) -> None:
+        super().__init__(Label(self._row_text(task, layout)))
         self.record = task
 
     @staticmethod
-    def _row_text(task: Task) -> str:
-        parts = ["[x]" if task.done else "[ ]"]
-        if task.created:
-            parts.append(task.created.isoformat())
-        if task.type:
-            parts.append(task.type)
-        parts.append(task.text)
-        if task.tags:
-            parts.append(",".join(task.tags))
-        return "  ".join(parts)
+    def _row_text(task: Task, layout: ColumnLayout) -> str:
+        # The done marker sits outside the four labelled columns (spec
+        # Assumptions): the four columns mean the same four fields in every
+        # collection, and folding the marker into the date column would make
+        # that column mean two different things depending on the collection.
+        # The brackets are escaped (`\[` not `[`) because Label content is
+        # parsed as Rich console markup: an unescaped "[x]" opens a style tag
+        # named "x" that Rich silently drops from the rendered text, which
+        # would make the done marker invisible on every completed task.
+        marker = "\\[x]" if task.done else "\\[ ]"
+        cells = (
+            task.created.isoformat() if task.created else "",
+            task.type,
+            task.text,
+            ",".join(task.tags),
+        )
+        text = f"{marker} {render_row(cells, layout)}"
+        return f"[strike]{text}[/strike]" if task.done else text
+
+    def update_layout(self, layout: ColumnLayout) -> None:
+        """Re-render this row's text for a new column layout (a resize),
+        without re-reading anything -- `self.record` is already in hand."""
+        self.query_one(Label).update(self._row_text(self.record, layout))
 
 
 class ListScreen(Screen[None]):
@@ -172,6 +184,7 @@ class ListScreen(Screen[None]):
         with Horizontal(id="body"):
             yield ScopePane(id="scope-pane")
             with Vertical(id="list-pane"):
+                yield Static(id="list-header")
                 yield ListView(id="meeting-list")
             with Vertical(id="preview-pane"):
                 yield Markdown(id="preview", open_links=False)
@@ -193,6 +206,29 @@ class ListScreen(Screen[None]):
         # should fire while this screen is not what is displayed (FR-012).
         if self._refresh_timer is not None:
             self._refresh_timer.pause()
+
+    def on_resize(self, event: events.Resize) -> None:
+        # Column widths are a pure function of the pane's width (research
+        # R8) -- re-render the header and every already-rendered row's text
+        # in place, with no disk read, rather than re-running the whole
+        # refresh (US5).
+        self._rerender_columns()
+
+    def _column_layout(self) -> ColumnLayout:
+        return column_widths(self.query_one("#meeting-list", ListView).size.width)
+
+    def _rerender_columns(self) -> None:
+        layout = self._column_layout()
+        try:
+            self.query_one("#list-header", Static).update(render_header(layout))
+        except NoMatches:
+            return  # not yet mounted
+        for row in self.query_one("#meeting-list", ListView).children:
+            if isinstance(row, DocumentRow | TaskRow):
+                try:
+                    row.update_layout(layout)
+                except NoMatches:
+                    continue  # this row's Label has not finished mounting yet
 
     async def on_screen_resume(self) -> None:
         # Coming back from PreviewScreen/EditScreen: a document may have been
@@ -242,6 +278,9 @@ class ListScreen(Screen[None]):
             elif isinstance(highlighted, TaskRow):
                 select_id = highlighted.record.id
 
+        layout = self._column_layout()
+        self.query_one("#list-header", Static).update(render_header(layout))
+
         await list_view.clear()
         hydrated = self._hydrated_pool()
         if hydrated is not None:
@@ -266,7 +305,10 @@ class ListScreen(Screen[None]):
             await list_view.append(ListItem(Label(_empty_state_message(app))))
             list_view.index = 0
         else:
-            rows = [TaskRow(item) if is_tasks else DocumentRow(item) for item in items]  # type: ignore[arg-type]
+            rows = [
+                TaskRow(item, layout) if is_tasks else DocumentRow(item, layout)  # type: ignore[arg-type]
+                for item in items
+            ]
             await list_view.extend(rows)
             index = 0
             if select_id is not None:

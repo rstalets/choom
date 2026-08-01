@@ -32,6 +32,12 @@ CollectionBar {
     height: 1fr;
 }
 
+#list-header {
+    height: 1;
+    background: $panel;
+    text-style: bold;
+}
+
 #meeting-list {
     height: 1fr;
 }
