@@ -85,6 +85,7 @@ def print_tasks_json(tasks: Iterable[Task]) -> None:
             "done": task.done,
             "type": task.type,
             "tags": list(task.tags),
+            "links": list(task.links),
             "created": task.created.isoformat() if task.created else None,
             "line": task.line,
         }

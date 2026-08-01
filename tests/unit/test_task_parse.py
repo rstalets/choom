@@ -123,3 +123,63 @@ def test_mixed_line_endings_roundtrip() -> None:
     parsed = parse_tasks(text)
     assert "".join(parsed.lines) == text
     assert len(parsed.tasks) == 4
+
+
+# --- US5: the links field --------------------------------------------------
+
+
+def test_links_field_with_one_id() -> None:
+    text = "- [ ] call Terry <!-- id:task_a1b2 links:meeting_20260728_a1b2c3d4 -->\n"
+    parsed = parse_tasks(text)
+    assert len(parsed.tasks) == 1
+    assert parsed.tasks[0].links == ("meeting_20260728_a1b2c3d4",)
+
+
+def test_links_field_with_several_ids() -> None:
+    text = (
+        "- [ ] call Terry "
+        "<!-- id:task_a1b2 links:meeting_20260728_a1b2c3d4,note_20260731_ff00ff00 -->\n"
+    )
+    parsed = parse_tasks(text)
+    assert len(parsed.tasks) == 1
+    assert parsed.tasks[0].links == ("meeting_20260728_a1b2c3d4", "note_20260731_ff00ff00")
+
+
+def test_links_field_malformed_value_warns_and_skips_only_that_line() -> None:
+    text = (
+        "- [ ] first <!-- id:task_a1b2 links:not valid -->\n"
+        "- [ ] second <!-- id:task_c3d4 links:meeting_1 -->\n"
+    )
+    parsed = parse_tasks(text)
+    assert len(parsed.tasks) == 1
+    assert parsed.tasks[0].id == "task_c3d4"
+    assert len(parsed.warnings) == 1
+    assert parsed.warnings[0].reason == "task_malformed_comment"
+
+
+def test_links_field_empty_value_is_malformed() -> None:
+    text = "- [ ] thing <!-- id:task_a1b2 links: -->\n"
+    parsed = parse_tasks(text)
+    assert parsed.tasks == ()
+    assert len(parsed.warnings) == 1
+    assert parsed.warnings[0].reason == "task_malformed_comment"
+
+
+def test_line_with_no_links_field_parses_exactly_as_before() -> None:
+    text = (
+        "- [ ] send the vendor comparison "
+        "<!-- id:task_a1b2 type:followup tags:procurement,q3 created:2026-07-28 -->\n"
+    )
+    parsed = parse_tasks(text)
+    assert len(parsed.tasks) == 1
+    assert parsed.tasks[0].links == ()
+    assert parsed.warnings == ()
+
+
+def test_hand_written_links_field_no_longer_makes_the_task_vanish() -> None:
+    # Before US5, "links" was an unrecognised key, which made _classify_body
+    # return "malformed" and drop the whole task from every listing (research R7).
+    text = "- [ ] call Terry <!-- id:task_a1b2 links:meeting_1 created:2026-07-28 -->\n"
+    parsed = parse_tasks(text)
+    assert len(parsed.tasks) == 1
+    assert parsed.warnings == ()

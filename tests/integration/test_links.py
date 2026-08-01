@@ -4,6 +4,7 @@ from endpaper.core.links import inbound_links, outbound_links, relative_destinat
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note
+from endpaper.core.tasks import add_task
 
 
 def test_inbound_and_outbound_end_to_end(tmp_workspace: Workspace) -> None:
@@ -79,3 +80,19 @@ def test_inbound_finds_the_target_after_it_moves(tmp_workspace: Workspace) -> No
     # id still resolves the same regardless of what the path says
     inbound = inbound_links(tmp_workspace, meeting.id)
     assert len(inbound) == 1
+
+
+def test_a_task_links_field_appears_as_an_inbound_link(tmp_workspace: Workspace) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    task = add_task(tmp_workspace, "call Terry about the renewal")
+    assert task.id is not None
+
+    text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    updated = text.replace(f"id:{task.id}", f"id:{task.id} links:{meeting.id}")
+    tmp_workspace.tasks_file.write_text(updated, encoding="utf-8")
+
+    inbound = inbound_links(tmp_workspace, meeting.id)
+    assert len(inbound) == 1
+    assert inbound[0].source == tmp_workspace.tasks_file
+    assert inbound[0].in_tasks_field is True
+    assert inbound[0].text == "call Terry about the renewal"

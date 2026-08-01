@@ -18,7 +18,7 @@ _TASK_LINE = re.compile(
 )
 _IDVAL = re.compile(r"^[A-Za-z0-9_-]+$")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-_RECOGNIZED_KEYS = frozenset({"id", "type", "tags", "created"})
+_RECOGNIZED_KEYS = frozenset({"id", "type", "tags", "links", "created"})
 _TERMINATORS = ("\r\n", "\n", "\r")
 
 TASKS_PATH = Path("tasks.md")
@@ -73,6 +73,10 @@ def _classify_body(body: str) -> tuple[str, dict[str, str]]:
     if "tags" in fields:
         tag_values = fields["tags"].split(",") if fields["tags"] else []
         if not tag_values or any(not _TOKEN_PATTERN.match(tag) for tag in tag_values):
+            return "malformed", {}
+    if "links" in fields:
+        link_values = fields["links"].split(",") if fields["links"] else []
+        if not link_values or any(not _IDVAL.match(link) for link in link_values):
             return "malformed", {}
 
     return "task", fields
@@ -159,6 +163,8 @@ def parse_tasks(text: str) -> ParsedTasks:
         task_type = fields.get("type", "")
         tags_raw = fields.get("tags", "")
         tags = tuple(tags_raw.split(",")) if tags_raw else ()
+        links_raw = fields.get("links", "")
+        links = tuple(links_raw.split(",")) if links_raw else ()
 
         created_raw = fields.get("created")
         created_value: date | None = None
@@ -184,6 +190,7 @@ def parse_tasks(text: str) -> ParsedTasks:
                 done=done,
                 type=task_type,
                 tags=tags,
+                links=links,
                 created=created_value,
                 line=line_no,
             )
@@ -198,13 +205,20 @@ def parse_tasks(text: str) -> ParsedTasks:
 
 
 def _render_comment(
-    *, id: str, type: str = "", tags: Sequence[str] = (), created: date | None = None
+    *,
+    id: str,
+    type: str = "",
+    tags: Sequence[str] = (),
+    links: Sequence[str] = (),
+    created: date | None = None,
 ) -> str:
     fields = [f"id:{id}"]
     if type:
         fields.append(f"type:{type}")
     if tags:
         fields.append(f"tags:{','.join(tags)}")
+    if links:
+        fields.append(f"links:{','.join(links)}")
     if created is not None:
         fields.append(f"created:{created.isoformat()}")
     return f"<!-- {' '.join(fields)} -->"
@@ -217,18 +231,19 @@ def render_task_line(
     id: str,
     type: str = "",
     tags: Sequence[str] = (),
+    links: Sequence[str] = (),
     created: date | None = None,
 ) -> str:
     """Render one task line, without a terminator.
 
-    Fields appear in the order id, type, tags, created; empty ones are omitted.
-    Raises UsageError if `text` is empty after stripping.
+    Fields appear in the order id, type, tags, links, created; empty ones are
+    omitted. Raises UsageError if `text` is empty after stripping.
     """
     stripped = text.strip()
     if not stripped:
         raise UsageError("task text must not be empty")
     checkbox = "x" if done else " "
-    comment = _render_comment(id=id, type=type, tags=tags, created=created)
+    comment = _render_comment(id=id, type=type, tags=tags, links=links, created=created)
     return f"- [{checkbox}] {stripped} {comment}"
 
 

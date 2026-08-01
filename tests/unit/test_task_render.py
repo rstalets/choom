@@ -38,3 +38,28 @@ def test_omits_empty_type_and_tags() -> None:
 def test_empty_text_raises_usage_error() -> None:
     with pytest.raises(UsageError):
         render_task_line("   ", id="task_5c31")
+
+
+def test_field_order_is_id_type_tags_links_created() -> None:
+    line = render_task_line(
+        "call Terry",
+        id="task_a1b2",
+        type="followup",
+        tags=("procurement",),
+        links=("meeting_20260728_a1b2c3d4",),
+        created=date(2026, 7, 28),
+    )
+    assert line == (
+        "- [ ] call Terry <!-- id:task_a1b2 type:followup tags:procurement "
+        "links:meeting_20260728_a1b2c3d4 created:2026-07-28 -->"
+    )
+
+
+def test_multiple_links_are_comma_joined() -> None:
+    line = render_task_line("call Terry", id="task_a1b2", links=("meeting_1", "note_2"))
+    assert line == "- [ ] call Terry <!-- id:task_a1b2 links:meeting_1,note_2 -->"
+
+
+def test_empty_links_is_omitted() -> None:
+    line = render_task_line("buy milk", id="task_5c31")
+    assert "links:" not in line

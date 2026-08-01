@@ -6,7 +6,7 @@ from pathlib import Path
 from endpaper.cli.main import main
 
 EXPECTED_KEYS = {"id", "path", "title", "type", "tags", "created", "updated"}
-EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "created", "line"}
+EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line"}
 
 
 def test_json_schema_has_exactly_seven_keys_and_no_nulls(

@@ -265,24 +265,24 @@ byte-identical after a read/write cycle.
 
 ### Tests for User Story 5
 
-- [ ] T037 [P] [US5] Extend `tests/unit/test_task_parse.py`: a `links:` field with one and several
+- [X] T037 [P] [US5] Extend `tests/unit/test_task_parse.py`: a `links:` field with one and several
       ids; a malformed value warning and skipping only that line; and — importantly — that a line
       with **no** `links:` field parses exactly as before (US5 AC1, AC2, AC6, FR-016).
-- [ ] T038 [P] [US5] Extend `tests/unit/test_task_render.py`: field order `id`, `type`, `tags`,
+- [X] T038 [P] [US5] Extend `tests/unit/test_task_render.py`: field order `id`, `type`, `tags`,
       `links`, `created`, with empty fields omitted (US5 AC4, FR-017).
-- [ ] T039 [P] [US5] Extend `tests/integration/test_task_handedit.py`: a hand-written `links:` field
+- [X] T039 [P] [US5] Extend `tests/integration/test_task_handedit.py`: a hand-written `links:` field
       survives a `task done` round-trip, every untouched line stays byte-identical, and `tasks.md`
       remains valid CommonMark (US5 AC3, AC8, SC-010).
-- [ ] T040 [US5] Add `links: tuple[str, ...] = ()` to `Task` in `src/endpaper/core/models.py`.
-- [ ] T041 [US5] Add `"links"` to `_RECOGNIZED_KEYS`, validate its values with `_IDVAL` mirroring the
+- [X] T040 [US5] Add `links: tuple[str, ...] = ()` to `Task` in `src/endpaper/core/models.py`.
+- [X] T041 [US5] Add `"links"` to `_RECOGNIZED_KEYS`, validate its values with `_IDVAL` mirroring the
       `tags` rule (split on `,`, reject empty), and populate `Task.links` in `parse_tasks` — all in
       `src/endpaper/core/tasks.py`. Note this also fixes a live trap: today an unrecognised key makes
       `_classify_body` return `malformed`, dropping the whole task from every listing (R7).
-- [ ] T042 [US5] Add the `links` parameter to `_render_comment` and `render_task_line` in
+- [X] T042 [US5] Add the `links` parameter to `_render_comment` and `render_task_line` in
       `src/endpaper/core/tasks.py`, emitted between `tags` and `created` and omitted when empty.
-- [ ] T043 [US5] Include `links` in task JSON output in `src/endpaper/cli/output.py`
+- [X] T043 [US5] Include `links` in task JSON output in `src/endpaper/cli/output.py`
       (`print_tasks_json`).
-- [ ] T044 [US5] Extend `src/endpaper/core/links.py` so tasks are first-class both ways: `resolve_id`
+- [X] T044 [US5] Extend `src/endpaper/core/links.py` so tasks are first-class both ways: `resolve_id`
       resolves a `task_` id to its line in `tasks.md`, and `inbound_links` scans task `links:` fields
       as well as document bodies (US5 AC7).
 
