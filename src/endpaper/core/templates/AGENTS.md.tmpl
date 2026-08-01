@@ -1,7 +1,6 @@
 # endpaper workspace
 
-Plain Markdown files with YAML frontmatter, no database. Every command below is
-non-interactive and produces stable, parseable output.
+Plain Markdown files with YAML frontmatter, no database; every command below is non-interactive and produces stable, parseable output.
 
 ## Layout
 
@@ -11,12 +10,11 @@ meetings/YYYY/MM/          one markdown file per meeting
 notes/YYYY/MM/             one markdown file per typed or untyped note
 notes/daily/YYYY/MM/       one markdown file per day, named YYYY-MM-DD.md
 tasks.md                   one checkbox line per task, at the workspace root
-AGENTS.md                  this file
 ```
 
 ## Frontmatter
 
-Every file in `meetings/` and `notes/` starts with exactly these six keys:
+Every file in `meetings/` and `notes/` starts with exactly these six keys (`id` prefixed `meeting_`/`note_`, `type` `""` when untyped, `tags` `[]`):
 
 ```yaml
 ---
@@ -29,7 +27,9 @@ updated: 2026-07-28T09:14:00
 ---
 ```
 
-`id` is prefixed `meeting_` for meetings, `note_` for notes. `type` is `""` when untyped; `tags` is `[]`.
+**Links**: an ordinary markdown link, `[text](path#id)` -- `#id` is authoritative and never
+changes; the path is computed by endpaper and repaired on save. Write links with no path, e.g.
+`[Q3 planning](#meeting_20260728_a1b2c3d4)`.
 
 ## Tasks
 
@@ -37,7 +37,7 @@ One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment (i
 any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on the next scan:
 
 ```
-- [ ] send the vendor comparison <!-- id:task_a1b2 type:followup tags:procurement created:2026-07-28 -->
+- [ ] send the vendor comparison <!-- id:task_a1b2 tags:procurement links:meeting_20260728_a1b2c3d4 -->
 ```
 
 ## Commands
@@ -45,19 +45,16 @@ any markdown viewer). `[ ]` open, `[x]` done; a bare `- [ ] ...` gets an `id` on
 ```bash
 endpaper meeting new "Q3 planning" --type standup --tag platform
 endpaper meeting list --json --type standup --tag platform --since 2026-07-01
-endpaper note today                                      # open/create today's note
-endpaper note new "vendor landscape" --type research --tag procurement
-endpaper note list --json --type daily --since 2026-07-01
+endpaper note today                       # note new/note list take the same flags as meeting new/list
 endpaper task add "send the vendor comparison" --type followup --tag procurement
 endpaper task list --json --all --type followup --tag procurement  # --done: completed only
-endpaper task done task_a1b2                              # endpaper task undone task_a1b2
-endpaper config assistant [<value>] [--json]              # get/set the /ai assistant
+endpaper task done task_a1b2                               # endpaper task undone task_a1b2
+endpaper links <id> [--json] [--direction out|in|both]     # what it points at / is pointed at by
+endpaper links check [<path>...] [--json]                  # report stale/dead links
+endpaper links heal  [<path>...] [--json] [--dry-run]      # repair stale links; dead ones untouched
+endpaper config assistant [<value>] [--json]                # get/set the /ai assistant
 ```
 
-`--tag` is repeatable and the supported way to attach tags on the command line -- an unquoted
-`#tag` is eaten by the shell first; a `#tag` inside a *quoted* description is parsed out too.
+`--tag` is repeatable, the supported way to attach tags -- an unquoted `#tag` is eaten by the shell.
 
-## Exit codes
-
-`0` success · `1` not found · `2` usage error · `3` workspace error. Diagnostics go to
-stderr; data goes to stdout; the two are never interleaved.
+Exit codes: `0` success · `1` not found · `2` usage error · `3` workspace error; diagnostics to stderr, data to stdout, never interleaved.

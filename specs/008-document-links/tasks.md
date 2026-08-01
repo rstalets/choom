@@ -374,16 +374,16 @@ providers and the exact setting each needs.
 
 ## Phase 11: Polish & Cross-Cutting Concerns
 
-- [ ] T058 Add the link syntax, the task `links:` field, and the three `endpaper links` commands to
+- [X] T058 Add the link syntax, the task `links:` field, and the three `endpaper links` commands to
       `src/endpaper/core/templates/AGENTS.md.tmpl`, **and tighten the file back to ≤ 60 lines**. It
       is 63 lines today, so this is a net reduction, not an append. The reclamation plan (fold the
       frontmatter example, collapse the duplicated list-command flags, halve the exit-code section)
       is worked out in [research.md](research.md#r9-the-agentsmd-line-budget). Acceptance:
       `wc -l < src/endpaper/core/templates/AGENTS.md.tmpl` returns ≤ 60.
-- [ ] T059 [P] Record all four public-API changes in `CHANGELOG.md` with their version: the id prefix
+- [X] T059 [P] Record all four public-API changes in `CHANGELOG.md` with their version: the id prefix
       scheme, the task line format gaining `links`, the new `endpaper links` commands, and the new
       JSON schema (FR-054).
-- [ ] T060 [P] Update `REQUIREMENTS.md` §3.3 and §4.6 for the task line's `links` field and the link
+- [X] T060 [P] Update `REQUIREMENTS.md` §3.3 and §4.6 for the task line's `links` field and the link
       format, so the requirements document and the shipped behaviour agree.
 - [ ] T061 Run the full gate: `uv run ruff format --check .`, `uv run ruff check .`,
       `uv run mypy`, `uv run pytest -q`. Expect the 407 baseline plus this feature's tests, all green.
