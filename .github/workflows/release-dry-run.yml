@@ -39,7 +39,7 @@ jobs:
         run: uv run --extra dev mypy
 
       - name: Test
-        run: uv run --extra dev pytest -q -n auto
+        run: uv run --extra dev pytest -q -n $(( $(getconf _NPROCESSORS_ONLN) * 2 ))
 
       - name: Build with the proposed version
         env:

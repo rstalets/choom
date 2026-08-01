@@ -21,10 +21,11 @@ choom = "choom.cli.main:main"
 dev = [
     "pytest==9.1.1",
     "pytest-asyncio==1.4.0",
-    # The suite is dominated by Textual's message pump, not by CPU -- it is ~75%
-    # idle, so it parallelises almost linearly. CI and scripts/dev-tests.sh both
-    # pass `-n auto`; a bare `pytest` invocation stays serial, which is useful
-    # for readable failure output when debugging a single test.
+    # The suite is dominated by Textual's message pump, not by CPU -- each worker
+    # is mostly idle, so CI and scripts/dev-tests.sh both oversubscribe to ~2x the
+    # core count (beats `-n auto`'s 1x; measured on both a workstation and CI
+    # runners). A bare `pytest` invocation stays serial, which is useful for
+    # readable failure output when debugging a single test.
     "pytest-xdist==3.8.0",
     "ruff==0.16.0",
     "mypy==2.3.0",
