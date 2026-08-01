@@ -24,6 +24,16 @@ session to watch it search, cross-reference, and write into the vault.
 This workspace lives under `/tmp`. It is scratch content, not part of the repo -- don't create it
 inside a git worktree, and don't commit anything from it.
 
+**This skill must not hardcode endpaper's feature set.** endpaper ships fast, and whatever
+commands, frontmatter fields, or conventions this file describes are a snapshot from whenever it
+was last written -- they will drift. `endpaper init` regenerates `AGENTS.md` fresh, for exactly
+the version installed, every time. Read that file (Step 3) and treat it as the authoritative
+spec for this run; treat anything below that conflicts with it as stale and defer to the file.
+The goal is that a new feature landing (a new command, a new frontmatter field, a new way to
+capture content -- e.g. a `/task` capture triggered from inside a note or meeting body, which
+didn't exist when this skill was first written) should make the demo richer automatically,
+without anyone having to edit this file.
+
 ## Step 1 — Find the `endpaper` executable
 
 Don't assume `endpaper` is on `PATH`, and don't assume any particular worktree path -- other
@@ -47,17 +57,31 @@ endpaper init
 If the path was user-supplied and already contains a workspace (`.endpaper/config.toml`
 exists), ask before reusing/overwriting it rather than assuming.
 
-## Step 3 — Check what's actually shipped
+## Step 3 — Learn this build's feature set from AGENTS.md
 
-Run `endpaper --help` and `endpaper <subcommand> --help` for each subcommand before populating.
-Feature surface has moved fast in this repo (document links, in particular, may or may not have
-landed yet) -- **build the demo around what this build actually supports, not around what
-REQUIREMENTS.md aspires to.** Two things specifically to check:
+`endpaper init` (Step 2) just wrote a fresh `AGENTS.md` at the workspace root, generated for
+whatever version is actually installed. Read it in full before populating anything -- it is kept
+deliberately short (~60 lines) precisely so an assistant can absorb it in one read and be
+productive immediately, which is exactly the job here. Pull out:
 
-- Is there a `link`/`links` subcommand? If yes, read its `--help` and use it for Step 6. If no,
-  fall back to hand-written relative markdown links (Step 6 covers both).
-- Does `task add`/`meeting new`/`note new` support anything beyond `--type`/`--tag` in this
-  build? Use whatever's actually there.
+- **Layout** -- which collections exist (meetings, notes, daily notes, tasks, others not listed
+  in this skill) and where each lives.
+- **Frontmatter** -- the exact current field set and id-prefix scheme per collection. Use this,
+  not the illustrative YAML in Step 4 below, if the two ever disagree.
+- **Tasks** -- the current checkbox/metadata-comment/body format.
+- **Commands** -- the full current command list and flags, including anything not mentioned
+  anywhere in this skill.
+
+Then run `endpaper --help` and `endpaper <subcommand> --help` for each subcommand, to fill in any
+flag-level detail `AGENTS.md` doesn't spell out (it documents the concepts and common invocation,
+not necessarily every flag).
+
+**If either source reveals something this skill has no step for** -- a `link`/`links`/backlinks
+command, a way to capture a task inline while editing a note or meeting, a new record type, a new
+frontmatter field -- don't skip it because it isn't covered below. Fold it in: add example
+content demonstrating it in Steps 4-7, and if it's something that only makes sense done live
+(e.g. an interactive in-editor capture flow, not scriptable from a shell command), add a prompt
+for it in Step 9 instead of trying to fake the artifact statically.
 
 ## Step 4 — Populate meetings and notes across several months
 
@@ -77,8 +101,9 @@ endpaper note new "vendor landscape" --type research --tag procurement
 endpaper note today
 ```
 
-For **past months**, hand-write additional files following the exact schema (confirm current
-field names against a CLI-generated file from Step 4's first commands, in case it's drifted):
+For **past months**, hand-write additional files following the schema from Step 3's `AGENTS.md`
+read (the block below is illustrative only -- if it disagrees with what `AGENTS.md` or a
+CLI-generated file from this step actually shows, the real file wins):
 
 ```
 meetings/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
@@ -120,10 +145,12 @@ against real content instead of hypothetical content.
 
 A record with an empty body (all a fresh CLI-created file has) doesn't demonstrate the markdown
 preview, so write a few sentences of plausible body content into every hand-written file, and
-back-fill the CLI-created ones from Step 4 the same way (open and edit them directly -- there's
-no CLI command for writing body content in this build). Make it read like real notes: bullet
-points, a small table or checklist somewhere, a heading or two -- varied enough to show off
-rendering, not a single flat paragraph repeated everywhere.
+back-fill the CLI-created ones from Step 4 the same way. Use a CLI command for this if Step 3
+turned one up (e.g. a `write`/`append` equivalent); otherwise edit the files directly -- these
+are plain hand-editable markdown by design, so that's a legitimate way to populate them, not a
+workaround. Make it read like real notes: bullet points, a small table or checklist somewhere, a
+heading or two -- varied enough to show off rendering, not a single flat paragraph repeated
+everywhere.
 
 ## Step 6 — Tasks: open, done, with bodies, and tagged
 
@@ -197,6 +224,10 @@ Cover a spread of interaction shapes, not just lookups:
   went." (use a task description actually created)
 - **Cross-record synthesis**: e.g. "Summarize everything related to the Acme renewal across
   meetings, notes, and tasks."
+- **Anything Step 3 turned up that isn't on this list** -- a new command, an inline-capture
+  flow, a linking feature -- gets a prompt of its own here, phrased against the actual content
+  created for it. This is the mechanism that keeps the skill useful without editing it: new
+  capability in, new demo prompt out.
 
 Present these as a plain numbered list in your final message (not just left in a file) --
 they're meant to be copy-pasted immediately into whatever assistant session is testing the
