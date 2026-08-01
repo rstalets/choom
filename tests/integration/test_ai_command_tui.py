@@ -15,7 +15,7 @@ from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditScreen
 from choom.tui.status_bar import EDIT_HELP, StatusBar
 from tests.conftest import STUB_REPLY_TEXT
-from tests.helpers import open_edit, submit_editor_line
+from tests.helpers import list_view, open_edit, submit_editor_line, task_rows, to_collection
 
 
 async def test_reply_replaces_the_command_line(
@@ -123,6 +123,101 @@ async def test_reply_containing_a_slash_ai_line_is_inserted_as_literal_text(
         # control has already returned to ordinary editing.
         assert screen._request is None
         assert editor.read_only is False
+
+
+async def test_reply_captured_tasks_reconcile_like_any_other_task(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    """Extends the US1 path (T026): a reply-captured task is not a special
+    case for reconciliation -- completing it from the tasks list ticks its
+    note's checklist, and ticking the note's checklist and saving completes
+    it, exactly as 009 already established for a typed capture."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("reply_with_tasks")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        await submit_editor_line(pilot, editor, "/ai summarise and track")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        await pilot.press("ctrl+x")  # save & close -- mirrors land on disk
+        await pilot.pause()
+        assert not isinstance(app.screen, EditScreen)
+        await pilot.press("escape")  # back from the preview to the list
+        await pilot.pause()
+
+        tasks, _warnings = load_tasks(tmp_workspace)
+        assert len(tasks) == 2
+        first_id, second_id = tasks[0].id, tasks[1].id
+        assert first_id is not None
+        assert second_id is not None
+
+        # Complete the first task from the tasks list -- the note's mirror ticks.
+        await to_collection(app, pilot, "tasks")
+        await pilot.pause()
+        rows = task_rows(app)
+        row_index = next(i for i, row in enumerate(rows) if row.record.id == first_id)
+        list_view(app).index = row_index
+        await pilot.press("space")
+        await pilot.pause()
+
+        note_text = meeting.path.read_text(encoding="utf-8")
+        assert "- [x] [call Terry about the renewal]" in note_text
+        assert f"#{first_id})" in note_text
+
+        # Re-open the note, tick the second mirror by hand, and save --
+        # the task completes.
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+        marker = "- [ ] [review the budget numbers"
+        assert marker in editor.text
+        editor.text = editor.text.replace(marker, marker.replace("[ ]", "[x]"), 1)
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+
+        tasks_after, _warnings = load_tasks(tmp_workspace)
+        assert next(t for t in tasks_after if t.id == second_id).done is True
+        assert next(t for t in tasks_after if t.id == first_id).done is True
+
+
+async def test_second_save_after_capture_writes_no_spurious_task_state(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    """T027: proves the mirror baseline seeded at capture time (T013, FR-023)
+    -- without it, a freshly inserted mirror is indistinguishable at the next
+    save from a state change the user just made."""
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("reply_with_tasks")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        await submit_editor_line(pilot, editor, "/ai summarise and track")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        tasks, _warnings = load_tasks(tmp_workspace)
+        assert len(tasks) == 2
+        for task in tasks:
+            assert task.id is not None
+            assert screen._mirror_baseline[task.id] is False
+
+        tasks_md_after_capture = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+
+        await pilot.press("ctrl+o")
+        await pilot.pause()
+        await pilot.press("ctrl+o")  # a second save straight after
+        await pilot.pause()
+
+        assert tmp_workspace.tasks_file.read_text(encoding="utf-8") == tasks_md_after_capture
+        tasks_after, _warnings = load_tasks(tmp_workspace)
+        assert all(t.done is False for t in tasks_after)
 
 
 async def test_reply_explaining_the_syntax_captures_nothing(

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from choom.core.meetings import create_meeting
-from choom.core.mirrors import capture_reply_tasks
+from choom.core.mirrors import capture_reply_tasks, capture_task
 from choom.core.models import Workspace
+
+_ID_OR_CREATED = re.compile(r"(id|created):\S+")
 
 
 def test_no_eligible_lines_returns_the_input_unchanged(tmp_workspace: Workspace) -> None:
@@ -72,3 +76,39 @@ def test_tasks_land_in_tasks_md(tmp_workspace: Workspace) -> None:
     capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     saved = tmp_workspace.tasks_file.read_text(encoding="utf-8")
     assert "call Terry about the renewal" in saved
+
+
+# --- T025: a reply-captured task is indistinguishable from a typed one (US4) ---
+
+
+def test_a_reply_captured_task_matches_a_typed_capture_of_the_same_words(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    typed_task, _typed_line = capture_task(
+        tmp_workspace,
+        "call Terry about the renewal #urgent",
+        type="followup",
+        source=meeting.path,
+        source_id=meeting.id,
+    )
+    capture = capture_reply_tasks(
+        tmp_workspace,
+        "/task.followup call Terry about the renewal #urgent",
+        source=meeting.path,
+        source_id=meeting.id,
+    )
+    reply_task = capture.tasks[0]
+
+    assert reply_task.id != typed_task.id  # two distinct tasks
+    assert reply_task.text == typed_task.text
+    assert reply_task.type == typed_task.type
+    assert reply_task.tags == typed_task.tags
+    assert reply_task.links == typed_task.links
+
+    # The rendered tasks.md lines differ only in id and created timestamp.
+    saved_lines = tmp_workspace.tasks_file.read_text(encoding="utf-8").splitlines()
+    assert len(saved_lines) == 2
+    normalised = [_ID_OR_CREATED.sub(r"\1:X", line) for line in saved_lines]
+    assert normalised[0] == normalised[1]
