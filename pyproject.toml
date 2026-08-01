@@ -30,6 +30,12 @@ dev = [
     "types-PyYAML==6.0.12.20260724",
 ]
 
+[tool.uv]
+# Supply-chain hardening: refuse to resolve any package version published less
+# than 48 hours ago, giving the community a window to catch and yank bad
+# releases before they land here (see issue #28).
+exclude-newer = "48 hours"
+
 [tool.hatch.version]
 source = "vcs"
 fallback-version = "0.0.0"
