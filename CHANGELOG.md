@@ -4,6 +4,52 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Inline task capture
+
+**CLI and TUI, user-visible**
+
+Typing `/task <description>` (or `/task.<type> <description>`) on its own line in the editor and
+pressing `enter` captures a task and replaces the line with a checklist item linking to it --
+`- [ ] [call Terry about the renewal](../../../tasks.md#task_a1b2)` -- with the cursor landing at
+its end and nothing else on screen moving. `#tag` tokens are extracted exactly as the command bar
+already does. Prefixing an existing line with `/task.followup ` promotes that line's own words
+into the task instead of typing a fresh description. The task records the document it was
+captured from as an ordinary link (`links:`), so it appears in that document's inbound links and
+opens in one keystroke from the task's preview.
+
+The checklist item is a control surface onto the task's state, not a copy of it: ticking either
+end and saving updates the other. Completing a task from the tasks list (`space`, or `endpaper
+task done`/`undone`) splices every mirror in the documents the task links to, without stamping
+those documents' `updated` -- ticking a box in a different collection is not an edit to the
+meeting note. Opening a document reconciles every mirror in it against `tasks.md` first, so a
+task completed elsewhere, or a mirror pasted into a second note, is always correct by the time it
+is shown; a document with no mirrors costs nothing extra to open. A mirror is found by its
+`#task_id` fragment alone -- rewording the link text or reindenting the line never loses it. If a
+mirror and its task both changed since they last agreed, saving reports the conflict rather than
+silently picking a winner; two disagreeing mirrors for the same task leave `tasks.md` untouched
+for it, and a warning names the problem either way. A mirror whose task no longer exists is left
+untouched and reported, never rewritten.
+
+`endpaper task add "<description>" --link <id>` records the same relationship from the command
+line -- repeatable, and validated before anything is written (an unresolvable id exits 1 and
+creates nothing). `endpaper task done`/`undone --json` gain `documents_updated` (paths actually
+written) and `warnings`; a document that could not be updated is a warning on stderr, never a
+non-zero exit, since the task's own completion already succeeded.
+
+**Public API**
+
+- `endpaper.core.mirrors` (new module): `find_mirrors`, `mirror_line`, `capture_task`,
+  `reconcile_on_open`, `reconcile_on_save`, `propagate_to_documents`, `write_document`.
+- `endpaper.core.models`: new `Mirror`, `MirrorReport`, `MirrorResolution`; `ScanWarningReason`
+  gains `"mirror_conflict"` / `"mirror_ambiguous"`; `EditorCommand` gains `accepts_suffix: bool =
+  False`; `ParsedCommand` gains `suffix: str = ""`.
+- `endpaper.core.tasks.add_task()`: gains `links: Sequence[str] = ()`, passed through to
+  `render_task_line()`; a call without it is unchanged.
+- `endpaper.core.editor_commands.parse_line()`: now splits a dotted verb suffix (`/task.followup`)
+  before the command-table lookup; `EDITOR_COMMANDS` gains `task`.
+- CLI: `task add` gains `--link <id>` (repeatable) and `--json`; `task done`/`undone` gain
+  `--json`, and both now propagate to every linked document's mirrors after writing `tasks.md`.
+
 ### Document links
 
 **CLI and TUI, user-visible**
