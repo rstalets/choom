@@ -8,6 +8,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
+from textual.timer import Timer
 from textual.widgets import Label, ListItem, ListView, Markdown
 
 from choom.core.documents import _read_document
@@ -27,6 +28,32 @@ _EMPTY_STATE = {
     "tasks": "No tasks yet. Press / then 'task <description>' to create one.",
 }
 _CREATE_VERB = {"meetings": "meeting", "notes": "note"}
+
+#: How often a displayed list re-reads on its own (US2, FR-009). Not the
+#: issue's proposed ~10 s: the binding constraint is Textual's main thread,
+#: not the disk -- a scoped month read is a few tens of ms even at 200
+#: documents, so 2 s spends well under 2% of one core. See research.md R5 for
+#: the full frame-budget argument and the trigger to move this read to a
+#: worker thread instead of shortening the interval.
+REFRESH_SECONDS = 2.0
+
+
+def _document_key(documents: list[Document]) -> tuple[tuple[object, ...], ...]:
+    """The change-detection key for a documents read (research R4): a tuple of
+    the fields `DocumentRow._row_text` renders, plus `path` and `updated` so
+    an edit that changes no *rendered* field still counts as a change for the
+    preview pane. Order is part of the key -- a re-sort with identical rows is
+    still a change, since row position is rendered."""
+    return tuple(
+        (d.id, str(d.path), d.title, d.type, d.tags, d.created, d.updated) for d in documents
+    )
+
+
+def _task_key(tasks: list[Task]) -> tuple[tuple[object, ...], ...]:
+    """The change-detection key for a tasks read -- the fields
+    `TaskRow._row_text` renders, plus `done` (which changes the row's markup
+    but not its text)."""
+    return tuple((t.id, t.text, t.type, t.tags, t.done, t.created) for t in tasks)
 
 
 def _empty_state_message(app: object) -> str:
@@ -121,6 +148,13 @@ class ListScreen(Screen[None]):
         #: output so `_render_status` -- called on every command-bar keystroke
         #: via `ModeChanged` -- never triggers a scan of its own (research R3).
         self._warning_count = 0
+        #: The change-detection key from the last render (research R4), so the
+        #: periodic refresh tick can tell "nothing changed" without rebuilding.
+        self._last_render_key: tuple[tuple[object, ...], ...] = ()
+        #: Registered in `on_mount`; paused while a preview, editor, help
+        #: screen, or dialog is on top (research R5) so no tick fires while
+        #: this screen is not what the user is looking at.
+        self._refresh_timer: Timer | None = None
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
@@ -141,12 +175,23 @@ class ListScreen(Screen[None]):
         await self._refresh_scope_pane()
         self.query_one("#meeting-list", ListView).focus()
         await self.refresh_rows()
+        self._refresh_timer = self.set_interval(REFRESH_SECONDS, self._refresh_tick)
+
+    def on_screen_suspend(self) -> None:
+        # A preview, editor, help screen, or dialog is now on top -- no tick
+        # should fire while this screen is not what is displayed (FR-012).
+        if self._refresh_timer is not None:
+            self._refresh_timer.pause()
 
     async def on_screen_resume(self) -> None:
         # Coming back from PreviewScreen/EditScreen: a document may have been
         # created or edited while we were away, and a create moves the active
         # collection/month too -- rebuild everything rather than assume nothing
-        # changed.
+        # changed. Also fires once at the initial push, coincident with
+        # `on_mount`, before `_refresh_timer` exists yet -- `resume()` on an
+        # already-running timer is a harmless no-op either way.
+        if self._refresh_timer is not None:
+            self._refresh_timer.resume()
         self.query_one(CollectionBar).set_active(self.app.active)  # type: ignore[attr-defined]
         await self._refresh_scope_pane()
         await self.refresh_rows(select_id=self._pending_select_id)
@@ -184,6 +229,11 @@ class ListScreen(Screen[None]):
         items = cast(
             "list[Document | Task]",
             app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+        )
+        self._last_render_key = (
+            _task_key(cast("list[Task]", items))
+            if is_tasks
+            else _document_key(cast("list[Document]", items))
         )
         if not items:
             await list_view.append(ListItem(Label(_empty_state_message(app))))
@@ -235,6 +285,57 @@ class ListScreen(Screen[None]):
         if warnings:
             text += f"   {warnings} warning{'s' if warnings != 1 else ''}"
         status.update(text)
+
+    # --- periodic refresh (US2) --------------------------------------------------
+
+    def _refresh_tick_read(
+        self,
+    ) -> tuple[list[Document | Task], bool, tuple[tuple[object, ...], ...]]:
+        """The read step (research R5): identical scope to `refresh_rows`'s own
+        read. Touches no widget -- returns the rows, whether they are tasks,
+        and the comparison key built from them, which is what a worker thread
+        would eventually hand back via `call_from_thread` instead of this
+        being called directly on the main thread."""
+        app = self.app
+        is_tasks = app.active == "tasks"  # type: ignore[attr-defined]
+        items = cast(
+            "list[Document | Task]",
+            app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+        )
+        key = (
+            _task_key(cast("list[Task]", items))
+            if is_tasks
+            else _document_key(cast("list[Document]", items))
+        )
+        return items, is_tasks, key
+
+    async def _refresh_tick_apply(self, key: tuple[tuple[object, ...], ...]) -> None:
+        """The apply step: re-renders via `refresh_rows` -- the same path
+        every other caller uses -- only when `key` differs from the last
+        render's (FR-010, contract C4). Selection is read fresh right before
+        the render it belongs to and passed through by record id, so a
+        record that moves position stays selected (FR-011)."""
+        if key == self._last_render_key:
+            return
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+        select_id: str | None = None
+        if isinstance(highlighted, DocumentRow):
+            select_id = highlighted.document.id
+        elif isinstance(highlighted, TaskRow):
+            select_id = highlighted.record.id
+        await self.refresh_rows(select_id=select_id)
+
+    async def _refresh_tick(self) -> None:
+        """Runs every `REFRESH_SECONDS` while this screen is displayed and
+        unobstructed (the timer itself is paused otherwise, `on_screen_suspend`/
+        `on_screen_resume`). Does nothing while the command bar is open
+        (FR-013) or a filter is active (FR-012) -- both are point-in-time
+        views that reconcile on their own terms, not the timer's (research R5)."""
+        if self.query_one(CommandBar).display or self.app.filter_query:  # type: ignore[attr-defined]
+            return
+        _items, _is_tasks, key = self._refresh_tick_read()
+        await self._refresh_tick_apply(key)
 
     # --- collection switching (Tab / shift+Tab) --------------------------------
 
