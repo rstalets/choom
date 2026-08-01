@@ -38,9 +38,11 @@ for the SC-003/SC-004 budgets. No `contract/` change — the CLI's AI-facing sur
 command-bar open never delays the keypress, first filter term under 500 ms (SC-004); periodic refresh every
 2 s with no render when nothing changed (FR-009, FR-010).
 
-**Constraints**: The refresh tick runs on Textual's main thread, so its cost is frame budget, not just CPU
-(research R5). Tests must not depend on the wall clock (Principle VI), which shapes how the timer is tested
-(research R9).
+**Constraints**: The refresh tick runs on Textual's main thread, so its cost is frame budget, not just CPU.
+Measured, `scan_month` is ~0.14 ms per document, crossing one 60 fps frame at roughly 100 documents in the
+displayed month; the read stays on the main thread with the tick split into read and apply steps so a worker
+can be retrofitted without rewriting tests (research R5). Tests must not depend on the wall clock
+(Principle VI), which shapes how the timer is tested (research R9).
 
 **Scale/Scope**: Hundreds to low thousands of files. Three source files change substantially
 (`app.py`, `list_screen.py`, `edit_screen.py`); `preview_screen.py` itself needs no change — only its
@@ -118,7 +120,10 @@ The spec's sequencing (US1 first, US2 and US3 following) maps to three independe
    `action_toggle_task` refresh the rows it just changed. Update the three tests in R10. **At this point the
    bug is fixed and the feature is releasable.**
 2. **US2 — refresh timer.** Add `REFRESH_SECONDS = 2.0`, the interval registration, pause/resume on screen
-   suspend/resume, the guards for command bar and active filter, and the change-detection key.
+   suspend/resume, the guards for command bar and active filter, and the change-detection key. Split the
+   tick into a read step and an apply step (research R5) so that moving the read to a worker thread later
+   does not require rewriting the tick's tests. Add the scan-cost performance test with its one-frame
+   ceiling.
 3. **US3 — filter hydration.** Add the thread worker started from `action_open_command_bar`, await it in
    `_on_filter_changed`, drop it in `_on_command_bar_closed`, delete the unread `app.filter_loading` flag.
 

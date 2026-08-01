@@ -105,12 +105,46 @@ that on a typical month. Workspaces are expected to be pinned to local disk, and
 in R4 means a quiet workspace costs a scan and no render at all.
 
 The binding constraint is not the disk but the thread: the tick runs on Textual's main thread, so on a month
-large enough to scan slowly, a tick landing during a held movement key is a stutter rather than a background
-cost. At 2 s a 200-document month occupies roughly 1.5% of the frame budget between ticks; at 1 s it is
-3%, for a difference no user perceives as "more live". If a real workspace ever makes this felt, moving the
-tick's read to a thread worker and applying the result on the main thread is a contained follow-on that
-introduces no new state — deliberately not done now, because it adds result-ordering concerns for a cost
-that is currently hypothetical.
+large enough to scan slowly, a tick landing during a held movement key costs a frame rather than background
+CPU. Measured on this machine, `scan_month` is linear at roughly 0.14 ms per document:
+
+| Documents in the displayed month | Median scan | Frames at 60 fps |
+|---|---|---|
+| 10 | 1.60 ms | 0.10 |
+| 25 | 3.55 ms | 0.21 |
+| 50 | 7.22 ms | 0.43 |
+| 100 | 14.09 ms | 0.84 |
+| 200 | 28.52 ms | 1.71 |
+
+(The 200-document figure reproduces issue #51's 29.4 ms.)
+
+The crossover into "can drop a frame" is around 100 documents **in the displayed month** — about five
+meetings a day, every working day, which the constitution's primary user (a corporate employee in
+back-to-backs) can reach. This is therefore not a hypothetical cost, and an earlier draft of this decision
+was wrong to call it one. What it produces at that size is a single dropped frame per tick, and only while a
+movement key is actually held; scrolling happens in one-to-two-second bursts, so the exposure is roughly one
+dropped frame per scroll.
+
+**Decision: the tick's read stays on the main thread for now**, with two accommodations rather than an
+outright deferral:
+
+1. `_refresh_tick` is written as a **read step and an apply step in separate methods**. Moving the read to
+   `@work(thread=True)` later then means changing which thread calls the read and routing the apply through
+   `call_from_thread` — the tests keep driving the apply directly, so they do not have to be rewritten. This
+   is the only cost of deferring that is not recoverable later, and it is removed here for free.
+2. The table above becomes a performance test with a stated ceiling, so the number is monitored rather than
+   assumed.
+
+**Why not the worker now**: the read would complete ~29 ms after it started, by which time the user may have
+switched collection, changed month scope, or opened the command bar. Applying that result blindly renders
+the wrong scope's rows — so the worker needs supersession logic (the `_request is not self._request` pattern
+at `edit_screen.py:479`). That is a new correctness surface inside a feature whose purpose is removing one,
+and it would need a third Complexity Tracking entry whose honest justification is "for a workspace shape we
+have not observed".
+
+**Trigger to build it**: the performance test shows a realistic displayed month exceeding ~15 ms (one frame)
+on target hardware, or a user reports stutter while scrolling. Either way the change is contained to
+`_refresh_tick` and introduces no new persistent state.
 
 **Rationale**: Textual pushes `ScreenSuspend` to a screen when another is pushed over it, so pausing there
 gives FR-012 (no refresh while previewing or editing) for free, with no knowledge of which screen is on top.

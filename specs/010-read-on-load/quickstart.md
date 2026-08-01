@@ -110,6 +110,7 @@ uv run mypy src tests
 | `/` on a 1,000-document workspace | FR-016, SC-004 | Keypress returns before hydration finishes |
 | Second filter term in one bar session | FR-018, FR-019 | No additional file reads |
 | Existing month-scope test | C3, SC-003 | A list load still reads only the displayed month |
+| Scan cost per displayed month | research R5 | A representative month scans inside one 60 fps frame (~15 ms); breaching it is the trigger to move the tick's read to a worker |
 
 ## 5. Cleanup
 
