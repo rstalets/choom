@@ -176,34 +176,37 @@ def test_task_with_no_links_reads_no_document(
     assert warnings == ()
 
 
-# --- the cached Document behind a spliced file must not go stale ---------------
+# --- a spliced document reads current on every subsequent view load -----------
 
 
-async def test_toggling_refreshes_the_cached_document_it_spliced(
+async def test_toggling_reflects_in_the_spliced_document_on_the_next_read(
     tmp_workspace: Workspace,
 ) -> None:
     """Regression, the mirror image of the reconcile-on-save staleness bug:
-    `propagate_to_documents` reports which documents it wrote, and the app was
-    discarding that list. The file on disk was correct while the Document cached
-    behind it still held the old checkbox, so the preview rendered a stale one."""
+    `propagate_to_documents` reports which documents it wrote, and the app used
+    to discard that list, leaving a cached `Document` holding the pre-toggle
+    checkbox so the preview rendered a stale one. 010-read-on-load removed the
+    cache entirely -- `visible_documents()` now reads fresh every call, so both
+    reads here are freshly scanned rather than one being served from memory."""
     task_id, meeting_path = _capture(tmp_workspace)
 
     app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await to_collection(app, pilot, "meetings")
         await pilot.pause()
-        cached_before = next(d for d in app.visible_documents() if d.path == meeting_path)
-        assert "- [ ] [call Terry]" in cached_before.path.read_text(encoding="utf-8")
+        read_before = next(d for d in app.visible_documents() if d.path == meeting_path)
+        assert "- [ ] [call Terry]" in read_before.path.read_text(encoding="utf-8")
 
         await to_collection(app, pilot, "tasks")
         await pilot.press("space")
         await pilot.pause()
 
-        assert next(t for t in app.tasks if t.id == task_id).done is True
+        tasks, _warnings = load_tasks(tmp_workspace)
+        assert next(t for t in tasks if t.id == task_id).done is True
 
         await to_collection(app, pilot, "meetings")
         await pilot.pause()
-        cached_after = next(d for d in app.visible_documents() if d.path == meeting_path)
-        # The cache entry was rebuilt from the spliced file rather than left
-        # holding the pre-toggle parse.
-        assert cached_after is not cached_before
+        read_after = next(d for d in app.visible_documents() if d.path == meeting_path)
+        # The second read reflects the spliced file -- it is not the same
+        # object as the first, since neither read was ever cached.
+        assert read_after is not read_before

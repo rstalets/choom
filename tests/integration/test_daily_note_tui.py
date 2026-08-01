@@ -1,19 +1,20 @@
 from __future__ import annotations
 
 import datetime
-from datetime import date
 
 from choom.core.documents import _read_document
-from choom.core.models import Workspace, YearMonth
+from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import ListScreen
 from tests.helpers import type_command
 
 
-def _todays_cache(app: ChoomApp) -> list:  # type: ignore[type-arg]
-    today = date.today()
-    return app.month_cache[("notes", YearMonth(today.year, today.month))]
+def _todays_notes(app: ChoomApp) -> list:  # type: ignore[type-arg]
+    """The notes currently visible -- a fresh read, not a cache lookup
+    (010-read-on-load). Callers land here right after creating today's daily
+    note, so `app.active` is already "notes" and scoped to the current month."""
+    return app.visible_documents()
 
 
 async def test_bare_note_creates_and_opens_todays_daily_note(tmp_workspace: Workspace) -> None:
@@ -26,7 +27,7 @@ async def test_bare_note_creates_and_opens_todays_daily_note(tmp_workspace: Work
         document = _read_document(app.screen.target.display_path)
         assert document is not None
         assert document.type == "daily"
-        assert _todays_cache(app)[0].path == app.screen.target.display_path
+        assert _todays_notes(app)[0].path == app.screen.target.display_path
 
 
 async def test_bare_note_second_time_reopens_same_note_without_creating(
@@ -46,7 +47,7 @@ async def test_bare_note_second_time_reopens_same_note_without_creating(
 
         assert isinstance(app.screen, EditScreen)
         assert app.screen.target.display_path == first_path
-        assert len(_todays_cache(app)) == 1
+        assert len(_todays_notes(app)) == 1
 
 
 async def test_bare_note_with_unparseable_existing_file_still_opens_the_editor(

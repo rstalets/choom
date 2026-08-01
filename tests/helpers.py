@@ -12,10 +12,15 @@ focused, so typing a 38-character command one key at a time costs ~3.4 seconds.
 from __future__ import annotations
 
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any
 
 from textual.widgets import Input, TextArea
 
+from choom.core.meetings import create_meeting
+from choom.core.models import Document, Task, Workspace
+from choom.core.notes import create_note
+from choom.core.tasks import set_task_state
 from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import DocumentRow, ListView, TaskRow
 
@@ -107,6 +112,47 @@ async def submit_editor_line(pilot: Any, editor: TextArea, line_text: str) -> in
     await pilot.press("enter")
     await pilot.pause()
     return line_index
+
+
+#: --- out-of-process mutation helpers (010-read-on-load) --------------------
+#
+# These call `choom.core` directly rather than driving the running app through
+# a `pilot`. That is the point: the running `ChoomApp` under test receives no
+# notification either way, exactly as if a separate process -- an AI
+# assistant sharing the workspace -- had made the change. They are still
+# in-process Python calls (there is no real second process, no subprocess),
+# but from the app-under-test's perspective the workspace changed with no
+# announcement, which is the condition US1 exists to handle.
+
+
+def create_document_out_of_process(
+    workspace: Workspace, collection: str, description: str, *, type: str = ""
+) -> Document:
+    """Create a meeting or note as an outside process would, bypassing the app."""
+    if collection == "meetings":
+        return create_meeting(workspace, description, type=type)
+    return create_note(workspace, description, type=type)
+
+
+def complete_task_out_of_process(workspace: Workspace, task_id: str) -> Task:
+    """Mark a task done as an outside process would, bypassing the app."""
+    return set_task_state(workspace, task_id, done=True)
+
+
+def delete_file_out_of_process(path: Path) -> None:
+    """Remove a file as an outside process would, bypassing the app."""
+    path.unlink()
+
+
+def write_malformed_document_out_of_process(
+    path: Path, *, text: str = "not frontmatter at all, and not a task file either"
+) -> None:
+    """Write a file that cannot be parsed as a document, as an outside process
+    would -- the shape of a half-written or corrupted file. Any date this or a
+    sibling fixture needs should come from `in_scope_month`/`date.today()`
+    (Principle VI), the same clock the month-scoped read uses."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def in_scope_month(day: int, hour: int = 9) -> datetime:

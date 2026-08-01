@@ -15,7 +15,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Run tests
-        run: uv run --extra dev pytest -q
+        run: uv run --extra dev pytest -q -n $(( $(getconf _NPROCESSORS_ONLN) * 2 ))
 
   publish:
     needs: test
