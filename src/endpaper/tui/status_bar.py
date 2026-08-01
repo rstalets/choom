@@ -14,7 +14,11 @@ LIST_HELP = (
 TASK_LIST_HELP = (
     "tab collection   / filter or command   ↑↓/jk move   h/l pane   space toggle   ctrl+q quit"
 )
-PREVIEW_HELP = "e edit   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+PREVIEW_HELP = "e edit   l links   esc back   ↑↓/pgup/pgdn scroll   ctrl+q quit"
+#: Swapped in for PREVIEW_HELP while the Links section has focus, the same way
+#: EDIT_HELP is a whole separate string rather than an append -- the footer must
+#: never grow past what fits, so the two never concatenate (research R10).
+LINKS_SECTION_HELP = "↑↓ move   enter/o open   esc close   ctrl+q quit"
 EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
 
 #: Shown in the status bar while `/ai` is in flight (contracts/editor-commands.md). One

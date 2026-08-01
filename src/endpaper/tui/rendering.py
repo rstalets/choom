@@ -2,7 +2,29 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from endpaper.core.models import Document
+from endpaper.core.models import Document, Link, LinkStatus, LinkTarget
+
+_KIND_LABEL = {"meeting": "meetings", "note": "notes", "task": "tasks"}
+
+
+def render_link_row(
+    link: Link, status: LinkStatus, target: LinkTarget | None, *, direction: str
+) -> str:
+    """One line in the preview's Links section (contracts/tui.md -> Rendering).
+
+    A dead link shows its unresolvable id rather than being hidden -- the user
+    wrote it, and it stays visible (Principle IV).
+    """
+    arrow = "→" if direction == "out" else "←"
+    if target is None:
+        unresolved = link.target_id or link.path or "?"
+        return f"⚠ (unresolved) {unresolved}"
+    kind = _KIND_LABEL[target.kind]
+    return f"{arrow} {target.title}   {kind}"
+
+
+NO_OUTBOUND_LINKS = "(this record points at nothing)"
+NO_INBOUND_LINKS = "(nothing points at this record)"
 
 
 def _strip_frontmatter(text: str) -> str:

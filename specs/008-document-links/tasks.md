@@ -332,23 +332,23 @@ the inbound section and confirm what points at it is listed; press the open key 
 
 ### Tests for User Story 7
 
-- [ ] T051 [P] [US7] Extend `tests/unit/test_footer_bindings.py` for the new preview bindings —
+- [X] T051 [P] [US7] Extend `tests/unit/test_footer_bindings.py` for the new preview bindings —
       every one of `l`, `enter`/`o`, and `esc` must be visible in the footer, and the links-section
       help string must fit 80 columns (Principle V, FR-051).
-- [ ] T052 [P] [US7] Extend `tests/integration/test_links.py`: outbound links render on open with no
+- [X] T052 [P] [US7] Extend `tests/integration/test_links.py`: outbound links render on open with no
       workspace scan; inbound links appear only once the section is expanded; a record nothing points
       at says so rather than rendering empty; opening a dead link reports and does not change the
       view (US7 AC1–5).
-- [ ] T053 [US7] Render the Links section in `src/endpaper/tui/rendering.py` — outbound above,
+- [X] T053 [US7] Render the Links section in `src/endpaper/tui/rendering.py` — outbound above,
       inbound below, dead links shown with their unresolvable id rather than hidden. Layout sketch in
       [contracts/tui.md](contracts/tui.md#rendering).
-- [ ] T054 [US7] Add the collapsible region and its bindings (`l` toggle, `↑↓`/`jk` move,
+- [X] T054 [US7] Add the collapsible region and its bindings (`l` toggle, `↑↓`/`jk` move,
       `enter`/`o` open, `esc` collapse) to `src/endpaper/tui/preview_screen.py`, computing outbound
       links on mount and inbound links only on first expansion (FR-048, FR-049).
-- [ ] T055 [US7] Add `l links` to `PREVIEW_HELP` and a separate links-section help string in
+- [X] T055 [US7] Add `l links` to `PREVIEW_HELP` and a separate links-section help string in
       `src/endpaper/tui/status_bar.py` — swap the string rather than appending, so the footer never
       overflows (53 → 63 chars, still inside 80).
-- [ ] T056 [US7] Implement opening a selected link from `src/endpaper/tui/preview_screen.py` into
+- [X] T056 [US7] Implement opening a selected link from `src/endpaper/tui/preview_screen.py` into
       whichever collection the target lives in, including a task target in `tasks.md` (FR-050).
 
 **Checkpoint**: All seven behavioural stories are complete.

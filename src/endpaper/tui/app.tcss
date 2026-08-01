@@ -41,6 +41,17 @@ CollectionBar {
     height: auto;
 }
 
+#links-section {
+    height: auto;
+    max-height: 12;
+    border-top: solid $accent;
+}
+
+#links-list {
+    height: auto;
+    max-height: 10;
+}
+
 CommandBar {
     height: 1;
     display: none;
