@@ -154,8 +154,15 @@ def propagate_to_documents(
     task: Task,
     *,
     skip: Container[Path] = (),
-) -> tuple[ScanWarning, ...]:
+) -> tuple[tuple[Path, ...], tuple[ScanWarning, ...]]:
     """Write `task`'s state into the mirrors of every document it links to.
+
+    Returns (documents written, warnings). The written-paths half exists because
+    cli.md requires `documents_updated` in the --json output of `task done`, and
+    only this function knows which documents actually needed a splice. Returning
+    warnings alone would have forced the CLI adapter to re-diff every mirror to
+    reconstruct the list -- behaviour in an adapter, which Principle I forbids.
+    Widened from the warnings-only signature this contract first specified.
 
     Called after tasks.md has already been written -- never before, and never conditionally.
     A document that is missing, unreadable, unwritable, or whose link is dead produces a

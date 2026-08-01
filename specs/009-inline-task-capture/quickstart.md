@@ -186,13 +186,21 @@ uv run endpaper task done task_XXXX --json
 **Expect**, in order: a JSON object whose `links` names the meeting; then exit **1** with the id named on
 stderr and no task created (`task list` unchanged); then a JSON object listing `documents_updated`.
 
-**Stream separation** — make a linked document read-only, then:
+**Stream separation** — make a linked document unwritable, then:
 
 ```bash
-chmod a-w meetings/2026/07/*.md
+chmod a-w meetings/2026/07          # the DIRECTORY, not the file
 uv run endpaper task undone task_XXXX --json > out.json 2> err.txt; echo "exit=$?"
-chmod u+w meetings/2026/07/*.md
+chmod u+w meetings/2026/07
 ```
+
+> `chmod a-w` on the *file* does not work here, and this recipe originally got it wrong.
+> Every write goes through `core.atomic_write.write_text_atomic`, which writes a
+> same-directory temp file and then `os.replace`s it over the target — and on POSIX a
+> rename needs write permission on the **directory**, not on the file being replaced. A
+> read-only file is still replaced successfully, so the warning path never fires.
+> `tests/contract/test_task_done_json.py` and `tests/integration/test_mirror_propagation.py`
+> chmod the directory for the same reason.
 
 **Expect**: exit **0**, `out.json` parses cleanly with the warning in its `warnings` array, and `err.txt`
 carries the human-readable warning. *A non-zero exit here would make an assistant retry a completion that
