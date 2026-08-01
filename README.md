@@ -36,9 +36,13 @@ The tool disappears into the twenty seconds before a meeting starts. You type `/
 
 ### Install
 
+Requires Python 3.11+. Works on Windows, macOS, and Linux, with no network access needed after install.
+
 ```bash
 uv tool install choom
 ```
+
+**Coming from v0.0.1, when this project was called `endpaper`?** Rename the workspace marker directory — `mv .endpaper .choom` from the workspace root — and nothing else about the workspace changes. Ids written under the old `m_`/`n_`/`t_` prefixes keep resolving alongside the new `meeting_`/`note_`/`task_` ones; no existing file is rewritten.
 
 ### Create a workspace
 
@@ -120,7 +124,7 @@ Run `choom --help` for the full command reference. The `AGENTS.md` that `init` w
 - **Tasks** — `/task.followup send the vendor comparison #procurement` appends a checkbox line to `tasks.md`. `/tasks` or `tab` opens on **To-Do**; `space` toggles a task done, moving it to the **Done** category in the left pane. A task can carry an optional markdown body — details, a running log — stored as indented lines beneath its checkbox line; it renders in the preview pane when the task is highlighted, and `e` opens the editor scoped to just that body. Empty until you type something, and a save that changes nothing writes nothing. `choom task show <id>` prints a task and its body from the CLI; `task list --json` carries `body` on every entry. The file stays hand-editable plain markdown — no database.
 - **Inline task capture** — inside any meeting or note, typing `/task <description>` (or `/task.<type> <description>`) on its own line and pressing `enter` captures a task without leaving the editor: the line becomes a checklist item linking to it, `- [ ] [call Terry about the renewal](../../../tasks.md#task_a1b2)`, cursor at its end, nothing else on screen moving. Prefix an existing line with `/task.followup ` to promote its own words into the task instead. That checklist item is a **two-way control surface**, not a copy — tick it and save, or tick the task from the tasks list, and the other side follows; opening a document brings every mirror in it into agreement with `tasks.md` first, so nothing shown is ever stale, with no repair command and no background process. `choom task add "<description>" --link <id>` does the same capture from the command line, and `task done`/`undone --json` report which documents were updated.
 - **Document links** — any record can point at any other, as an ordinary markdown link: `See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20260728_a1b2c3d4)`. The `#id` fragment is what choom resolves and never changes; the path is derived so the link is clickable in any plain markdown viewer, and it's recomputed whenever the target moves. Write just the fragment — `[Q3 planning](#meeting_20260728_a1b2c3d4)` — and the path fills itself in on the next save; nobody has to count `../`. `b` opens a pane of outbound and inbound links in any preview, `/link <search terms>` inserts a correct link without leaving the editor, and `choom links <id> --direction in` answers what points at a record from the command line. `choom links check` separates **stale** links (fixable) from **dead** ones (need a decision) and `choom links heal` repairs every stale one. Nothing is indexed or cached — inbound links are computed by scanning, measured at 155 ms across 6,000 documents.
-- **Workspace init** — `choom init` sets up a workspace (config, `AGENTS.md`, `meetings/`, `notes/daily/`, `tasks.md`) in the current directory. Multi-user shared workspaces are planned but not in v0.0.2 — see [Roadmap](#roadmap).
+- **Workspace init** — `choom init` sets up a workspace (config, `AGENTS.md`, `meetings/`, `notes/daily/`, `tasks.md`) in the current directory. Multi-user shared workspaces are planned but not in v0.0.2 — tracked in [issue #18](https://github.com/rstalets/choom/issues/18).
 - **View and edit** — every note or meeting opens in a rendered markdown preview (`enter`), switches to a raw editor (`e`) with line numbers and soft wrap, and saves with `ctrl+o` (stay) or `ctrl+x` (save and return). `esc` discards, but only prompts when there's something to lose. `ctrl+s` is also bound as a save alias, but `ctrl+o` is the canonical key: some terminals treat `ctrl+s` as the legacy XOFF flow-control signal and swallow it before it ever reaches choom. If saves with `ctrl+s` seem to do nothing, run `stty -ixon` in that shell (or use `ctrl+o` instead).
 - **AI-friendly CLI** — every TUI action has a non-interactive CLI equivalent backed by the same core library: `--json` on every read command, meaningful exit codes, data on stdout and errors on stderr, nothing that opens an editor or blocks on input. Assistants create records through the commands, so frontmatter and file placement stay correct, then edit the markdown bodies directly like any other file.
 - **`/ai` in the editor** — type `/ai <prompt>` on its own line and press `enter`: the document saves, your already-installed Claude Code CLI or GitHub Copilot CLI runs the prompt, and the reply lands where the command was. The line shows `⋯` and the status bar names a random breadcrumb plus `ctrl+c to cancel` while it works; every failure — cancelled, no reply, the assistant errored — restores the line exactly as typed. Which assistant to call is detected automatically when only one is installed, or set explicitly with `choom config assistant <claude|copilot|none>` (CLI) or `/config assistant <value>` (TUI command bar) — a workspace with neither tool installed keeps every other feature unchanged.
@@ -128,25 +132,6 @@ Run `choom --help` for the full command reference. The `AGENTS.md` that `init` w
 - **`AGENTS.md`** — generated at `init`, under ~100 lines, so an assistant landing in the workspace is productive immediately.
 
 Everything above has landed on `main` as of v0.0.2 — see [Releases](https://github.com/rstalets/choom/releases) for what has been published to PyPI.
-
-## Roadmap
-
-Planned for a future release, tracked in [issue #18](https://github.com/rstalets/choom/issues/18):
-
-- **Multi-user shared workspaces** — `choom init <name>` inside a shared root (e.g. a OneDrive folder), `/workspace` switching, and cross-workspace search, so a team can share one root without a server.
-
-Considered and explicitly out of scope, each tracked in [issues](https://github.com/rstalets/choom/issues):
-
-- Webcam or image capture (`/pic`)
-- Embeddings, vector search, semantic retrieval
-- Graph views
-- Syntax highlighting in the editor
-
-## Status
-
-Draft / pre-release. v0.0.2 targets Python 3.11+, installable via `uv tool install` or `pipx`, on Windows, macOS, and Linux with no network access required.
-
-**Upgrading from v0.0.1**, when this project was called `endpaper`: rename the workspace marker directory — `mv .endpaper .choom` from the workspace root — and nothing else about the workspace changes. Ids written under the old `m_`/`n_`/`t_` prefixes keep resolving alongside the new `meeting_`/`note_`/`task_` ones; no existing file is rewritten.
 
 ## License
 
