@@ -1,0 +1,59 @@
+name: "🔧 Maintenance"
+description: Track test improvements, refactors, dependency upgrades, or other non-user-facing work
+title: "[Maintenance]: "
+labels: ["maintenance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for work that keeps the project healthy but doesn't change
+        user-facing behavior — refactors, test coverage, dependency bumps,
+        tooling, CI, etc.
+
+  - type: checkboxes
+    id: duplicate-check
+    attributes:
+      label: Check for existing issues
+      description: Please search open and closed issues before filing to avoid duplicates.
+      options:
+        - label: I searched existing issues and didn't find one already open for this
+          required: true
+
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      options:
+        - Refactor
+        - Test coverage
+        - Dependency / supply chain
+        - CI / tooling
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What needs to be done?
+      description: Describe the work and why it's needed.
+      placeholder: "This code/test/dependency is..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: risk
+    attributes:
+      label: Risk / impact
+      description: What could break, and how should it be verified?
+    validations:
+      required: false
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Links, related issues/PRs, benchmarks, etc.
+    validations:
+      required: false
