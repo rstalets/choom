@@ -1,43 +1,54 @@
 <!--
 SYNC IMPACT REPORT
 ==================
-Version change: 1.0.0 → 1.1.0
-Bump rationale: MINOR. Principle VI's testing rule is materially rewritten
-(risk-based coverage replaces the 1:1 acceptance-criterion-to-test mandate,
-plus new guidance on what each test layer is for), but no principle is
-removed or renamed, and the change only loosens what was previously
-required — nothing that satisfied the old rule becomes non-compliant.
+Version change: 1.1.0 → 1.2.0
+Bump rationale: MINOR. Principle VI gains a new testing rule (tests must not
+depend on the wall clock), which materially expands existing guidance. No
+principle is removed, renamed, or redefined, and nothing that satisfied the
+1.1.0 rules becomes non-compliant — the only tests that violated the new rule
+were already fixed before this amendment.
 
 Modified principles:
-  - VI. Readable Python, Enforced Automatically — testing bullet replaced:
-    "every acceptance criterion in a spec MUST map to at least one test"
-    → risk-based coverage chosen by the author, plus a definition of what
-    contract/integration/unit/performance tests are each for.
+  - VI. Readable Python, Enforced Automatically — new bullet added alongside
+    the existing testing bullet: "Tests MUST NOT depend on the wall clock",
+    with the failure it prevents (a fixture pinned to a literal month falling
+    out of a month-scoped view and rendering an empty list) and the remedy
+    (derive such dates from the same clock the behaviour reads).
 
 Added sections: none
 Removed sections: none
 
 Templates requiring updates:
   ✅ .specify/templates/plan-template.md — Constitution Check gate VI row
-     updated to describe risk-based coverage instead of the AC-mapping rule
-  ✅ .specify/templates/tasks-template.md — per-user-story test scaffolding
-     no longer offers an unconditional contract test + integration test;
-     both are now conditioned on the story actually needing that layer, and
-     integration tests are directed to be parametrized across CLI/TUI
-     adapters instead of duplicated into separate files
-  ✅ .specify/templates/spec-template.md — reviewed; no constitution-driven
-     mandatory sections added or removed
-  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; no outdated references to
-     the old 1:1 AC→test rule found
-  ✅ README.md / AGENTS.md — reviewed; neither references the old rule
+     extended with "and no test depends on the wall clock", so every future
+     plan is checked against the new rule at the gate
+  ✅ .specify/templates/tasks-template.md — reviewed; left unchanged. Its
+     per-user-story notes govern which test layers a story needs, not how a
+     fixture is written, and repeating the rule in all three story phases
+     would add noise without adding a check the plan gate does not already do
+  ✅ .specify/templates/spec-template.md — reviewed; left unchanged. No
+     constitution-driven mandatory section is added or removed, and how a
+     test sources its dates is an implementation concern, not a spec one
+  ✅ .specify/templates/checklist-template.md — reviewed; left unchanged. It
+     carries no test-authoring guidance to contradict
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; left unchanged. None
+     instructs an agent to write date literals into fixtures, and each already
+     defers to the constitution as the authority on testing discipline
+  ✅ README.md — reviewed; left unchanged. It documents usage, not test
+     authoring. (No AGENTS.md exists at the repository root; the file is
+     generated into a workspace at `init`.)
 
 Follow-up TODOs:
   - README.md names the project "cairn" while REQUIREMENTS.md, the command
-    name, and this constitution use "endpaper". Not changed here (outside the
-    constitution workflow's scope); resolve before first public release.
-  - The actual retrofit of tests/ (consolidating CLI/TUI duplicate files,
-    dropping tests that don't survive the new rule) is deferred — see
-    Next Actions. This command only updates governance and templates.
+    name, and this constitution use "endpaper". Carried over from 1.1.0, not
+    changed here (outside the constitution workflow's scope); resolve before
+    first public release.
+
+Migration path:
+  - None required. No existing spec, plan, or test becomes non-compliant. The
+    six tests that violated this rule (July-2026 fixtures asserted against the
+    month-scoped list introduced by spec 005) were already repaired on main
+    before this amendment landed.
 -->
 
 # endpaper Constitution
@@ -153,6 +164,10 @@ by strangers.
   TUI adapters rather than duplicated into separate files; `unit/` covers `core` logic
   worth isolating (parsing, id generation); `performance/` covers only scenarios with a
   real budget to protect. A behaviour does not get re-verified at every layer it touches.
+- Tests MUST NOT depend on the wall clock. A meeting fixture dated 20 July, listed by a
+  pane that shows the current month, passes every day of July and returns an empty list on
+  1 August — nothing changed but the date, and it breaks for whoever pushes next rather
+  than whoever wrote it. Derive such dates from the same clock the behaviour reads.
 - Prefer a plain function to a class, a class to a framework, and an explicit branch to a
   clever abstraction. Names say what the thing is; comments explain only why.
 - Public API changes — `--json` schemas, exit codes, frontmatter fields, the task line
@@ -216,4 +231,4 @@ in writing is removed rather than merged.
 `REQUIREMENTS.md` holds the current version's scope and acceptance criteria; `AGENTS.md`
 in a workspace holds runtime guidance for AI assistants. Neither overrides this document.
 
-**Version**: 1.1.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-30
+**Version**: 1.2.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
