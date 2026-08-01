@@ -15,6 +15,13 @@ EDITOR_COMMANDS: tuple[EditorCommand, ...] = (
         description="Insert a link to the matching record",
         requires_argument=True,
     ),
+    EditorCommand(
+        name="task",
+        argument="<description>",
+        description="Capture a task; this line becomes a link to it",
+        requires_argument=True,
+        accepts_suffix=True,
+    ),
 )
 
 _BY_NAME: dict[str, EditorCommand] = {command.name: command for command in EDITOR_COMMANDS}
@@ -24,9 +31,15 @@ def parse_line(line: str) -> ParsedCommand | None:
     """Parse one submitted editor line as an in-editor command.
 
     Returns None when the line is ordinary document text -- which is every case except a
-    line whose entire content is `/<registered word>` optionally followed by a space and
-    argument text. Leading whitespace, a preceding character, an unregistered word, and a
-    partial match all return None.
+    line whose entire content is `/<registered word>[.<suffix>]` optionally followed by a
+    space and argument text. Leading whitespace, a preceding character, an unregistered
+    word, and a partial match all return None.
+
+    The verb is split on the first `.` before the table lookup, mirroring
+    `tui/command_bar.py`'s `resolve_mode`, so `/task.followup` and the command bar never
+    disagree about what the suffix is. `ParsedCommand.suffix` is empty when there is no
+    dot. A suffix on a command whose `accepts_suffix` is False still parses -- it is the
+    dispatcher's job to reject it with a message, not this function's to discard it.
 
     Never raises: a line this cannot parse is a line the user typed, not an error.
     """
@@ -34,7 +47,8 @@ def parse_line(line: str) -> ParsedCommand | None:
         return None
     rest = line.rstrip()[1:]
     word, _, argument = rest.partition(" ")
-    command = _BY_NAME.get(word.lower())
+    stem, _, suffix = word.partition(".")
+    command = _BY_NAME.get(stem.lower())
     if command is None:
         return None
-    return ParsedCommand(command=command, argument=argument.strip())
+    return ParsedCommand(command=command, argument=argument.strip(), suffix=suffix)

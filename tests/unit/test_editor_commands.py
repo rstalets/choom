@@ -90,3 +90,45 @@ def test_link_is_registered_in_editor_commands() -> None:
 def test_line_not_entirely_the_link_command_is_ordinary_text() -> None:
     assert parse_line("prefix /link foo") is None
     assert parse_line("  /link foo") is None
+
+
+# --- 009: the dotted verb suffix ----------------------------------------------
+
+
+def test_task_followup_yields_verb_task_suffix_followup_and_the_argument() -> None:
+    result = parse_line("/task.followup call Terry")
+    assert result is not None
+    assert result.command.name == "task"
+    assert result.suffix == "followup"
+    assert result.argument == "call Terry"
+
+
+def test_bare_task_has_an_empty_suffix() -> None:
+    result = parse_line("/task call Terry")
+    assert result is not None
+    assert result.suffix == ""
+    assert result.argument == "call Terry"
+
+
+def test_task_is_registered_and_accepts_a_suffix() -> None:
+    names = {command.name: command for command in EDITOR_COMMANDS}
+    assert "task" in names
+    assert names["task"].accepts_suffix is True
+    assert names["link"].accepts_suffix is False
+
+
+def test_suffix_on_a_command_that_does_not_accept_one_still_parses() -> None:
+    result = parse_line("/ai.foo bar")
+    assert result is not None
+    assert result.command.name == "ai"
+    assert result.suffix == "foo"
+    assert result.argument == "bar"
+    assert result.command.accepts_suffix is False
+
+
+def test_line_not_entirely_a_command_still_returns_none_with_a_suffix() -> None:
+    assert parse_line("prefix /task.followup call Terry") is None
+
+
+def test_prose_mentioning_task_mid_sentence_is_text() -> None:
+    assert parse_line("Did you know you can type /task here?") is None

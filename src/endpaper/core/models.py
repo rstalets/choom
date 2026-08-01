@@ -86,6 +86,8 @@ ScanWarningReason = Literal[
     "task_invalid_value",
     "link_dead",
     "link_ambiguous",
+    "mirror_conflict",
+    "mirror_ambiguous",
 ]
 
 
@@ -220,18 +222,65 @@ class LinkTarget:
     line: int | None
 
 
+MirrorOutcome = Literal[
+    "unchanged", "task_written", "mirror_corrected", "conflict", "ambiguous", "dead"
+]
+
+
+@dataclass(frozen=True, slots=True)
+class Mirror:
+    """One recognised mirror -- a checklist line in a document that is also a
+    link to a task. Frozen; produced by scanning (`find_mirrors`), never
+    constructed by a caller.
+
+    `state_offset` is the load-bearing field: it is the character offset of
+    the single state character in the document text, so applying a state is
+    always `text[:o] + char + text[o+1:]` -- no line is ever re-rendered."""
+
+    task_id: str
+    done: bool
+    line: int
+    state_offset: int
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class MirrorResolution:
+    """What was decided for one task during a reconcile pass."""
+
+    task_id: str
+    outcome: MirrorOutcome
+    done: bool | None
+    message: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class MirrorReport:
+    """The result of a reconcile or propagate call.
+
+    `text` is the *same object* as the input when nothing needed correcting,
+    so a caller can test identity to decide whether a write is needed at all
+    (FR-030)."""
+
+    text: str
+    resolutions: tuple[MirrorResolution, ...]
+    warnings: tuple[ScanWarning, ...]
+
+
 @dataclass(frozen=True, slots=True)
 class EditorCommand:
     name: str
     argument: str
     description: str
     requires_argument: bool
+    accepts_suffix: bool = False
 
 
 @dataclass(frozen=True, slots=True)
 class ParsedCommand:
     command: EditorCommand
     argument: str
+    suffix: str = ""
 
 
 @dataclass(frozen=True, slots=True)
