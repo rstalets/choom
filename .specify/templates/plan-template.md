@@ -43,9 +43,15 @@
 Mark each gate PASS / FAIL / N/A with a one-line justification. Any FAIL must appear in
 Complexity Tracking below with a rejected simpler alternative, or the plan does not proceed.
 
+Gate I is **two-way**. "This feature does not change `core`" is not a passing justification — it
+answers the wrong half. Principle I says core *holds all logic*, so the gate asks both whether
+adapter concerns are leaking into core **and** whether logic that belongs in core is being written
+or left in an adapter. Answering it requires reading `core`'s public API for the area you are
+touching, not only the call sites you are editing.
+
 | # | Gate | Status |
 |---|------|--------|
-| I | All logic lands in `choom.core`; no I/O formatting, widget code, or argument parsing there. Core is testable without a terminal. | |
+| I | All logic lands in `choom.core`; no I/O formatting, widget code, or argument parsing there. Core is testable without a terminal. **List the `core` functions this feature's reads and writes go through**, and justify any assembly done in an adapter that an existing `core` function already performs. | |
 | II | Behaviour is reachable from both CLI and TUI (or is inherently interactive/non-interactive). CLI never opens an editor, never blocks on input, never decorates non-TTY stdout. `--json` schema and exit codes are stable. | |
 | III | No new source of truth (index, database, cache). No new external binary dependency. Every new third-party dependency is justified. No new configuration knob that could be a default. Date stays the only axis the directory tree encodes; `type` never becomes a directory. | |
 | IV | Parsers skip malformed input without raising and never lose or truncate a line. Writes preserve `created`, update `updated`, and leave files valid CommonMark. No user file is moved to match its partition, and no tag can be silently dropped. | |

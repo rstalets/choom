@@ -10,9 +10,9 @@ from textual.binding import Binding
 from choom.core.assistants import resolve_assistant
 from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from choom.core.documents import (
-    _read_document,
     list_months,
     match_document,
+    scan_documents,
     scan_month,
     scan_unfiled,
 )
@@ -31,7 +31,14 @@ from choom.core.models import (
     YearMonth,
 )
 from choom.core.notes import NOTES, create_note, open_daily_note
-from choom.core.tasks import add_task, filter_tasks, load_tasks, match_task, set_task_state
+from choom.core.tasks import (
+    add_task,
+    filter_tasks,
+    get_task,
+    load_tasks,
+    match_task,
+    set_task_state,
+)
 
 DOCUMENT_COLLECTIONS: dict[str, Collection] = {"meetings": MEETINGS, "notes": NOTES}
 ScopeSelection = YearMonth | Literal["unfiled"]
@@ -72,28 +79,21 @@ class ChoomApp(App[None]):
         # Tasks: which category the scope pane shows.
         self.task_category: str = "todo"
 
-        self.month_cache: dict[tuple[str, YearMonth], list[Document]] = {}
-        self.month_warnings: dict[tuple[str, YearMonth], list[ScanWarning]] = {}
-        self.unfiled_cache: dict[str, list[Document]] = {}
-        self.unfiled_warnings: dict[str, list[ScanWarning]] = {}
-        self.fully_loaded: set[str] = set()
-
         self.filter_query: str = ""
         self.pre_filter_scope: YearMonth | None = None
-        self.filter_loading: bool = False
 
         self.last_create_error: str | None = None
         self.last_task_error: str | None = None
 
-        self.tasks: list[Task] = []
-        self.task_warnings: list[ScanWarning] = []
+        # Warnings from the most recent `visible_documents()`/`visible_tasks()`
+        # read -- render output, not a source of truth (research R3, data-model
+        # §3.3). Read by `visible_warnings()`; never consulted for anything else.
+        self._last_warnings: list[ScanWarning] = []
 
         for name in DOCUMENT_COLLECTIONS:
             self._reset_scope(name)
 
     def on_mount(self) -> None:
-        self.tasks, self.task_warnings = load_tasks(self.workspace)
-
         from choom.tui.list_screen import ListScreen
 
         self.push_screen(ListScreen())
@@ -108,27 +108,23 @@ class ChoomApp(App[None]):
     def list_scope(self, collection: str) -> MonthListing:
         return list_months(self.workspace, DOCUMENT_COLLECTIONS[collection])
 
+    def collection_descriptor(self, collection: str) -> Collection:
+        """The scan-path descriptor for `collection` -- exposed so `ListScreen`
+        can hydrate a filter pool on a worker thread (research R6) without
+        reaching into this module's private `DOCUMENT_COLLECTIONS` mapping."""
+        return DOCUMENT_COLLECTIONS[collection]
+
     def select_scope(self, collection: str, selection: ScopeSelection) -> None:
         self.scope_selection[collection] = selection
         if isinstance(selection, YearMonth):
             self.month_scope[collection] = selection
 
-    def _ensure_month_loaded(self, collection: str, month: YearMonth) -> None:
-        key = (collection, month)
-        if key in self.month_cache:
-            return
-        documents, warnings = scan_month(self.workspace, DOCUMENT_COLLECTIONS[collection], month)
-        self.month_cache[key] = documents
-        self.month_warnings[key] = warnings
-
-    def _ensure_unfiled_loaded(self, collection: str) -> None:
-        if collection in self.unfiled_cache:
-            return
-        documents, warnings = scan_unfiled(self.workspace, DOCUMENT_COLLECTIONS[collection])
-        self.unfiled_cache[collection] = documents
-        self.unfiled_warnings[collection] = warnings
-
     def visible_documents(self) -> list[Document]:
+        """The documents the active collection's current scope displays, read
+        fresh from disk on every call (010-read-on-load, contract C1/C3). A
+        list load stays scoped to what it displays -- one month, or the
+        unfiled set -- never the whole collection; only a filter reads every
+        month (research R2)."""
         collection = self.active
         if collection == "tasks":
             return []
@@ -136,45 +132,60 @@ class ChoomApp(App[None]):
             return self._filtered_documents(collection)
         selection = self.scope_selection.get(collection, self.month_scope[collection])
         if selection == "unfiled":
-            self._ensure_unfiled_loaded(collection)
-            return list(self.unfiled_cache[collection])
+            documents, self._last_warnings = scan_unfiled(
+                self.workspace, DOCUMENT_COLLECTIONS[collection]
+            )
+            return documents
         month = selection if isinstance(selection, YearMonth) else self.month_scope[collection]
-        self._ensure_month_loaded(collection, month)
-        return list(self.month_cache[(collection, month)])
+        documents, self._last_warnings = scan_month(
+            self.workspace, DOCUMENT_COLLECTIONS[collection], month
+        )
+        return documents
 
     def _filtered_documents(self, collection: str) -> list[Document]:
-        """A filter reads every month of the collection (at most once per session,
-        via the cache) rather than only the displayed one (FR-032, FR-035)."""
-        for month in self.list_scope(collection).months:
-            self._ensure_month_loaded(collection, month)
-        self._ensure_unfiled_loaded(collection)
-        self.fully_loaded.add(collection)
+        """A filter reads every month of the collection plus unfiled (FR-015,
+        FR-017) -- the one read that is not scoped to a single month. This is
+        the fallback path: `ListScreen` normally supplies an already-hydrated
+        pool to `match_documents` directly, from the worker started when the
+        command bar opened (research R6), bypassing this scan entirely for
+        every keystroke after the first. This method still exists for any
+        caller without a hydration session -- direct app use, and the first
+        render before a worker has finished.
 
-        pool: list[Document] = []
-        for month in self.list_scope(collection).months:
-            pool.extend(self.month_cache[(collection, month)])
-        pool.extend(self.unfiled_cache[collection])
+        One `scan_documents` walk, not a `scan_month` per month plus
+        `scan_unfiled`: reading the whole collection is a thing `core` already
+        knows how to do, and it is what the CLI's `scan_meetings`/`scan_notes`
+        call for the same question (Principle I, Principle II). Assembling the
+        same set here from month-scoped pieces re-implemented core in the
+        adapter and cost more -- the loop re-walks the tree once to enumerate
+        months, once per month, and once again for unfiled."""
+        pool, warnings = scan_documents(self.workspace, DOCUMENT_COLLECTIONS[collection])
+        self._last_warnings = warnings
+        return self.match_documents(pool)
 
+    def match_documents(self, pool: list[Document]) -> list[Document]:
+        """Match `pool` against the active filter term and sort it exactly as
+        `_filtered_documents` sorts a fresh scan -- shared so a caller holding
+        an already-hydrated pool (`ListScreen`'s command-bar session) gets
+        identical ordering without re-implementing it."""
         matches = [d for d in pool if match_document(d, self.filter_query)]
         matches.sort(key=lambda d: str(d.path))
         matches.sort(key=lambda d: d.created, reverse=True)
         return matches
 
     def visible_warnings(self) -> list[ScanWarning]:
-        collection = self.active
-        if collection == "tasks":
-            return list(self.task_warnings)
-        if self.filter_query:
-            return []
-        selection = self.scope_selection.get(collection, self.month_scope[collection])
-        if selection == "unfiled":
-            return list(self.unfiled_warnings.get(collection, []))
-        month = selection if isinstance(selection, YearMonth) else self.month_scope[collection]
-        return list(self.month_warnings.get((collection, month), []))
+        """The warnings produced by the read that populated the rows currently
+        on screen -- not a fresh scan of its own (research R3). Only
+        meaningful right after `visible_documents()`/`visible_tasks()` ran;
+        `ListScreen` is the one caller, via `refresh_rows`."""
+        return list(self._last_warnings)
 
     def visible_tasks(self) -> list[Task]:
+        """Every task the active category (and filter, if any) shows, read
+        fresh from `tasks.md` on every call (010-read-on-load, contract C1)."""
+        tasks, self._last_warnings = load_tasks(self.workspace)
         task_filter = TaskFilter(only_done=self.task_category == "done")
-        tasks = filter_tasks(self.tasks, task_filter)
+        tasks = filter_tasks(tasks, task_filter)
         if self.filter_query:
             tasks = [t for t in tasks if match_task(t, self.filter_query)]
         return tasks
@@ -205,68 +216,6 @@ class ChoomApp(App[None]):
             self.task_category = "todo"
         else:
             self._reset_scope(name)
-
-    # --- refresh after a save ---------------------------------------------------
-
-    def reload_tasks(self) -> None:
-        """Re-read tasks.md after a task-body save.
-
-        A body write can shift the line of every task after it, and `load_tasks`
-        is the only code that knows how to recompute the spans a splice just
-        moved -- patching one task in place is not cheaper than re-parsing the
-        one file (research R7). `ListScreen.on_screen_resume` re-selects by id
-        once this returns.
-        """
-        self.tasks, self.task_warnings = load_tasks(self.workspace)
-
-    def refresh_document(self, path: Path) -> None:
-        """Re-parse only the one file that changed, in place -- never rescans the
-        workspace (Principle IV)."""
-        new_document = _read_document(path)
-        for collection in DOCUMENT_COLLECTIONS:
-            if collection == "notes":
-                under = self.workspace.notes_dir
-            else:
-                under = self.workspace.meetings_dir
-            try:
-                path.relative_to(under)
-            except ValueError:
-                continue
-            self._refresh_document_in(collection, path, new_document)
-            return
-
-    def _refresh_document_in(
-        self, collection: str, path: Path, new_document: Document | None
-    ) -> None:
-        month = _month_of(path)
-        if month is None:
-            documents = self.unfiled_cache.get(collection)
-            if documents is None:
-                return
-            index = next((i for i, d in enumerate(documents) if d.path == path), None)
-            if index is None:
-                if new_document is not None:
-                    documents.insert(0, new_document)
-                return
-            if new_document is not None:
-                documents[index] = new_document
-            else:
-                del documents[index]
-            return
-
-        key = (collection, month)
-        documents = self.month_cache.get(key)
-        if documents is None:
-            return
-        index = next((i for i, d in enumerate(documents) if d.path == path), None)
-        if index is None:
-            if new_document is not None:
-                documents.insert(0, new_document)
-            return
-        if new_document is not None:
-            documents[index] = new_document
-        else:
-            del documents[index]
 
     # --- create flows ------------------------------------------------------
 
@@ -303,9 +252,6 @@ class ChoomApp(App[None]):
 
     def _track_created(self, collection: str, document: Document) -> None:
         month = _month_of(document.path) or _current_month()
-        key = (collection, month)
-        self.month_cache.setdefault(key, [])
-        self.month_cache[key].insert(0, document)
         self.active = collection
         self.filter_query = ""
         self.select_scope(collection, month)
@@ -322,7 +268,6 @@ class ChoomApp(App[None]):
             self.last_create_error = str(exc)
             return None
         self.last_create_error = None
-        self.tasks.append(task)
         if self.active == "tasks":
             self.task_category = "todo"
             self.filter_query = ""
@@ -362,17 +307,18 @@ class ChoomApp(App[None]):
         written first and is never reversed by a document failure; a document
         open with unsaved changes is skipped and picked up at the user's next
         save instead (FR-033) -- the screen stack is what knows which those
-        are, so this supplies `skip` rather than core discovering it."""
-        current = next((t for t in self.tasks if t.id == task_id), None)
+        are, so this supplies `skip` rather than core discovering it.
+
+        Reads the task's current state fresh rather than from any retained
+        copy (010-read-on-load, research R8) -- there is nothing to keep in
+        sync with disk, so nothing here can go stale."""
         try:
-            updated = set_task_state(
-                self.workspace, task_id, done=not (current.done if current else False)
-            )
+            current = get_task(self.workspace, task_id)
+            updated = set_task_state(self.workspace, task_id, done=not current.done)
         except ChoomError as exc:
             self.last_task_error = str(exc)
             return
         self.last_task_error = None
-        self.tasks = [updated if t.id == task_id else t for t in self.tasks]
 
         from choom.tui.edit_screen import EditScreen
 
@@ -381,11 +327,6 @@ class ChoomApp(App[None]):
             for screen in self.screen_stack
             if isinstance(screen, EditScreen) and screen.is_dirty
         )
-        written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
-        for path in written:
-            # The splice changed these files on disk; the cached Document behind
-            # each one still holds the old checkbox and would render it stale in
-            # the preview. Re-parse only what actually changed -- never a rescan.
-            self.refresh_document(path)
+        _written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
         if warnings:
             self.last_task_error = "; ".join(w.message for w in warnings)

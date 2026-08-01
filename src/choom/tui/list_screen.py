@@ -3,16 +3,18 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from textual import on
+from textual import on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
+from textual.timer import Timer
 from textual.widgets import Label, ListItem, ListView, Markdown
+from textual.worker import Worker, WorkerCancelled, WorkerFailed
 
-from choom.core.documents import _read_document
+from choom.core.documents import _read_document, scan_documents
 from choom.core.links import resolve_href
-from choom.core.models import Document, LinkTarget, Task, Workspace, YearMonth
+from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
 from choom.tui.command_bar import CommandBar
 from choom.tui.help_screen import HelpScreen
@@ -27,6 +29,32 @@ _EMPTY_STATE = {
     "tasks": "No tasks yet. Press / then 'task <description>' to create one.",
 }
 _CREATE_VERB = {"meetings": "meeting", "notes": "note"}
+
+#: How often a displayed list re-reads on its own (US2, FR-009). Not the
+#: issue's proposed ~10 s: the binding constraint is Textual's main thread,
+#: not the disk -- a scoped month read is a few tens of ms even at 200
+#: documents, so 2 s spends well under 2% of one core. See research.md R5 for
+#: the full frame-budget argument and the trigger to move this read to a
+#: worker thread instead of shortening the interval.
+REFRESH_SECONDS = 2.0
+
+
+def _document_key(documents: list[Document]) -> tuple[tuple[object, ...], ...]:
+    """The change-detection key for a documents read (research R4): a tuple of
+    the fields `DocumentRow._row_text` renders, plus `path` and `updated` so
+    an edit that changes no *rendered* field still counts as a change for the
+    preview pane. Order is part of the key -- a re-sort with identical rows is
+    still a change, since row position is rendered."""
+    return tuple(
+        (d.id, str(d.path), d.title, d.type, d.tags, d.created, d.updated) for d in documents
+    )
+
+
+def _task_key(tasks: list[Task]) -> tuple[tuple[object, ...], ...]:
+    """The change-detection key for a tasks read -- the fields
+    `TaskRow._row_text` renders, plus `done` (which changes the row's markup
+    but not its text)."""
+    return tuple((t.id, t.text, t.type, t.tags, t.done, t.created) for t in tasks)
 
 
 def _empty_state_message(app: object) -> str:
@@ -117,6 +145,23 @@ class ListScreen(Screen[None]):
         self._pending_select_id: str | None = None
         self._preview_links_expanded = False
         self._pending_error: str | None = None
+        #: The warning count from `refresh_rows`'s own read, kept as render
+        #: output so `_render_status` -- called on every command-bar keystroke
+        #: via `ModeChanged` -- never triggers a scan of its own (research R3).
+        self._warning_count = 0
+        #: The change-detection key from the last render (research R4), so the
+        #: periodic refresh tick can tell "nothing changed" without rebuilding.
+        self._last_render_key: tuple[tuple[object, ...], ...] = ()
+        #: Registered in `on_mount`; paused while a preview, editor, help
+        #: screen, or dialog is on top (research R5) so no tick fires while
+        #: this screen is not what the user is looking at.
+        self._refresh_timer: Timer | None = None
+        #: The command-bar session's filter hydration (US3, research R6):
+        #: started in `action_open_command_bar`, awaited by `_on_filter_changed`
+        #: before the first match, dropped in `_on_command_bar_closed`. Its
+        #: lifetime is exactly one bar session (contract C5, plan Complexity
+        #: Tracking) -- never consulted once the bar is closed.
+        self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
@@ -137,12 +182,23 @@ class ListScreen(Screen[None]):
         await self._refresh_scope_pane()
         self.query_one("#meeting-list", ListView).focus()
         await self.refresh_rows()
+        self._refresh_timer = self.set_interval(REFRESH_SECONDS, self._refresh_tick)
+
+    def on_screen_suspend(self) -> None:
+        # A preview, editor, help screen, or dialog is now on top -- no tick
+        # should fire while this screen is not what is displayed (FR-012).
+        if self._refresh_timer is not None:
+            self._refresh_timer.pause()
 
     async def on_screen_resume(self) -> None:
         # Coming back from PreviewScreen/EditScreen: a document may have been
         # created or edited while we were away, and a create moves the active
         # collection/month too -- rebuild everything rather than assume nothing
-        # changed.
+        # changed. Also fires once at the initial push, coincident with
+        # `on_mount`, before `_refresh_timer` exists yet -- `resume()` on an
+        # already-running timer is a harmless no-op either way.
+        if self._refresh_timer is not None:
+            self._refresh_timer.resume()
         self.query_one(CollectionBar).set_active(self.app.active)  # type: ignore[attr-defined]
         await self._refresh_scope_pane()
         await self.refresh_rows(select_id=self._pending_select_id)
@@ -177,9 +233,24 @@ class ListScreen(Screen[None]):
                 select_id = highlighted.record.id
 
         await list_view.clear()
-        items = cast(
-            "list[Document | Task]",
-            app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+        hydrated = self._hydrated_pool()
+        if hydrated is not None:
+            # A command-bar session's already-hydrated read (US3, research
+            # R6): match+sort it directly rather than scanning the collection
+            # again for every keystroke after the first (contract C5).
+            documents, warnings = hydrated
+            items = cast("list[Document | Task]", app.match_documents(documents))  # type: ignore[attr-defined]
+            self._warning_count = len(warnings)
+        else:
+            items = cast(
+                "list[Document | Task]",
+                app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+            )
+            self._warning_count = len(app.visible_warnings())  # type: ignore[attr-defined]
+        self._last_render_key = (
+            _task_key(cast("list[Task]", items))
+            if is_tasks
+            else _document_key(cast("list[Document]", items))
         )
         if not items:
             await list_view.append(ListItem(Label(_empty_state_message(app))))
@@ -196,6 +267,19 @@ class ListScreen(Screen[None]):
             list_view.index = index
         self._update_preview()
         self._render_status()
+
+    def _hydrated_pool(self) -> tuple[list[Document], list[ScanWarning]] | None:
+        """The active command-bar session's hydrated read, if a filter is set
+        and the worker has finished (US3, research R6) -- `None` otherwise,
+        meaning the caller should read fresh through `app.visible_documents()`.
+        Never consulted once the bar has closed (contract C5); the caller
+        drops the worker handle in `_on_command_bar_closed`."""
+        hydration = self._filter_hydration
+        if not self.app.filter_query or hydration is None:  # type: ignore[attr-defined]
+            return None
+        if not hydration.is_finished or hydration.result is None:
+            return None
+        return hydration.result
 
     def _update_preview(self) -> None:
         list_view = self.query_one("#meeting-list", ListView)
@@ -226,10 +310,61 @@ class ListScreen(Screen[None]):
         active = self.app.active  # type: ignore[attr-defined]
         help_text = TASK_LIST_HELP if active == "tasks" else LIST_HELP
         text = f"{collection_indicator(active)}   {help_text}"
-        warnings = len(self.app.visible_warnings())  # type: ignore[attr-defined]
+        warnings = self._warning_count
         if warnings:
             text += f"   {warnings} warning{'s' if warnings != 1 else ''}"
         status.update(text)
+
+    # --- periodic refresh (US2) --------------------------------------------------
+
+    def _refresh_tick_read(
+        self,
+    ) -> tuple[list[Document | Task], bool, tuple[tuple[object, ...], ...]]:
+        """The read step (research R5): identical scope to `refresh_rows`'s own
+        read. Touches no widget -- returns the rows, whether they are tasks,
+        and the comparison key built from them, which is what a worker thread
+        would eventually hand back via `call_from_thread` instead of this
+        being called directly on the main thread."""
+        app = self.app
+        is_tasks = app.active == "tasks"  # type: ignore[attr-defined]
+        items = cast(
+            "list[Document | Task]",
+            app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
+        )
+        key = (
+            _task_key(cast("list[Task]", items))
+            if is_tasks
+            else _document_key(cast("list[Document]", items))
+        )
+        return items, is_tasks, key
+
+    async def _refresh_tick_apply(self, key: tuple[tuple[object, ...], ...]) -> None:
+        """The apply step: re-renders via `refresh_rows` -- the same path
+        every other caller uses -- only when `key` differs from the last
+        render's (FR-010, contract C4). Selection is read fresh right before
+        the render it belongs to and passed through by record id, so a
+        record that moves position stays selected (FR-011)."""
+        if key == self._last_render_key:
+            return
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+        select_id: str | None = None
+        if isinstance(highlighted, DocumentRow):
+            select_id = highlighted.document.id
+        elif isinstance(highlighted, TaskRow):
+            select_id = highlighted.record.id
+        await self.refresh_rows(select_id=select_id)
+
+    async def _refresh_tick(self) -> None:
+        """Runs every `REFRESH_SECONDS` while this screen is displayed and
+        unobstructed (the timer itself is paused otherwise, `on_screen_suspend`/
+        `on_screen_resume`). Does nothing while the command bar is open
+        (FR-013) or a filter is active (FR-012) -- both are point-in-time
+        views that reconcile on their own terms, not the timer's (research R5)."""
+        if self.query_one(CommandBar).display or self.app.filter_query:  # type: ignore[attr-defined]
+            return
+        _items, _is_tasks, key = self._refresh_tick_read()
+        await self._refresh_tick_apply(key)
 
     # --- collection switching (Tab / shift+Tab) --------------------------------
 
@@ -279,6 +414,32 @@ class ListScreen(Screen[None]):
 
     def action_open_command_bar(self) -> None:
         self.query_one(CommandBar).open()
+        # Started here, not from `CommandBar.ModeChanged` -- that message is
+        # posted on every keystroke, so starting the hydration there would
+        # restart the scan per character (research R6). Tasks needs no
+        # hydration: filtering it re-reads one file, not every month.
+        active = self.app.active  # type: ignore[attr-defined]
+        self._filter_hydration = None if active == "tasks" else self._hydrate_filter_pool(active)
+
+    @work(thread=True, exclusive=True, group="filter-hydrate")
+    def _hydrate_filter_pool(self, collection: str) -> tuple[list[Document], list[ScanWarning]]:
+        """Read the whole of `collection` on a worker thread (US3, research
+        R6), so the `/` keypress that opens the command bar never stalls
+        (FR-016). Filesystem work does not belong on the event loop -- the
+        existing worker precedent is `edit_screen.py`'s AI-request thread.
+        `exclusive=True` means a second `/` while one is in flight supersedes
+        it rather than racing it.
+
+        `scan_documents` is one walk of the collection's scan dirs, and is what
+        the CLI already calls to answer this same question (`scan_meetings`,
+        `scan_notes`). The earlier form of this method assembled the same set
+        from `scan_month` per month plus `scan_unfiled`, which re-implemented a
+        core function in the adapter (Principle I) and walked the tree N+2
+        times to core's one -- measurably slower the more months a workspace
+        holds: 1.27x at 1,000 documents over 36 months."""
+        app = self.app
+        descriptor = app.collection_descriptor(collection)  # type: ignore[attr-defined]
+        return scan_documents(app.workspace, descriptor)  # type: ignore[attr-defined]
 
     def action_edit(self) -> None:
         list_view = self.query_one("#meeting-list", ListView)
@@ -448,7 +609,11 @@ class ListScreen(Screen[None]):
 
             document = event.item.document
             self._pending_select_id = document.id
-            self.app.push_screen(PreviewScreen(document.path, document))
+            # Read fresh rather than pass the row's `Document` -- matches
+            # `action_open_preview`/`_open_link_target`, so every path into the
+            # preview shows the file as it is now, not as it was when this row
+            # was rendered (010-read-on-load, research R7, FR-003).
+            self.app.push_screen(PreviewScreen(document.path, _read_document(document.path)))
 
     # --- command bar --------------------------------------------------------
 
@@ -459,6 +624,15 @@ class ListScreen(Screen[None]):
     @on(CommandBar.FilterChanged)
     async def _on_filter_changed(self, message: CommandBar.FilterChanged) -> None:
         self.app.set_filter(message.query)  # type: ignore[attr-defined]
+        if self._filter_hydration is not None:
+            # Waits for the read started when the bar opened, so the first
+            # term matches the whole collection rather than a partial set
+            # (FR-017). A failed or superseded hydration falls back to
+            # `refresh_rows`'s own scan via `_hydrated_pool` returning None.
+            try:
+                await self._filter_hydration.wait()
+            except (WorkerFailed, WorkerCancelled):
+                pass
         await self._refresh_scope_pane()
         await self.refresh_rows(reset_selection=True)
 
@@ -525,6 +699,10 @@ class ListScreen(Screen[None]):
 
     @on(CommandBar.Closed)
     def _on_command_bar_closed(self, message: CommandBar.Closed) -> None:
+        # The snapshot's lifetime is exactly one bar session (FR-019, contract
+        # C5) -- a filter left showing after the bar closes is a point-in-time
+        # answer that reconciles when cleared, not on the next keystroke.
+        self._filter_hydration = None
         self._render_status(error=self._pending_error)
         self._pending_error = None
         self.query_one("#meeting-list", ListView).focus()

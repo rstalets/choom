@@ -99,10 +99,7 @@ def open_editor(app: App[None], path: Path) -> bool:
 
     def _save(text: str) -> SaveResult:
         workspace = app.workspace  # type: ignore[attr-defined]
-        result = save_buffer(file.path, text, file, workspace=workspace)
-        if result.ok:
-            app.refresh_document(file.path)  # type: ignore[attr-defined]
-        return result
+        return save_buffer(file.path, text, file, workspace=workspace)
 
     target = EditTarget(
         text=text,
@@ -156,14 +153,12 @@ def open_task_editor(app: App[None], task: Task) -> None:
             pass
         else:
             body = report.text
-            app.reload_tasks()  # type: ignore[attr-defined]
 
     def _save(text: str) -> SaveResult:
         try:
             set_task_body(workspace, task_id, text)
         except (NotFoundError, UsageError, WorkspaceError) as exc:
             return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
-        app.reload_tasks()  # type: ignore[attr-defined]
         return SaveResult(ok=True, saved_text=text, stamped=False, message="")
 
     target = EditTarget(
@@ -312,14 +307,6 @@ class EditScreen(Screen[None]):
             for m in find_mirrors(result.saved_text, source=self.target.display_path)
         }
 
-        if any(r.outcome in ("task_written", "conflict") for r in mirror_report.resolutions):
-            # Reconciliation just wrote tasks.md behind the app's cached task
-            # list, which would otherwise keep showing the pre-save state until
-            # something else happened to reload it. Every other path that writes
-            # tasks.md already does this; ticking a mirror in a document is a
-            # write to tasks.md too.
-            self.app.reload_tasks()  # type: ignore[attr-defined]
-
         messages = [w.message for w in result.warnings]
         messages.extend(w.message for w in mirror_report.warnings)
         if self.target.stamps_frontmatter and not result.stamped:
@@ -409,7 +396,6 @@ class EditScreen(Screen[None]):
         editor.cursor_location = (line_index, len(line))
         assert task.id is not None
         self._mirror_baseline[task.id] = False
-        self.app.reload_tasks()  # type: ignore[attr-defined]
         self._render_status(None)
 
     def _insert_link(self, parsed: ParsedCommand, line_index: int) -> None:

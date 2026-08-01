@@ -68,23 +68,6 @@ async def test_unticking_and_saving_reopens_the_task(tmp_workspace: Workspace) -
         assert next(t for t in tasks if t.id == task_id).done is False
 
 
-async def test_saving_with_no_mirror_change_writes_nothing_to_tasks_md(
-    tmp_workspace: Workspace,
-) -> None:
-    _seed_mirror(tmp_workspace)
-    tasks_mtime_before = tmp_workspace.tasks_file.stat().st_mtime_ns
-
-    app = ChoomApp(tmp_workspace)
-    async with app.run_test(size=(100, 30)) as pilot:
-        screen = await open_edit(app, pilot)
-        editor = screen.query_one("#editor", TextArea)
-        editor.text = editor.text + "\nan unrelated line\n"
-        await pilot.press("ctrl+o")
-        await pilot.pause()
-
-    assert tmp_workspace.tasks_file.stat().st_mtime_ns == tasks_mtime_before
-
-
 async def test_a_tasks_md_write_does_not_cascade_back_into_the_document(
     tmp_workspace: Workspace,
 ) -> None:
@@ -115,49 +98,14 @@ async def test_a_tasks_md_write_does_not_cascade_back_into_the_document(
         assert meeting_path.stat().st_mtime_ns == mtime_settled
 
 
-async def test_ticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Workspace) -> None:
-    """Regression: reconciliation wrote tasks.md but left the app's cached task
-    list holding the pre-save state, so the Tasks collection went on showing the
-    followup as open until something else happened to reload it. Asserting only
-    `load_tasks` from disk missed this -- the disk was always right."""
-    task_id = _seed_mirror(tmp_workspace)
-
-    app = ChoomApp(tmp_workspace)
-    async with app.run_test(size=(100, 30)) as pilot:
-        screen = await open_edit(app, pilot)
-        editor = screen.query_one("#editor", TextArea)
-        assert next(t for t in app.tasks if t.id == task_id).done is False
-
-        _flip_checkbox(editor, done=True)
-        await pilot.press("ctrl+o")
-        await pilot.pause()
-
-        assert next(t for t in app.tasks if t.id == task_id).done is True
-
-
-async def test_unticking_a_mirror_refreshes_the_apps_task_list(tmp_workspace: Workspace) -> None:
-    task_id = _seed_mirror(tmp_workspace)
-    from choom.core.tasks import set_task_state
-
-    set_task_state(tmp_workspace, task_id, done=True)
-
-    app = ChoomApp(tmp_workspace)
-    async with app.run_test(size=(100, 30)) as pilot:
-        screen = await open_edit(app, pilot)
-        editor = screen.query_one("#editor", TextArea)
-
-        _flip_checkbox(editor, done=False)
-        await pilot.press("ctrl+o")
-        await pilot.pause()
-
-        assert next(t for t in app.tasks if t.id == task_id).done is False
-
-
-async def test_saving_without_touching_a_mirror_does_not_reload_tasks(
+async def test_saving_without_touching_a_mirror_does_not_rewrite_tasks_md(
     tmp_workspace: Workspace,
 ) -> None:
-    """The reload is conditional on reconciliation actually having written
-    tasks.md -- an ordinary save must not pay for a re-parse it does not need."""
+    """Reconciliation only writes tasks.md when it actually found something to
+    correct -- an ordinary save that touches no mirror must leave the mirror
+    file untouched (010-read-on-load removed the `reload_tasks` cache-refresh
+    method this test used to count calls against; the user-visible outcome is
+    that tasks.md itself is not rewritten)."""
     _seed_mirror(tmp_workspace)
 
     app = ChoomApp(tmp_workspace)
@@ -165,17 +113,10 @@ async def test_saving_without_touching_a_mirror_does_not_reload_tasks(
         screen = await open_edit(app, pilot)
         editor = screen.query_one("#editor", TextArea)
 
-        calls: list[int] = []
-        original = app.reload_tasks
-
-        def _counting_reload() -> None:
-            calls.append(1)
-            original()
-
-        app.reload_tasks = _counting_reload  # type: ignore[method-assign]
+        tasks_mtime_before = tmp_workspace.tasks_file.stat().st_mtime_ns
 
         editor.text = editor.text + "\nan unrelated line\n"
         await pilot.press("ctrl+o")
         await pilot.pause()
 
-        assert calls == []
+        assert tmp_workspace.tasks_file.stat().st_mtime_ns == tasks_mtime_before
