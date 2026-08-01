@@ -59,7 +59,7 @@ For each issue, judge two things:
    it and what goes wrong today -- not just a feature name ("add dark mode" is not a problem;
    "the TUI is unreadable on a light terminal, and there's no way to change that" is). If it's a
    restated feature name with no problem underneath, and the problem is inferable from context
-   (related issues, README, REQUIREMENTS.md), draft one sentence stating it. If it truly isn't
+   (related issues, README, docs/REQUIREMENTS.md), draft one sentence stating it. If it truly isn't
    inferable, don't guess -- flag it as an open question instead (Step 5).
 
 2. **Proposed solution is complete and viable.** It describes what would change, roughly how,

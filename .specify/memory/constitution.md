@@ -99,8 +99,8 @@ SYNC IMPACT REPORT
 ==================
 Version change: 1.2.0 → 1.3.0
 Bump rationale: MINOR, covering four amendments in one bump. (1) Two conventions
-are promoted from REQUIREMENTS.md into gated principles (III, IV). (2) Three
-enumerated registries move out to REQUIREMENTS.md, each leaving behind the rule
+are promoted from docs/REQUIREMENTS.md into gated principles (III, IV). (2) Three
+enumerated registries move out to docs/REQUIREMENTS.md, each leaving behind the rule
 that governs it (II, Platform, Development Workflow). (3) Principle II's rationale
 is corrected. (4) Principle VI's changelog mandate is removed. No principle is
 removed or renamed.
@@ -118,7 +118,7 @@ Modified principles:
   - II. Two Interfaces, One Contract — the exit code list (0 success, 1 not found,
     2 usage error, 3 workspace error) is replaced by the rule that exit codes MUST
     be meaningful and stable and that renaming or removing one is breaking; the
-    registry moves to REQUIREMENTS.md. Separately, the rationale no longer opens
+    registry moves to docs/REQUIREMENTS.md. Separately, the rationale no longer opens
     "The CLI is an assistant's only interface". That stopped being true when
     assistants began editing markdown bodies directly, which the shipped
     CLAUDE.md.tmpl already instructs them to do. It now states what the CLI is
@@ -126,7 +126,7 @@ Modified principles:
     where endpaper's conventions have to hold. No rule under II changes.
   - III. Simplicity Is the Default — gains the directory-layout invariant: date is
     the only axis the tree encodes, and `type` is carried in frontmatter and the
-    filename, never as a directory. Stated only in REQUIREMENTS.md until now, and
+    filename, never as a directory. Stated only in docs/REQUIREMENTS.md until now, and
     therefore ungated, while violating it means migrating every user's vault.
   - IV. Never Lose the User's Words — gains two invariants, both previously
     ungated: endpaper never moves a user's file to match its partition, and a tag
@@ -136,12 +136,12 @@ Modified principles:
     PRs, and release notes generated from PRs and closed issues, now carry that
     record; requiring a hand-maintained changelog alongside them duplicates it.
   - Platform & Distribution Constraints — the `AGENTS.md` bullet no longer
-    enumerates what the file carries; that list moves to REQUIREMENTS.md. The
+    enumerates what the file carries; that list moves to docs/REQUIREMENTS.md. The
     content rule and the ~100-line backstop introduced in 1.2.0 are unchanged. The
     enumeration had already drifted: it omitted the link syntax 008 added to the
     shipped template.
   - Development Workflow & Quality Gates — the target-terminal list moves to
-    REQUIREMENTS.md; the rule that TUI changes are verified before release stays.
+    docs/REQUIREMENTS.md; the rule that TUI changes are verified before release stays.
 
 Added sections: none
 Removed sections: none
@@ -165,25 +165,30 @@ Templates requiring updates:
      optional tooling and contradicts nothing
   ✅ README.md — changed in this PR, but for its own reason: it is becoming
      public-facing documentation and now links no internal document. It referenced
-     REQUIREMENTS.md four times and this constitution zero times
+     docs/REQUIREMENTS.md four times and this constitution zero times
 
 Non-template files:
-  ✅ REQUIREMENTS.md — reshaped in this same PR, and NOT retired. Issue #41
+  ✅ docs/REQUIREMENTS.md — reshaped in this same PR, and NOT retired. Issue #41
      proposed deleting it; the outcome instead was to strip the v0.0.1
      bootstrapping (per-feature acceptance criteria, the out-of-scope list, the
      backlog) and keep the design intent and the living conventions. This
      supersedes the 1.2.0 report's statement that the file "is being retired under
      separate work in flight". Its §4.3 cap, deliberately left divergent at
      "roughly 60 lines" for that reason, is restated to match this document.
+     It also moves from the repository root to `docs/`, where it sits alongside
+     the other contributor-facing material. References in this document, in
+     tasks-template.md, and in the product-owner skill are updated; the citations
+     under specs/ are not, for the same reason their section numbers are not —
+     they are point-in-time records, accurate as written.
 
 Follow-up TODOs:
-  - (Resolved) REQUIREMENTS.md's stale "six commands" count — logged during 1.2.0
+  - (Resolved) docs/REQUIREMENTS.md's stale "six commands" count — logged during 1.2.0
     and then withdrawn on the grounds that the file was going away — is fixed here.
   - (Resolved) The "cairn" naming TODO carried from 1.1.0 is withdrawn: README
     names the project "endpaper" throughout, so there is nothing to reconcile.
 
 Note on 1.2.0's AGENTS.md cap arithmetic:
-  - It cited two inputs this PR removes — REQUIREMENTS.md §4.2's promise of `read`,
+  - It cited two inputs this PR removes — docs/REQUIREMENTS.md §4.2's promise of `read`,
     `write`, `append` and `find`, and `workspace list/use/current` from the §6.1
     backlog. The four commands are obsolete, since an assistant edits a markdown
     body directly; the backlog moved to issue #18. The cap is not reopened: it is a
@@ -196,7 +201,7 @@ Migration path:
     Both codify what the codebase and every shipped spec already do; no existing
     layout, spec, or test becomes non-compliant.
   - Amendment 2 (registries): none required. No rule changes, and each list is
-    restated in REQUIREMENTS.md rather than dropped.
+    restated in docs/REQUIREMENTS.md rather than dropped.
   - Amendment 4 (changelog mandate): none required. A relaxation. CHANGELOG.md is
     left in place and untouched; nothing now requires it to be maintained, and
     whether to retire it is tracked separately.
@@ -232,7 +237,7 @@ The CLI serves AI assistants, and that is a hard requirement:
 - `--json` MUST be available on every read command and emit a stable, documented schema.
   Adding a key is a minor change; renaming or removing one is breaking.
 - Data goes to stdout, errors to stderr. Exit codes MUST be meaningful and stable;
-  renaming or removing one is breaking. The registry lives in `REQUIREMENTS.md`.
+  renaming or removing one is breaking. The registry lives in `docs/REQUIREMENTS.md`.
 
 **Rationale**: The CLI is how an assistant creates records and reads structured output —
 the operations where endpaper's conventions have to hold, and the ones it cannot safely
@@ -350,7 +355,7 @@ contributor who sends a second patch.
 - Per-user state (such as the current workspace) MUST live in per-user local state, never
   in the shared workspace directory, so two people sharing a synced folder cannot
   overwrite each other's selection.
-- `AGENTS.md` is generated at `init`. It carries what `REQUIREMENTS.md` lists, and nothing
+- `AGENTS.md` is generated at `init`. It carries what `docs/REQUIREMENTS.md` lists, and nothing
   an assistant could infer from the workspace itself. It does not restate the README. That
   content rule is what binds; roughly 100 lines is its checkable backstop, not a budget to
   be spent. Short, human-curated, genuinely non-obvious guidance is what helps an
@@ -369,7 +374,7 @@ contributor who sends a second patch.
 - Behaviour changes MUST land with the tests that cover them and the documentation that
   describes them, in the same change.
 - TUI changes MUST be verified before release on the target terminals listed in
-  `REQUIREMENTS.md`.
+  `docs/REQUIREMENTS.md`.
 - Anything in a version's explicit out-of-scope list stays out until a spec moves it.
 
 ## Governance
@@ -392,7 +397,7 @@ implementation plan, and pull request review. Reviewers MUST cite the principle 
 when requesting a change on constitutional grounds. Complexity that cannot be justified
 in writing is removed rather than merged.
 
-`REQUIREMENTS.md` holds endpaper's design intent and its living conventions — the
+`docs/REQUIREMENTS.md` holds endpaper's design intent and its living conventions — the
 frontmatter schema, the id scheme, the file layout, the task line format, link semantics,
 the exit code registry, and the target terminals — and is expected to change as features
 ship. `AGENTS.md` in a workspace holds runtime guidance for AI assistants. Neither

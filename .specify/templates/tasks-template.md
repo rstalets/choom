@@ -170,7 +170,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Documentation updates (README, AGENTS.md)
 - [ ] TXXX Code cleanup and refactoring
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Verify TUI on the target terminals listed in REQUIREMENTS.md
+- [ ] TXXX Verify TUI on the target terminals listed in docs/REQUIREMENTS.md
 - [ ] TXXX Verify cross-platform paths: spaces, non-ASCII, Windows length limit
 - [ ] TXXX Run quickstart.md validation
 
