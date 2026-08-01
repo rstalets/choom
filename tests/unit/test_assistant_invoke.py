@@ -110,7 +110,7 @@ def test_copilot_parse_reply_handles_a_single_turn_with_no_tool_call() -> None:
 def test_copilot_parse_reply_ignores_non_message_events_and_bad_json() -> None:
     stdout = "\n".join(
         [
-            'not json at all',
+            "not json at all",
             json.dumps({"type": "session.usage_checkpoint", "data": {}}),
             _copilot_message_event("the actual answer", has_tool_request=False),
         ]
