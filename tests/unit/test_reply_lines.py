@@ -65,3 +65,52 @@ def test_crlf_input_is_normalised_line_by_line() -> None:
 
 def test_empty_text_returns_no_lines() -> None:
     assert parse_reply_lines("") == ()
+
+
+# --- T021: fence tracking (US3) ------------------------------------------------
+
+
+def test_task_line_inside_a_backtick_fence_is_not_eligible() -> None:
+    text = "```\n/task call Terry\n```"
+    lines = parse_reply_lines(text)
+    assert lines[1].task is None
+
+
+def test_task_line_inside_a_tilde_fence_is_not_eligible() -> None:
+    text = "~~~\n/task call Terry\n~~~"
+    lines = parse_reply_lines(text)
+    assert lines[1].task is None
+
+
+def test_fence_with_an_info_string_still_opens_a_fence() -> None:
+    text = "```python\n/task call Terry\n```"
+    lines = parse_reply_lines(text)
+    assert lines[1].task is None
+
+
+def test_a_closing_fence_longer_than_its_opener_still_closes() -> None:
+    text = "```\n/task inside\n````\n/task outside"
+    lines = parse_reply_lines(text)
+    assert lines[1].task is None  # inside the fence
+    assert lines[3].task is not None  # after it closed
+
+
+def test_an_unclosed_fence_makes_everything_after_it_ineligible() -> None:
+    text = "```\nsome code\n/task call Terry\nmore code"
+    lines = parse_reply_lines(text)
+    assert lines[2].task is None
+    assert lines[3].task is None
+
+
+def test_a_four_space_indented_block_needs_no_special_handling() -> None:
+    # Already excluded by the leading-whitespace rule -- no fence involved.
+    text = "    /task call Terry"
+    (line,) = parse_reply_lines(text)
+    assert line.task is None
+
+
+def test_a_task_line_immediately_after_a_closed_fence_is_still_eligible() -> None:
+    text = "```\ncode here\n```\n/task call Terry"
+    lines = parse_reply_lines(text)
+    assert lines[3].task is not None
+    assert lines[3].task.argument == "call Terry"

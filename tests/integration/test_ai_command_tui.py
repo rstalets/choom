@@ -125,6 +125,43 @@ async def test_reply_containing_a_slash_ai_line_is_inserted_as_literal_text(
         assert editor.read_only is False
 
 
+async def test_reply_explaining_the_syntax_captures_nothing(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("reply_explaining")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/ai how do I make a task")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        expected_lines = [
+            "You can ask choom to capture a task by writing a line like this:",
+            "```",
+            "/task call Terry about the renewal",
+            "```",
+            "Just mention /task on its own line and choom does the rest.",
+        ]
+        actual_lines = [
+            editor.get_line(line_index + offset).plain for offset in range(len(expected_lines))
+        ]
+        assert actual_lines == expected_lines
+
+        # init_workspace already creates an empty tasks.md -- unchanged means
+        # still empty, not merely present.
+        assert tmp_workspace.tasks_file.read_text(encoding="utf-8") == ""
+
+        status = screen.query_one(StatusBar)
+        status_text = str(status.content)
+        assert "captured" not in status_text
+        assert EDIT_HELP in status_text
+
+
 async def test_cancel_restores_the_line_and_kills_the_process(
     tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
 ) -> None:

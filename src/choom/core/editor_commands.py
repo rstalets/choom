@@ -1,6 +1,12 @@
 from __future__ import annotations
 
+import re
+
 from choom.core.models import EditorCommand, ParsedCommand, ReplyLine
+
+# CommonMark fence rule: three or more backticks or tildes, after at most three
+# leading spaces, with an optional info string that plays no role here.
+_FENCE_OPEN = re.compile(r"^ {0,3}(?P<char>`{3,}|~{3,})")
 
 EDITOR_COMMANDS: tuple[EditorCommand, ...] = (
     EditorCommand(
@@ -58,22 +64,52 @@ def parse_reply_lines(text: str) -> tuple[ReplyLine, ...]:
     """Classify every line of an assistant reply as prose or an eligible task command.
 
     Returns one `ReplyLine` per line of `text`, in order -- never dropped, merged, or
-    reordered. A line is eligible (`task` is not `None`) when it has no leading
-    whitespace and `parse_line` resolves it to a command named `task`, exactly the
-    editor's own whole-line rule -- this delegates to `parse_line` rather than
-    restating the grammar, so the editor and a reply can never disagree about what a
-    task line is. `/task` with no description is still eligible; a `task` being
-    unusable is `capture_task`'s concern, not this function's.
+    reordered. A line is eligible (`task` is not `None`) when all of these hold: it is
+    not inside a fenced code block, it has no leading whitespace, and `parse_line`
+    resolves it to a command named `task` -- the last two are exactly the editor's own
+    whole-line rule, and this delegates to `parse_line` rather than restating the
+    grammar, so the editor and a reply can never disagree about what a task line is.
+    `/task` with no description is still eligible; a `task` being unusable is
+    `capture_task`'s concern, not this function's.
 
-    Fence tracking (excluding a line inside a fenced code block from eligibility) is
-    not yet implemented here -- see `capture_reply_tasks`'s caller and
-    contracts/reply-capture.md §2; that arrives with US3.
+    A fence opens on a line whose first non-space run (after at most three leading
+    spaces) is three or more backticks or three or more tildes, with or without an
+    info string, and closes on a later line using the same character, at least as
+    long, with no info string (contracts/reply-capture.md §2). A fence that is never
+    closed puts every remaining line inside it -- the safe direction. A four-space
+    indented code block needs no separate handling: the leading-whitespace rule
+    already excludes it.
 
     Pure: no workspace, no filesystem, no clock. Never raises.
     """
     result: list[ReplyLine] = []
+    in_fence = False
+    fence_char = ""
+    fence_len = 0
+
     for line in text.splitlines():
+        match = _FENCE_OPEN.match(line)
+
+        if in_fence:
+            if (
+                match is not None
+                and match.group("char")[0] == fence_char
+                and len(match.group("char")) >= fence_len
+                and line[match.end() :].strip() == ""
+            ):
+                in_fence = False
+            result.append(ReplyLine(text=line, task=None))
+            continue
+
+        if match is not None:
+            in_fence = True
+            fence_char = match.group("char")[0]
+            fence_len = len(match.group("char"))
+            result.append(ReplyLine(text=line, task=None))
+            continue
+
         parsed = parse_line(line)
         task = parsed if parsed is not None and parsed.command.name == "task" else None
         result.append(ReplyLine(text=line, task=task))
+
     return tuple(result)
