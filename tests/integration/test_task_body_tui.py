@@ -5,7 +5,7 @@ from textual.widgets import Markdown, TextArea
 from choom.core.models import Workspace
 from choom.core.tasks import add_task, load_tasks
 from choom.tui.app import ChoomApp
-from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import ListScreen
 from tests.conftest import tasks_file, write_tasks
@@ -152,7 +152,7 @@ async def test_discard_leaves_tasks_file_unchanged(tmp_workspace: Workspace) -> 
 
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DiscardDialog)
+        assert isinstance(app.screen, ConfirmDialog)
 
         dialog = app.screen
         dialog.dismiss(True)

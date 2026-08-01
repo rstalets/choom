@@ -40,7 +40,7 @@ from choom.core.models import (
     Task,
 )
 from choom.core.tasks import parse_tasks, set_task_body
-from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.status_bar import (
     EDIT_HELP,
     StatusBar,
@@ -335,7 +335,12 @@ class EditScreen(Screen[None]):
             else:
                 self.query_one("#editor", TextArea).focus()
 
-        self.app.push_screen(DiscardDialog(), _handle_dismiss)
+        dialog = ConfirmDialog(
+            "You have unsaved changes. Are you sure you want to exit?",
+            cancel_label="Continue Editing",
+            confirm_label="Exit Without Saving",
+        )
+        self.app.push_screen(dialog, _handle_dismiss)
 
     # --- /ai in-editor command --------------------------------------------------
 

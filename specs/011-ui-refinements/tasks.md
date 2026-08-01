@@ -79,19 +79,20 @@ parallel with it.
 **Independent Test**: Edit a document, leave without saving. The dialog is a slim centred bar; `Esc`
 returns with edits intact, `Enter` leaves without saving; no other key does anything.
 
-- [ ] T008 [US1] Rewrite `tests/integration/test_discard_tui.py` against `ConfirmDialog`: assert the two
+- [X] T008 [US1] Rewrite `tests/integration/test_discard_tui.py` against `ConfirmDialog`: assert the two
       key labels, that `escape` cancels and `enter` proceeds, and that an unrelated key is swallowed.
       Must fail first
-- [ ] T009 [P] [US1] Create `src/choom/tui/confirm_dialog.py` with
+- [X] T009 [P] [US1] Create `src/choom/tui/confirm_dialog.py` with
       `ConfirmDialog(ModalScreen[bool])` — question plus two labels, `Label` widgets only, no `Button`,
       bindings `escape` → `dismiss(False)` and `enter` → `dismiss(True)` (contracts/tui-chrome §1)
-- [ ] T010 [US1] Replace `#discard-dialog`, `#discard-buttons`, `#discard-buttons Button`, and
+- [X] T010 [US1] Replace `#discard-dialog`, `#discard-buttons`, `#discard-buttons Button`, and
       `DiscardDialog` rules in `src/choom/tui/app.tcss` with a slim centred `#confirm-dialog`
-- [ ] T011 [US1] Point `src/choom/tui/edit_screen.py` at `ConfirmDialog` with "You have unsaved changes.
+- [X] T011 [US1] Point `src/choom/tui/edit_screen.py` at `ConfirmDialog` with "You have unsaved changes.
       Are you sure you want to exit?" / `(Esc) Continue Editing` / `(Enter) Exit Without Saving`, and
       delete `src/choom/tui/discard_dialog.py`
-- [ ] T012 [P] [US1] Update the remaining `DiscardDialog` references in
+- [X] T012 [P] [US1] Update the remaining `DiscardDialog` references in
       `tests/integration/test_task_body_tui.py` and `tests/integration/test_mirror_propagation.py`
+      (`test_mirror_propagation.py` had no import to update; only a comment mentioning "discard")
 
 **Checkpoint**: One dialog class exists; `grep -r DiscardDialog` returns nothing
 
