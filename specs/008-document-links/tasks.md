@@ -385,9 +385,9 @@ providers and the exact setting each needs.
       JSON schema (FR-054).
 - [X] T060 [P] Update `REQUIREMENTS.md` §3.3 and §4.6 for the task line's `links` field and the link
       format, so the requirements document and the shipped behaviour agree.
-- [ ] T061 Run the full gate: `uv run ruff format --check .`, `uv run ruff check .`,
+- [X] T061 Run the full gate: `uv run ruff format --check .`, `uv run ruff check .`,
       `uv run mypy`, `uv run pytest -q`. Expect the 407 baseline plus this feature's tests, all green.
-- [ ] T062 Walk [quickstart.md](quickstart.md) Scenarios 1–8 by hand against a scratch workspace,
+- [X] T062 Walk [quickstart.md](quickstart.md) Scenarios 1–8 by hand against a scratch workspace,
       including the code-fence non-rewrite check in Scenario 2 — the case that would silently corrupt
       a note explaining link syntax.
 - [ ] T063 Verify the new preview bindings from `src/endpaper/tui/preview_screen.py` on the target
