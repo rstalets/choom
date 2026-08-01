@@ -94,7 +94,9 @@ def test_old_prefix_id_resolves_unchanged(tmp_workspace: Workspace) -> None:
 
 def test_duplicate_ids_resolve_deterministically_with_a_warning(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "first")
-    duplicate_path = tmp_workspace.meetings_dir / "2026" / "07" / "z-duplicate.md"
+    # Beside the real file, not a hardcoded YYYY/MM -- `create_meeting` files by
+    # today's date, so a literal month is only correct until the month turns.
+    duplicate_path = meeting.path.with_name("z-duplicate.md")
     text = meeting.path.read_text(encoding="utf-8")
     duplicate_path.write_text(text, encoding="utf-8")
 

@@ -11,6 +11,7 @@ focused, so typing a 38-character command one key at a time costs ~3.4 seconds.
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from typing import Any
 
 from textual.widgets import Input, TextArea
@@ -106,3 +107,15 @@ async def submit_editor_line(pilot: Any, editor: TextArea, line_text: str) -> in
     await pilot.press("enter")
     await pilot.pause()
     return line_index
+
+
+def in_scope_month(day: int, hour: int = 9) -> datetime:
+    """A datetime inside the month the list scopes to by default.
+
+    The list shows the current month (005), so a fixture pinned to a literal
+    month drops out of the default scope the moment real time moves past it --
+    which is exactly what happened at the 2026-07/08 boundary, breaking tests
+    that had not been touched. Days must be <= 28 to exist in every month.
+    """
+    today = date.today()
+    return datetime(today.year, today.month, day, hour, 0, 0)
