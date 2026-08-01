@@ -138,12 +138,14 @@ omit the flag (exit 2, nothing deleted); run with stdin closed and confirm it ne
 
 **Depends on**: Phase 2. **No dependency on Phase 3** — the CLI never confirms.
 
-- [ ] T018 [US3] Contract tests `tests/contract/test_cli_delete.py` covering every row of
+- [X] T018 [US3] Contract tests `tests/contract/test_cli_delete.py` covering every row of
       contracts/cli-delete.md: exit codes 0/1/2/3, empty stdout on success, messages on stderr, `--force`
       required, wrong-collection refusal, and a stdin-closed non-blocking check. Must fail first
-- [ ] T019 [US3] Add `delete` subparsers with a positional `id` and a required `--force` to the meeting,
-      note, and task parsers in `src/choom/cli/main.py`
-- [ ] T020 [US3] Add `_cmd_meeting_delete`, `_cmd_note_delete`, and `_cmd_task_delete` over
+- [X] T019 [US3] Add `delete` subparsers with a positional `id` and a required `--force` to the meeting,
+      note, and task parsers in `src/choom/cli/main.py`. `--force` is `action="store_true"` (default
+      False) rather than argparse `required=True`, so a missing flag raises our own `UsageError` message
+      ("refusing to delete without --force") instead of argparse's generic usage text (contract row)
+- [X] T020 [US3] Add `_cmd_meeting_delete`, `_cmd_note_delete`, and `_cmd_task_delete` over
       `delete_by_id(..., expect=<kind>)` and route them in `_dispatch` (depends on T019)
 
 **Checkpoint**: Both front-ends delete, through one core function

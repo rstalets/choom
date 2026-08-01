@@ -24,6 +24,7 @@ from choom.cli.output import (
 )
 from choom.core.assistants import resolve_assistant
 from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
+from choom.core.deletion import delete_by_id
 from choom.core.documents import filter_documents
 from choom.core.errors import ChoomError, NotFoundError, UsageError, WorkspaceError
 from choom.core.links import check_links, heal_links, links_for_id, resolve_id
@@ -78,6 +79,14 @@ def _build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--tag", action="append", default=[])
     list_parser.add_argument("--since", help="ISO date, e.g. 2026-07-28; inclusive")
 
+    meeting_delete_parser = meeting_subparsers.add_parser(
+        "delete", help="delete a meeting (contracts/cli-delete.md)"
+    )
+    meeting_delete_parser.add_argument("id")
+    meeting_delete_parser.add_argument(
+        "--force", action="store_true", help="required; deletes without asking"
+    )
+
     note_parser = subparsers.add_parser("note", help="create or list notes")
     note_subparsers = note_parser.add_subparsers(dest="note_command", required=True)
 
@@ -106,6 +115,14 @@ def _build_parser() -> argparse.ArgumentParser:
     note_list_parser.add_argument("--type")
     note_list_parser.add_argument("--tag", action="append", default=[])
     note_list_parser.add_argument("--since", help="ISO date, e.g. 2026-07-28; inclusive")
+
+    note_delete_parser = note_subparsers.add_parser(
+        "delete", help="delete a note (contracts/cli-delete.md)"
+    )
+    note_delete_parser.add_argument("id")
+    note_delete_parser.add_argument(
+        "--force", action="store_true", help="required; deletes without asking"
+    )
 
     task_parser = subparsers.add_parser("task", help="capture, list, and complete tasks")
     task_subparsers = task_parser.add_subparsers(dest="task_command", required=True)
@@ -155,6 +172,14 @@ def _build_parser() -> argparse.ArgumentParser:
     task_undone_parser = task_subparsers.add_parser("undone", help="mark a task incomplete")
     task_undone_parser.add_argument("id")
     task_undone_parser.add_argument("--json", action="store_true")
+
+    task_delete_parser = task_subparsers.add_parser(
+        "delete", help="delete a task (contracts/cli-delete.md)"
+    )
+    task_delete_parser.add_argument("id")
+    task_delete_parser.add_argument(
+        "--force", action="store_true", help="required; deletes without asking"
+    )
 
     config_parser = subparsers.add_parser("config", help="get or set workspace settings")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
@@ -267,6 +292,31 @@ def _cmd_meeting_list(namespace: argparse.Namespace) -> int:
     else:
         print_documents_table(workspace, filtered)
     return 0
+
+
+def _cmd_delete(namespace: argparse.Namespace, *, expect: str) -> int:
+    """Shared body of `meeting delete`/`note delete`/`task delete`
+    (contracts/cli-delete.md): `--force` is a required flag, not a prompt, so
+    there is no interactive branch to reach (Principle II). Success prints
+    nothing to stdout and returns 0; every failure is a `ChoomError` that
+    `main()` already maps to its exit code."""
+    workspace = find_workspace(Path.cwd())
+    if not namespace.force:
+        raise UsageError("refusing to delete without --force")
+    delete_by_id(workspace, namespace.id, expect=expect)
+    return 0
+
+
+def _cmd_meeting_delete(namespace: argparse.Namespace) -> int:
+    return _cmd_delete(namespace, expect="meeting")
+
+
+def _cmd_note_delete(namespace: argparse.Namespace) -> int:
+    return _cmd_delete(namespace, expect="note")
+
+
+def _cmd_task_delete(namespace: argparse.Namespace) -> int:
+    return _cmd_delete(namespace, expect="task")
 
 
 def _cmd_note_today() -> int:
@@ -507,12 +557,16 @@ def _dispatch(namespace: argparse.Namespace) -> int:
     if namespace.command == "meeting":
         if namespace.meeting_command == "new":
             return _cmd_meeting_new(namespace)
+        if namespace.meeting_command == "delete":
+            return _cmd_meeting_delete(namespace)
         return _cmd_meeting_list(namespace)
     if namespace.command == "note":
         if namespace.note_command == "today":
             return _cmd_note_today()
         if namespace.note_command == "new":
             return _cmd_note_new(namespace)
+        if namespace.note_command == "delete":
+            return _cmd_note_delete(namespace)
         return _cmd_note_list(namespace)
     if namespace.command == "task":
         if namespace.task_command == "add":
@@ -523,6 +577,8 @@ def _dispatch(namespace: argparse.Namespace) -> int:
             return _cmd_task_done(namespace)
         if namespace.task_command == "undone":
             return _cmd_task_undone(namespace)
+        if namespace.task_command == "delete":
+            return _cmd_task_delete(namespace)
         return _cmd_task_list(namespace)
     if namespace.command == "config":
         return _cmd_config_assistant(namespace)
