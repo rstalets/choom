@@ -1,6 +1,6 @@
 ---
 name: "release"
-description: "Draft release notes for a version's milestone, then use them to open a PR that folds the shipped user-visible changes into README.md."
+description: "Draft release notes for a version's milestone, then use them (plus any supplied screenshots) to open a PR that folds the shipped user-visible changes into README.md."
 argument-hint: "<version, e.g. v0.0.4 or 0.0.4>"
 metadata:
   author: "choom"
@@ -14,8 +14,8 @@ Two steps, run together, for cutting a release:
 
 1. Draft release notes for the milestone matching the given version -- everything that closed
    under it, written as prose (not a bare list of titles), grouped by theme.
-2. Use that draft to update `README.md`'s user-facing feature summary, and open a PR with the
-   result.
+2. Use that draft, plus any screenshots the user supplies, to update `README.md`'s user-facing
+   feature summary, and open a PR with the result.
 
 This is the "ship" end of the pipeline that starts at `/product-owner` (refine the issue) and
 `/speckit-specify`/`/speckit-plan`/`/speckit-implement` (build it) -- once a milestone's work has
@@ -92,13 +92,42 @@ everything above has landed on `main` yet...").
 - Leave `CHANGELOG.md` alone. It already accrues entries as work lands; this skill's job is
   README's release-facing summary, not the changelog itself.
 
-## Step 4 — Branch, commit, and open the PR
+## Step 4 — Incorporate any supplied screenshots (optional)
+
+The user may attach one or more screenshots to this run, to replace a stale one, add one for a
+feature that doesn't have one yet, or refresh one after a UI change. README's existing images
+live at `docs/screenshots/<kebab-name>.png`, each referenced by exactly one
+`![alt text](docs/screenshots/<name>.png)` line placed right after the prose paragraph describing
+that feature (see the `meetings`/`edit-meeting`/`execute-task`/`research-note` screenshots
+already there for the pattern).
+
+For each supplied image, figure out which of these it is -- from the user's message if they said,
+otherwise by comparing it against what's already in `docs/screenshots/` and what changed this
+release -- and **ask if it's genuinely ambiguous** rather than guessing at intent:
+
+- **Replace**: overwrite the file at its existing path. Leave the README reference line alone
+  unless the alt text no longer matches what the new image shows.
+- **Add**: save it as a new file following the existing kebab-case naming convention, and add a
+  `![...](docs/screenshots/<name>.png)` line after the paragraph for the feature it depicts --
+  matching where this release notes draft says that feature is documented in README.
+- **Refresh** (same feature, re-taken after a visual change): overwrite in place, same as
+  replace.
+
+Write alt text that describes what the image shows, not a restatement of surrounding prose.
+Flag, rather than silently committing, any supplied image that looks unusually large uncompressed
+-- README's existing screenshots are small PNGs, and a multi-MB file bloats the repo.
+
+Screenshots go into the same commit as the `README.md` text changes, so the PR's diff reviews as
+one coherent unit.
+
+## Step 5 — Branch, commit, and open the PR
 
 - Create a branch, e.g. `docs/release-<version>-readme`.
-- Commit the `README.md` changes (and `release-notes-<version>.md` if Step 2 said to keep it).
-- Show the user the `README.md` diff and ask for confirmation before pushing -- this opens a PR
-  visible to everyone watching the repo, and README wording is exactly the kind of thing worth a
-  human glance before it goes out.
+- Commit the `README.md` changes, any `docs/screenshots/` additions or replacements from Step 4,
+  and `release-notes-<version>.md` if Step 2 said to keep it.
+- Show the user the `README.md` diff (and name which screenshots were added/replaced) and ask for
+  confirmation before pushing -- this opens a PR visible to everyone watching the repo, and
+  README wording/images are exactly the kind of thing worth a human glance before they go out.
 - On confirmation: push, then `gh pr create --draft`, following this repo's `CLAUDE.md` --
   no Claude session URL anywhere in the title or description.
 - After opening (and after any later push to it), check `gh pr checks` and troubleshoot
@@ -107,5 +136,5 @@ everything above has landed on `main` yet...").
 
 ## Output
 
-End with: the milestone resolved, the path to the release-notes draft, the PR URL, and its CI
-status at the time of opening.
+End with: the milestone resolved, the path to the release-notes draft, which screenshots were
+added/replaced (if any), the PR URL, and its CI status at the time of opening.
