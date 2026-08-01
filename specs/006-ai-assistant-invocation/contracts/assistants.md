@@ -16,7 +16,7 @@ The two assistants FR-019 requires, and nothing else:
 | `name` | `display_name` | `binary` | Arguments |
 |---|---|---|---|
 | `claude` | Claude Code CLI | `claude` | `["-p", <prompt>, "--allowedTools", "Read"]` |
-| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", <prompt>, "--allow-tool", "read", "-s"]` |
+| `copilot` | GitHub Copilot CLI | `copilot` | `["-p", <prompt>, "--allow-tool", "read", "--output-format", "json"]` |
 
 Both assistants document `-p` as their non-interactive mode, printing the reply to stdout and
 exiting non-zero on failure ([research.md](./research.md) R2). That they agree on the shape is

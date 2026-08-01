@@ -1,11 +1,12 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
 from pathlib import Path
 
 import pytest
 
-from choom.core.assistants import PROFILES, compose_prompt, start_request
+from choom.core.assistants import PROFILES, _copilot_parse_reply, compose_prompt, start_request
 
 _CLAUDE = next(p for p in PROFILES if p.name == "claude")
 
@@ -85,7 +86,41 @@ def test_claude_build_args_grants_read_only_permission() -> None:
 def test_copilot_build_args_grants_read_only_permission() -> None:
     copilot = next(p for p in PROFILES if p.name == "copilot")
     args = copilot.build_args("a prompt")
-    assert args == ["-p", "a prompt", "--allow-tool", "read", "-s"]
+    assert args == ["-p", "a prompt", "--allow-tool", "read", "--output-format", "json"]
+
+
+def _copilot_message_event(content: str, *, has_tool_request: bool) -> str:
+    tool_requests = [{"name": "view"}] if has_tool_request else []
+    return json.dumps(
+        {"type": "assistant.message", "data": {"content": content, "toolRequests": tool_requests}}
+    )
+
+
+def test_copilot_parse_reply_returns_the_final_turn_and_drops_narration() -> None:
+    narration = _copilot_message_event("I'll read the file to check.", has_tool_request=True)
+    final = _copilot_message_event("the actual answer", has_tool_request=False)
+    assert _copilot_parse_reply(f"{narration}\n{final}") == "the actual answer"
+
+
+def test_copilot_parse_reply_handles_a_single_turn_with_no_tool_call() -> None:
+    stdout = _copilot_message_event("PONG", has_tool_request=False)
+    assert _copilot_parse_reply(stdout) == "PONG"
+
+
+def test_copilot_parse_reply_ignores_non_message_events_and_bad_json() -> None:
+    stdout = "\n".join(
+        [
+            'not json at all',
+            json.dumps({"type": "session.usage_checkpoint", "data": {}}),
+            _copilot_message_event("the actual answer", has_tool_request=False),
+        ]
+    )
+    assert _copilot_parse_reply(stdout) == "the actual answer"
+
+
+def test_copilot_parse_reply_is_empty_when_no_final_turn_is_present() -> None:
+    stdout = _copilot_message_event("I'll read the file first.", has_tool_request=True)
+    assert _copilot_parse_reply(stdout) == ""
 
 
 def test_echo_mode_shows_the_permission_flag_reached_argv(
