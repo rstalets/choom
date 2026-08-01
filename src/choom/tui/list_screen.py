@@ -3,20 +3,31 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from textual import on, work
+from textual import events, on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
+from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.timer import Timer
-from textual.widgets import Label, ListItem, ListView, Markdown
+from textual.widgets import Label, ListItem, ListView, Markdown, Static
 from textual.worker import Worker, WorkerCancelled, WorkerFailed
 
+from choom.core.deletion import delete_by_id
 from choom.core.documents import _read_document, scan_documents
+from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
+from choom.tui.columns import (
+    TASK_LEAD,
+    ColumnLayout,
+    column_widths,
+    render_header,
+    render_row,
+)
 from choom.tui.command_bar import CommandBar
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.help_screen import HelpScreen
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
@@ -78,8 +89,8 @@ def _empty_state_message(app: object) -> str:
 
 
 class DocumentRow(ListItem):
-    def __init__(self, document: Document) -> None:
-        super().__init__(Label(self._row_text(document)))
+    def __init__(self, document: Document, layout: ColumnLayout) -> None:
+        super().__init__(Label(self._row_text(document, layout)))
         self.document = document
 
     @property
@@ -88,38 +99,48 @@ class DocumentRow(ListItem):
         return self.document
 
     @staticmethod
-    def _row_text(document: Document) -> str:
-        parts = [document.created[:10]]
-        if document.type:
-            parts.append(document.type)
-        parts.append(document.title)
-        if document.tags:
-            parts.append(",".join(document.tags))
-        return "  ".join(parts)
+    def _row_text(document: Document, layout: ColumnLayout) -> str:
+        cells = (document.created[:10], document.type, document.title, ",".join(document.tags))
+        return render_row(cells, layout)
+
+    def update_layout(self, layout: ColumnLayout) -> None:
+        """Re-render this row's text for a new column layout (a resize),
+        without re-reading anything -- `self.document` is already in hand."""
+        self.query_one(Label).update(self._row_text(self.document, layout))
 
 
 MeetingRow = DocumentRow  # alias, feature 001 compatibility
 
 
 class TaskRow(ListItem):
-    def __init__(self, task: Task) -> None:
-        text = self._row_text(task)
-        if task.done:
-            text = f"[strike]{text}[/strike]"
-        super().__init__(Label(text))
+    def __init__(self, task: Task, layout: ColumnLayout) -> None:
+        super().__init__(Label(self._row_text(task, layout)))
         self.record = task
 
     @staticmethod
-    def _row_text(task: Task) -> str:
-        parts = ["[x]" if task.done else "[ ]"]
-        if task.created:
-            parts.append(task.created.isoformat())
-        if task.type:
-            parts.append(task.type)
-        parts.append(task.text)
-        if task.tags:
-            parts.append(",".join(task.tags))
-        return "  ".join(parts)
+    def _row_text(task: Task, layout: ColumnLayout) -> str:
+        # The done marker sits outside the four labelled columns (spec
+        # Assumptions): the four columns mean the same four fields in every
+        # collection, and folding the marker into the date column would make
+        # that column mean two different things depending on the collection.
+        # The brackets are escaped (`\[` not `[`) because Label content is
+        # parsed as Rich console markup: an unescaped "[x]" opens a style tag
+        # named "x" that Rich silently drops from the rendered text, which
+        # would make the done marker invisible on every completed task.
+        marker = "\\[x]" if task.done else "\\[ ]"  # 3 visible chars + the space below = TASK_LEAD
+        cells = (
+            task.created.isoformat() if task.created else "",
+            task.type,
+            task.text,
+            ",".join(task.tags),
+        )
+        text = f"{marker} {render_row(cells, layout)}"
+        return f"[strike]{text}[/strike]" if task.done else text
+
+    def update_layout(self, layout: ColumnLayout) -> None:
+        """Re-render this row's text for a new column layout (a resize),
+        without re-reading anything -- `self.record` is already in hand."""
+        self.query_one(Label).update(self._row_text(self.record, layout))
 
 
 class ListScreen(Screen[None]):
@@ -137,6 +158,7 @@ class ListScreen(Screen[None]):
         Binding("e", "edit", "Edit", show=True),
         Binding("b", "toggle_preview_links", "Backlinks", show=True),
         Binding("space", "toggle_task", "Toggle", show=True),
+        Binding("ctrl+d", "delete", "Delete", show=True),
         Binding("/", "open_command_bar", "Filter/command", show=True),
     ]
 
@@ -164,10 +186,15 @@ class ListScreen(Screen[None]):
         self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
 
     def compose(self) -> ComposeResult:
-        yield CollectionBar(self.app.active, id="collection-bar")  # type: ignore[attr-defined]
+        yield CollectionBar(
+            self.app.active,  # type: ignore[attr-defined]
+            str(self.app.workspace.root),  # type: ignore[attr-defined]
+            id="collection-bar",
+        )
         with Horizontal(id="body"):
             yield ScopePane(id="scope-pane")
             with Vertical(id="list-pane"):
+                yield Static(id="list-header")
                 yield ListView(id="meeting-list")
             with Vertical(id="preview-pane"):
                 yield Markdown(id="preview", open_links=False)
@@ -190,6 +217,34 @@ class ListScreen(Screen[None]):
         if self._refresh_timer is not None:
             self._refresh_timer.pause()
 
+    def on_resize(self, event: events.Resize) -> None:
+        # Column widths are a pure function of the pane's width (research
+        # R8) -- re-render the header and every already-rendered row's text
+        # in place, with no disk read, rather than re-running the whole
+        # refresh (US5).
+        self._rerender_columns()
+
+    def _column_layout(self) -> ColumnLayout:
+        # Tasks reserve room ahead of the first column for the done marker, which
+        # sits outside the four columns (spec Assumptions). Without the lead the
+        # header would sit `TASK_LEAD` characters left of the cells it names, and
+        # a task row would render `TASK_LEAD` characters wider than the pane.
+        lead = TASK_LEAD if self.app.active == "tasks" else 0  # type: ignore[attr-defined]
+        return column_widths(self.query_one("#meeting-list", ListView).size.width, lead=lead)
+
+    def _rerender_columns(self) -> None:
+        layout = self._column_layout()
+        try:
+            self.query_one("#list-header", Static).update(render_header(layout))
+        except NoMatches:
+            return  # not yet mounted
+        for row in self.query_one("#meeting-list", ListView).children:
+            if isinstance(row, DocumentRow | TaskRow):
+                try:
+                    row.update_layout(layout)
+                except NoMatches:
+                    continue  # this row's Label has not finished mounting yet
+
     async def on_screen_resume(self) -> None:
         # Coming back from PreviewScreen/EditScreen: a document may have been
         # created or edited while we were away, and a create moves the active
@@ -203,6 +258,12 @@ class ListScreen(Screen[None]):
         await self._refresh_scope_pane()
         await self.refresh_rows(select_id=self._pending_select_id)
         self._pending_select_id = None
+        # A delete's outcome (research above `_delete_record`): rendered here,
+        # after this resume's own refresh, so it is not the thing that gets
+        # overwritten by it.
+        if self._pending_error is not None:
+            self._render_status(error=self._pending_error)
+            self._pending_error = None
 
     async def _refresh_scope_pane(self) -> None:
         scope_pane = self.query_one(ScopePane)
@@ -232,6 +293,9 @@ class ListScreen(Screen[None]):
             elif isinstance(highlighted, TaskRow):
                 select_id = highlighted.record.id
 
+        layout = self._column_layout()
+        self.query_one("#list-header", Static).update(render_header(layout))
+
         await list_view.clear()
         hydrated = self._hydrated_pool()
         if hydrated is not None:
@@ -256,7 +320,10 @@ class ListScreen(Screen[None]):
             await list_view.append(ListItem(Label(_empty_state_message(app))))
             list_view.index = 0
         else:
-            rows = [TaskRow(item) if is_tasks else DocumentRow(item) for item in items]  # type: ignore[arg-type]
+            rows = [
+                TaskRow(item, layout) if is_tasks else DocumentRow(item, layout)  # type: ignore[arg-type]
+                for item in items
+            ]
             await list_view.extend(rows)
             index = 0
             if select_id is not None:
@@ -369,7 +436,7 @@ class ListScreen(Screen[None]):
     # --- collection switching (Tab / shift+Tab) --------------------------------
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
-        if action in ("next_collection", "previous_collection"):
+        if action in ("next_collection", "previous_collection", "delete"):
             return not self.query_one(CommandBar).display
         return True
 
@@ -476,6 +543,88 @@ class ListScreen(Screen[None]):
         await self.refresh_rows(select_id=task_id)
         if error:
             self._render_status(error=error)
+
+    # --- delete (ctrl+d, US2) ----------------------------------------------------
+
+    async def action_delete(self) -> None:
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+
+        record_id: str | None
+        title: str
+        if isinstance(highlighted, DocumentRow):
+            record_id = highlighted.document.id
+            title = highlighted.document.title
+        elif isinstance(highlighted, TaskRow):
+            record_id = highlighted.record.id
+            title = highlighted.record.text
+        else:
+            return  # no record highlighted -- the empty-state row, or nothing (FR-014)
+        if record_id is None:
+            return
+
+        # Captured now, acted on when the dialog returns (FR-010, research
+        # R11) -- a background re-read cannot redirect the delete onto a
+        # different record, whether or not it can even run while the dialog
+        # (a ModalScreen) suspends this one.
+        captured_id = record_id
+        dialog = ConfirmDialog(
+            f'Delete "{title}"? This cannot be undone.',
+            cancel_label="Keep It",
+            confirm_label="Delete",
+        )
+
+        async def _handle_dismiss(confirmed: bool | None) -> None:
+            if confirmed:
+                await self._delete_record(captured_id)
+
+        self.app.push_screen(dialog, _handle_dismiss)
+
+    async def _delete_record(self, record_id: str) -> None:
+        """Delete `record_id` and arrange for the next `on_screen_resume` --
+        which fires as soon as `ConfirmDialog` finishes popping itself off the
+        screen stack -- to render the outcome.
+
+        Deliberately does *not* call `refresh_rows`/`_render_status` directly:
+        popping the dialog always triggers `on_screen_resume`'s own refresh on
+        this screen, and a second, independent refresh from here would race
+        it -- whichever finished last would silently overwrite the other's
+        status text. Setting `_pending_select_id`/`_pending_error` here and
+        letting `on_screen_resume` be the one place that renders keeps there
+        being exactly one refresh for this whole gesture.
+        """
+        workspace: Workspace = self.app.workspace  # type: ignore[attr-defined]
+        list_view = self.query_one("#meeting-list", ListView)
+        ids_in_order = [
+            row_id
+            for row in list_view.children
+            if isinstance(row, DocumentRow | TaskRow)
+            and (row_id := (row.document.id if isinstance(row, DocumentRow) else row.record.id))
+            is not None
+        ]
+
+        try:
+            delete_by_id(workspace, record_id)
+        except (NotFoundError, UsageError, WorkspaceError) as exc:
+            self._pending_error = str(exc)
+            return
+
+        self._pending_select_id = self._next_highlight_id(ids_in_order, record_id)
+
+    @staticmethod
+    def _next_highlight_id(ids_in_order: list[str], deleted_id: str) -> str | None:
+        """Which record should be highlighted once `deleted_id` is gone from a
+        list rendered in `ids_in_order`: the next record, or the previous one
+        when the deleted record was last, or `None` when it was the only one
+        (FR-011, FR-012)."""
+        try:
+            index = ids_in_order.index(deleted_id)
+        except ValueError:
+            return None
+        remaining = ids_in_order[:index] + ids_in_order[index + 1 :]
+        if not remaining:
+            return None
+        return remaining[index] if index < len(remaining) else remaining[-1]
 
     # --- scope pane interaction --------------------------------------------------
 

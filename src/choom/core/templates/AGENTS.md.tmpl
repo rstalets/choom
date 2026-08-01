@@ -67,8 +67,11 @@ choom links <id> [--json] [--direction out|in|both]     # what it points at / is
 choom links check [<path>...] [--json]                  # report stale/dead links
 choom links heal  [<path>...] [--json] [--dry-run]      # repair stale links; dead ones untouched
 choom config assistant [<value>] [--json]               # get/set the /ai assistant
+choom meeting delete <id> --force                       # choom note delete <id> --force
+choom task delete <id> --force                          # removes the task's line and its whole body
 ```
 
 `--tag` and `--link` are repeatable; an unquoted `#tag` is eaten by the shell, so use `--tag`.
 `task done`/`undone --json` add `documents_updated` and `warnings` for mirrors it spliced or could not.
+`delete` requires `--force` and never prompts; without it nothing is deleted. There is no undo.
 Exit codes: `0` success · `1` not found · `2` usage error · `3` workspace error; diagnostics to stderr, data to stdout, never interleaved.

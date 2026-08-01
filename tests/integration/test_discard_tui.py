@@ -5,7 +5,7 @@ from textual.widgets import TextArea
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
-from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditScreen
 from choom.tui.preview_screen import PreviewScreen
 from tests.helpers import open_edit
@@ -28,11 +28,34 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
         await pilot.press("escape")
         await pilot.pause()
 
-        assert isinstance(app.screen, DiscardDialog)
+        assert isinstance(app.screen, ConfirmDialog)
         assert path.read_bytes() == before_bytes
 
 
-async def test_cancel_returns_with_buffer_and_cursor_intact(tmp_workspace: Workspace) -> None:
+async def test_dialog_is_a_slim_bar_with_two_named_keys(tmp_workspace: Workspace) -> None:
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        edit_screen = await open_edit(app, pilot)
+        editor = edit_screen.query_one("#editor", TextArea)
+        editor.text = editor.text + "unsaved change"
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmDialog)
+        rendered = "\n".join(str(w.render()) for w in app.screen.query("Label"))
+        assert "(Esc) Continue Editing" in rendered
+        assert "(Enter) Exit Without Saving" in rendered
+        # No bare OK/Yes/No/Cancel (SC-006), and no focusable child to move a
+        # highlight between (FR-022) -- the only widgets are Labels.
+        assert not app.screen.query("Button")
+
+
+async def test_esc_cancels_and_returns_with_buffer_and_cursor_intact(
+    tmp_workspace: Workspace,
+) -> None:
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
     app = ChoomApp(tmp_workspace)
@@ -45,10 +68,9 @@ async def test_cancel_returns_with_buffer_and_cursor_intact(tmp_workspace: Works
 
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DiscardDialog)
+        assert isinstance(app.screen, ConfirmDialog)
 
-        await pilot.press("tab")  # move focus to Cancel (Discard, Cancel order)
-        await pilot.press("enter")
+        await pilot.press("escape")
         await pilot.pause()
 
         assert isinstance(app.screen, EditScreen)
@@ -57,7 +79,7 @@ async def test_cancel_returns_with_buffer_and_cursor_intact(tmp_workspace: Works
         assert editor.cursor_location == (0, 2)
 
 
-async def test_discard_leaves_file_byte_identical(tmp_workspace: Workspace) -> None:
+async def test_enter_proceeds_and_leaves_file_byte_identical(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     before_bytes = meeting.path.read_bytes()
 
@@ -69,14 +91,36 @@ async def test_discard_leaves_file_byte_identical(tmp_workspace: Workspace) -> N
 
         await pilot.press("escape")
         await pilot.pause()
-        assert isinstance(app.screen, DiscardDialog)
+        assert isinstance(app.screen, ConfirmDialog)
 
-        dialog = app.screen
-        dialog.dismiss(True)
+        await pilot.press("enter")
         await pilot.pause()
 
         assert isinstance(app.screen, PreviewScreen)
         assert meeting.path.read_bytes() == before_bytes
+
+
+async def test_unrelated_key_is_swallowed_and_dialog_stays_up(tmp_workspace: Workspace) -> None:
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        edit_screen = await open_edit(app, pilot)
+        editor = edit_screen.query_one("#editor", TextArea)
+        editor.text = editor.text + "unsaved change"
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmDialog)
+
+        # A key that would mean something on the screen underneath (e.g. "e"
+        # for edit, "j" for cursor-down) must not fall through.
+        await pilot.press("j")
+        await pilot.press("e")
+        await pilot.press("x")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmDialog)
 
 
 async def test_no_changes_means_no_dialog(tmp_workspace: Workspace) -> None:
