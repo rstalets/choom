@@ -88,9 +88,10 @@ the complete benefit on its own.
 
 Someone has choom and exactly one assistant installed. They have never run `config assistant`,
 because they never had a reason to — `/ai` already works, since choom picks the only assistant on
-the machine on its own. They open choom. It asks, once: an assistant was found, may choom tell it
-where this workspace is? They answer yes, and the pointer is installed without them learning that a
-command existed. Had they answered no, they would never be asked again.
+the machine on its own. They open choom. It asks, once, in the same slim confirmation bar the tool
+already uses everywhere else: an assistant was found, may choom tell it where this workspace is?
+`Enter` installs the pointer, without them ever learning a command existed. `Esc` declines. Either
+way the question has now been asked, and it is never asked again.
 
 **Why this priority**: US1 gives the pointer to users who type a command. This story gives it to
 everyone else — the users who never had to name their assistant because choom named it for them,
@@ -100,40 +101,49 @@ by a command the user has no reason to run is a feature most users never get.
 
 **Why it is a question and not an automatic install**: choom would be writing into the user's own
 profile directory, outside the workspace, for a program choom does not own. That is not a default to
-assume on someone's behalf. The constitution warns that confirmations which guard nothing teach
-users to dismiss them reflexively (Principle V); the protection here is that this one is asked at
-most once and the answer is durable in both directions, so it can never become the dialog a user
-learns to swat away.
+assume on someone's behalf.
+
+**Why it is asked at most once, whichever key is pressed**: the tool's shared confirmation offers
+exactly two options and requires `Esc` to change nothing about the request it interrupted. That
+leaves no room for a third "ask me later" outcome, and inventing one would mean either a second
+dialog style or an `Esc` whose meaning depends on which question is on screen. Recording that the
+offer was *made* — rather than recording the answer — resolves it: pressing `Esc` installs nothing
+and has no consequence the user did not see on screen, and neither key leads to being asked twice.
+The cost is that an `Esc` pressed by accident is not re-offered; the set command is the way back,
+and the dialog says so.
 
 **Independent Test**: In a workspace with no assistant configured and exactly one assistant
-installed, start choom and confirm the offer appears; answer no, restart, and confirm silence;
-in a second workspace answer yes and confirm the pointer is installed.
+installed, start choom and confirm the offer appears; press `Esc`, restart, and confirm silence;
+in a second workspace press `Enter` and confirm the pointer is installed.
 
 **Acceptance Scenarios**:
 
 1. **Given** a workspace with no assistant configured, exactly one assistant installed on the
    machine, and no discovery file for it, **When** choom starts, **Then** the user is asked whether
    to install the discovery file, and the question names the assistant and the workspace.
-2. **Given** that question, **When** the user answers yes, **Then** the discovery file is installed
-   for that assistant pointing at that workspace, the assistant is recorded as the workspace's
-   setting, and the outcome is reported.
-3. **Given** that question, **When** the user answers no, **Then** nothing is installed, the refusal
-   is recorded in the workspace's configuration, and choom continues to start normally.
-4. **Given** the user has answered no, **When** choom starts again in that workspace — on that
-   launch or any later one — **Then** the question is not asked again.
-5. **Given** that question, **When** the user dismisses it without answering — by closing it, or by
-   quitting choom — **Then** nothing is installed and nothing is recorded, and the question may be
-   asked again on the next launch.
-6. **Given** a discovery file is already installed for the assistant choom would use, **When** choom
+2. **Given** that question, **When** it is displayed, **Then** it is the same confirmation surface
+   the rest of the tool uses — a slim, centred, single-question bar with exactly two options, each
+   labelled with its key and the outcome that key produces — and it consumes every keystroke while
+   it is up.
+3. **Given** that question, **When** the user presses `Enter`, **Then** the discovery file is
+   installed for that assistant pointing at that workspace, the assistant is recorded as the
+   workspace's setting, and the outcome is reported.
+4. **Given** that question, **When** the user presses `Esc`, **Then** nothing is installed, nothing
+   is written into the user's profile, and choom continues to start normally.
+5. **Given** the question has been shown and answered either way, **When** choom starts again in
+   that workspace — on that launch or any later one — **Then** the question is not asked again.
+6. **Given** the question is shown but choom exits before it is answered, **When** choom starts
+   again, **Then** the question is asked again, because it was never answered.
+7. **Given** a discovery file is already installed for the assistant choom would use, **When** choom
    starts, **Then** no question is asked.
-7. **Given** two or more assistants are installed and none is configured, **When** choom starts,
+8. **Given** two or more assistants are installed and none is configured, **When** choom starts,
    **Then** no question is asked, because choom does not know which assistant the user means.
-8. **Given** the assistant is configured as `none`, **When** choom starts, **Then** no question is
+9. **Given** the assistant is configured as `none`, **When** choom starts, **Then** no question is
    asked — an explicit opt-out is never re-litigated at launch.
-9. **Given** the user has previously answered no, **When** they later run the set command naming an
-   assistant, **Then** the file is installed and the recorded refusal is cleared, because an
-   explicit request outranks an earlier declined offer.
-10. **Given** the question is showing, **When** the user answers either way, **Then** it takes one
+10. **Given** the user declined the offer, **When** they later run the set command naming an
+    assistant, **Then** the file is installed and the record of the offer is cleared, because an
+    explicit request outranks an earlier declined offer.
+11. **Given** the question is showing, **When** the user answers either way, **Then** it takes one
     keystroke and choom is fully usable immediately afterwards.
 
 ---
@@ -258,22 +268,26 @@ discovery file exists and points at the new workspace.
   path must still stay inside the Windows limit.
 - **Repeat runs with nothing changed.** Running the same command twice leaves the same single file
   with the same content; there is no accumulation and no second copy.
-- **The launch offer is dismissed rather than answered.** Closing the question, or quitting choom
-  while it is up, is not an answer: nothing is installed, nothing is recorded, and the question is
-  asked again next launch. Only an explicit no is durable.
-- **The install fails after the user says yes.** The refusal is not recorded — the user did not
-  refuse — so the offer stands for the next launch, and the failure is reported like any other.
+- **choom exits while the question is still up.** Quitting or killing the app before answering is
+  not an answer: nothing is installed, nothing is recorded, and the question is asked again next
+  launch.
+- **`Esc` pressed by accident.** It is not re-offered — the shared confirmation has two options and
+  no third "ask me later", so the record covers both answers. The set command installs the file at
+  any time, and the question says so before it is answered.
+- **The install fails after the user presses `Enter`.** The offer is still recorded as made, so a
+  machine whose profile directory is permanently unwritable does not raise the same question at
+  every launch. The failure is reported like any other, and the set command remains the retry.
 - **The user declines, then changes their mind.** Running the set command installs the file and
-  clears the recorded refusal. There is no state a user can get into where the explicit command is
-  refused because of an earlier answer at launch.
-- **The user declines, then removes the assistant and installs a different one.** The recorded
-  refusal covers the workspace, not one assistant, so they are not asked again. Naming the new
-  assistant with the set command still installs the pointer.
+  clears the record of the offer. There is no state a user can get into where the explicit command
+  is refused because of an earlier answer at launch.
+- **The user declines, then removes the assistant and installs a different one.** The record covers
+  the workspace, not one assistant, so they are not asked again. Naming the new assistant with the
+  set command still installs the pointer.
 - **An assistant is installed after choom has been used for a while.** A workspace that previously
   resolved to no assistant starts resolving to one; the offer appears at the next launch, since it
   is the first launch at which there is anything to offer.
-- **A second person opens the same synced workspace.** The refusal is recorded in the workspace, so
-  a colleague sharing the folder inherits it and is not asked. What they lose is a question, not a
+- **A second person opens the same synced workspace.** The record lives in the workspace, so a
+  colleague sharing the folder inherits it and is not asked. What they lose is a question, not a
   setting — their own discovery file, if they want one, is still one command away.
 - **The launch check runs where there is nothing to check.** No assistant installed, an unreadable
   configuration, or a workspace whose configuration cannot be written: choom starts normally and
@@ -337,22 +351,25 @@ discovery file exists and points at the new workspace.
 - **FR-021**: Rejected values MUST behave as they do today — the setting is unchanged, and no
   discovery file is written or removed.
 - **FR-022**: When choom starts in a workspace where an assistant will be used but no discovery file
-  is installed for it, and no refusal has been recorded, the user MUST be asked whether to install
-  one. "Will be used" covers both the assistant choom selects on its own — nothing configured,
+  is installed for it, and the offer has not already been made, the user MUST be asked whether to
+  install one. "Will be used" covers both the assistant choom selects on its own — nothing configured,
   exactly one installed on the machine — and an assistant explicitly configured whose file is
   missing.
 - **FR-023**: The question MUST name the assistant it would tell and the workspace it would point
   at, so the user is not agreeing to an unnamed action.
-- **FR-024**: Answering yes MUST install the discovery file exactly as the set command does, record
-  that assistant as the workspace's setting, and report the outcome.
-- **FR-025**: Answering no MUST install nothing and MUST record the refusal in the workspace's
-  configuration, in a form that survives restarts.
-- **FR-026**: A recorded refusal MUST suppress the question on every subsequent launch of that
-  workspace.
-- **FR-027**: Dismissing the question without answering MUST record nothing and install nothing,
-  leaving the question to be asked again at the next launch. Only an explicit no is durable.
-- **FR-028**: Setting the assistant explicitly MUST clear any recorded refusal, so an earlier
-  declined offer can never suppress an install the user has directly asked for.
+- **FR-024**: The question MUST use the tool's single shared confirmation surface and its
+  established key contract — a slim, centred, two-option bar, each option labelled with its key and
+  outcome, consuming every keystroke, `Enter` proceeding and `Esc` declining. It MUST NOT introduce
+  a second confirmation style, and MUST NOT give `Esc` a meaning it does not have elsewhere.
+- **FR-025**: `Enter` MUST install the discovery file exactly as the set command does, record that
+  assistant as the workspace's setting, and report the outcome.
+- **FR-026**: `Esc` MUST install nothing and write nothing into the user's profile.
+- **FR-027**: Once the question has been answered either way, the fact that it was asked MUST be
+  recorded in the workspace's configuration, in a form that survives restarts, and MUST suppress the
+  question on every subsequent launch of that workspace. What is recorded is that the offer was
+  made, not which key was pressed.
+- **FR-028**: Setting the assistant explicitly MUST clear that record, so an earlier declined offer
+  can never suppress an install the user has directly asked for.
 - **FR-029**: The question MUST NOT be asked when a discovery file is already installed for the
   assistant that will be used, when the assistant is configured as `none`, when two or more
   assistants are installed with none configured, or when no assistant is installed at all.
@@ -362,8 +379,10 @@ discovery file exists and points at the new workspace.
   immediately afterwards.
 - **FR-032**: The question MUST be asked only in the interactive interface. No command-line
   invocation may prompt, block, or install without being told to.
-- **FR-033**: The machine-readable read output MUST report whether the offer has been refused,
-  so the state is visible without opening the interactive interface.
+- **FR-033**: The machine-readable read output MUST report whether the launch offer has already been
+  made, so the state is visible without opening the interactive interface.
+- **FR-034**: The question MUST be raised only after the app is up and usable, and answering it MUST
+  leave the user where they would have been had it never appeared.
 
 ### Key Entities
 
@@ -378,9 +397,10 @@ discovery file exists and points at the new workspace.
   monitored afterwards.
 - **Assistant setting**: The existing per-workspace record of which assistant `/ai` calls. Unchanged
   by this feature, except that writing it now has a second, user-scope effect.
-- **Recorded refusal**: A per-workspace record that the user was offered a discovery file at launch
-  and said no. Set only by an explicit no, cleared by explicitly setting an assistant, and read only
-  to decide whether to ask. It suppresses a question, never an install.
+- **Recorded offer**: A per-workspace record that the launch question has been asked and answered.
+  Written once the user answers, on either key; cleared by explicitly setting an assistant; read
+  only to decide whether to ask. It records that the offer was made, not which way it went, and it
+  suppresses a question, never an install.
 
 ## Success Criteria *(mandatory)*
 
@@ -406,11 +426,13 @@ discovery file exists and points at the new workspace.
 - **SC-009**: A user who has never run the assistant command, and has exactly one assistant
   installed, is offered the pointer without having to discover that any command exists, and reaches
   a working pointer in one keystroke.
-- **SC-010**: A user who declines is asked exactly once, ever: zero further questions across any
-  number of subsequent launches of that workspace.
+- **SC-010**: A user is asked exactly once, ever, whichever way they answer: zero further questions
+  across any number of subsequent launches of that workspace.
 - **SC-011**: The launch check adds no perceptible delay to opening choom, and no state it can
   encounter — no assistant, several assistants, an unreadable or unwritable configuration — prevents
   the app from starting.
+- **SC-012**: The launch question is indistinguishable in shape and key behaviour from every other
+  confirmation in the tool — same bar, same two-option labelling, same `Esc` and `Enter` meanings.
 
 ## Assumptions
 
@@ -438,11 +460,11 @@ discovery file exists and points at the new workspace.
 - **`AGENTS.md` exists in the workspace.** It is generated at `init`. A workspace whose `AGENTS.md`
   the user deleted still gets a pointer to where it should be; regenerating it is not this feature's
   job.
-- **The refusal is recorded in the workspace configuration**, alongside the assistant setting it
+- **The record is written in the workspace configuration**, alongside the assistant setting it
   belongs to, as directed. This is worth naming because the constitution requires per-user state to
   live outside the shared workspace, and two people sharing a synced folder do share this record.
   It is judged acceptable here on two grounds: the assistant setting itself already lives in the
-  workspace configuration, so the refusal sits with the thing it qualifies rather than splitting one
+  workspace configuration, so the record sits with the thing it qualifies rather than splitting one
   decision across two stores; and what a colleague inherits is the absence of a question, not an
   overwritten selection — their own pointer, in their own profile, remains one command away. The
   failure the constitution's rule exists to prevent is one person's state silently becoming another
@@ -457,9 +479,17 @@ discovery file exists and points at the new workspace.
   an assistant it has no record of, and installing a second assistant later would flip resolution to
   ambiguous while the pointer stayed behind. Recording it makes what choom will call and what got
   told about the workspace the same fact.
-- **The refusal covers the workspace, not one assistant.** A user who says no is saying no to being
+- **The record covers the workspace, not one assistant.** A user who declines is declining to be
   asked, and re-asking them because they changed assistants would defeat the point. The set command
-  remains the way back in, and it clears the refusal (FR-028).
+  remains the way back in, and it clears the record (FR-028).
+- **What is recorded is that the offer was made, not the answer given** (FR-027). This is a
+  consequence of reusing the tool's single confirmation, which offers exactly two options and
+  requires `Esc` to carry no consequence beyond halting what it interrupted. A durable "no" that
+  `Esc` wrote would give that key a meaning it has nowhere else in the tool; a third "ask me later"
+  option would need a second dialog style. Recording the asking instead satisfies both: the user is
+  never asked twice, `Esc` writes nothing to their profile, and nothing about the confirmation
+  behaves differently here than anywhere else. What it costs is the ability to distinguish an
+  accidental `Esc` from a considered one, which the set command makes recoverable.
 - **The question belongs to the interactive interface only** (FR-032). A confirmation is inherently
   interactive, which is the constitution's own exemption to the two-interfaces rule; the CLI's peer
   behaviour is the set command, which installs the same file without asking anyone anything.
@@ -474,13 +504,24 @@ discovery file exists and points at the new workspace.
 - **Related to #44** (linked task syntax in the composed prompt): the same problem — the assistant
   needs to be told how choom works — at the reply layer rather than the install and discovery layer.
   The two are independent and can land in either order.
+- **Depends on the shared confirmation delivered by 011-ui-refinements.** That feature replaced the
+  one-off discard dialog with a single confirmation used everywhere: a slim, centred, two-option
+  bar, each option labelled with its key and outcome, consuming every keystroke, `Enter` proceeding
+  and `Esc` halting without consequence (011's FR-021–FR-026). US2 uses it as-is rather than adding
+  a second style, and FR-027 of this spec is shaped by its two-option contract.
+- **Knowingly extends 011's FR-027**, which says confirmations fire only where something would be
+  lost, and that deletion was the one confirmation point that feature added. The launch offer guards
+  no loss, so it does not meet that bar and is not claimed to. It is proposed as a deliberate second
+  exception on narrower grounds: it is the only moment choom writes outside the workspace into a
+  directory belonging to another program, it is asked at most once per workspace ever, and it is the
+  only path by which users who never run the command receive the feature at all. If that trade is
+  rejected at plan time, US2 is the story to cut — the rest of the spec stands without it.
 - **Constrained by the constitution**: no network; no admin rights; paths stay well inside the
   Windows limit; the CLI never prompts, never blocks, and keeps data and diagnostics on separate
   streams; both interfaces offer every behaviour that is not inherently interactive. Two rules are
   in tension with this spec and are answered rather than ignored: per-user state normally lives
-  outside the shared workspace (see the recorded-refusal assumption), and confirmations normally
-  fire only when there is something to lose (see US2, where the protection is that the question is
-  asked at most once and both answers are durable).
+  outside the shared workspace (see the recorded-offer assumption), and confirmations normally fire
+  only when there is something to lose (the bullet above).
 
 ## Out of Scope
 

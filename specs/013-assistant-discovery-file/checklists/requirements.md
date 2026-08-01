@@ -88,3 +88,31 @@ Also re-checked against Principle V's rule that confirmations fire only when the
 lose. This dialog guards nothing, so it is justified in US2 on the narrower ground that it writes
 into the user's own profile for a program choom does not own — and bounded so it cannot become a
 reflex: asked at most once, durable in both directions, and dismissible without answering.
+
+**Iteration 3** — reconciled against `011-ui-refinements`, merged into main after iteration 2. That
+feature replaced the one-off discard dialog with a single shared confirmation and set rules for it:
+exactly two options, each labelled with its key and outcome (011 FR-022); `Esc` always halts and
+*changes nothing* (011 FR-023); `Enter` always proceeds (011 FR-024); every confirmation point uses
+this same one (011 FR-026); confirmations fire only where something would be lost (011 FR-027). Two
+real conflicts, both resolved in the spec rather than left for implementation to discover:
+
+1. *Requirements are testable and unambiguous* — US2 specified three outcomes (yes, a durable no,
+   and a non-durable dismissal). The shared confirmation has two, and 011 FR-023 forbids the one
+   that would carry the durable no, since `Esc` may not write anything. The spec now records **that
+   the offer was made** rather than which key was pressed: `Enter` installs, `Esc` installs nothing
+   and writes nothing to the user's profile, and neither key leads to being asked twice. This keeps
+   `Esc`'s meaning identical to everywhere else in the tool, needs no second dialog style, and still
+   satisfies the requirement that a user who declines is not re-prompted at every launch. It costs
+   the ability to tell an accidental `Esc` from a considered one; the set command is the way back,
+   and FR-023 requires the question to say so. FR-024 now pins the shared confirmation and its key
+   contract explicitly, and FR-034 covers when the question may be raised.
+2. *Scope is clearly bounded* — 011 FR-027 says confirmations fire only where something would be
+   lost, and names deletion as the one confirmation point that feature added. The launch offer does
+   not meet that bar. Rather than quietly widen the rule, the spec states plainly that it extends
+   FR-027, gives the narrower grounds it claims instead (the only write outside the workspace into
+   another program's directory; at most once per workspace ever; the only route by which users who
+   never run the command get the feature), and names US2 as the story to cut if the plan's
+   Constitution Check rejects the trade. The other four stories do not depend on it.
+
+Re-validated after both changes; all items still pass. FR numbering is contiguous 001–034, SC
+numbering 001–012.
