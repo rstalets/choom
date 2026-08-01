@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from textual.widgets import Label, ListView, TextArea
 
-from endpaper.core.links import inbound_links, outbound_links, relative_destination
+from endpaper.core.links import (
+    check_links,
+    heal_links,
+    inbound_links,
+    outbound_for_target,
+    outbound_links,
+    relative_destination,
+    resolve_id,
+)
 from endpaper.core.meetings import create_meeting
 from endpaper.core.models import Workspace
 from endpaper.core.notes import create_note
@@ -357,3 +365,89 @@ async def test_jk_move_within_the_links_section(tmp_workspace: Workspace) -> Non
         await pilot.press("k")
         await pilot.pause()
         assert list_view.index == 0
+
+
+# --- markdown links inside tasks.md (007's task bodies meet 008's links) --------
+
+
+def _task_with_body_link(workspace: Workspace, meeting_id: str) -> str:
+    """A task whose indented body holds an ordinary fragment-only markdown link."""
+    task = add_task(workspace, "call Terry", type="followup")
+    path = workspace.tasks_file
+    path.write_text(
+        path.read_text(encoding="utf-8").rstrip("\n")
+        + f"\n\n  See [Q3 planning](#{meeting_id}) for context.\n",
+        encoding="utf-8",
+    )
+    assert task.id is not None
+    return task.id
+
+
+def test_a_link_in_a_task_body_is_an_inbound_link(tmp_workspace: Workspace) -> None:
+    """tasks.md carries `links:` field ids *and* ordinary markdown links in a
+    task's text or indented body. Before task bodies existed (007) the second
+    kind could not occur, so the scan treated tasks.md as metadata-only and a
+    body link was invisible to every direction."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    _task_with_body_link(tmp_workspace, meeting.id)
+
+    inbound = inbound_links(tmp_workspace, meeting.id)
+    assert len(inbound) == 1
+    assert inbound[0].source == tmp_workspace.tasks_file
+    assert inbound[0].text == "Q3 planning"
+
+
+def test_a_link_in_a_task_body_is_reported_stale_and_then_healed(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    _task_with_body_link(tmp_workspace, meeting.id)
+
+    stale = check_links(tmp_workspace)
+    assert [r.status for r in stale] == ["stale"]
+    assert stale[0].file == tmp_workspace.tasks_file
+    assert stale[0].old_path is None
+
+    heal_links(tmp_workspace)
+    body = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    assert f"]({relative_destination(tmp_workspace.tasks_file, meeting.path)}#{meeting.id})" in body
+    assert check_links(tmp_workspace) == ()
+
+
+def test_a_body_link_belongs_to_the_task_whose_body_it_sits_in(
+    tmp_workspace: Workspace,
+) -> None:
+    """Two tasks, one body link: `--direction out` must attribute it to the task
+    that owns the line, not to every task in the file."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    owner_id = _task_with_body_link(tmp_workspace, meeting.id)
+    other = add_task(tmp_workspace, "unrelated errand")
+
+    owner_target, _warnings = resolve_id(tmp_workspace, owner_id)
+    assert owner_target is not None
+    assert [
+        link.target_id for link, _status in outbound_for_target(tmp_workspace, owner_target)
+    ] == [meeting.id]
+
+    assert other.id is not None
+    other_target, _warnings = resolve_id(tmp_workspace, other.id)
+    assert other_target is not None
+    assert outbound_for_target(tmp_workspace, other_target) == ()
+
+
+def test_a_task_body_link_does_not_disturb_the_links_field(tmp_workspace: Workspace) -> None:
+    """A task may carry both kinds at once; neither hides the other."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning")
+    note = create_note(tmp_workspace, "vendor landscape")
+    task_id = _task_with_body_link(tmp_workspace, meeting.id)
+
+    path = tmp_workspace.tasks_file
+    path.write_text(
+        path.read_text(encoding="utf-8").replace("type:followup", f"type:followup links:{note.id}"),
+        encoding="utf-8",
+    )
+
+    target, _warnings = resolve_id(tmp_workspace, task_id)
+    assert target is not None
+    found = {link.target_id for link, _status in outbound_for_target(tmp_workspace, target)}
+    assert found == {meeting.id, note.id}

@@ -32,7 +32,7 @@ from endpaper.core.models import (
     Workspace,
 )
 from endpaper.core.notes import scan_notes
-from endpaper.core.tasks import load_tasks, match_task
+from endpaper.core.tasks import load_tasks, match_task, parse_tasks
 from endpaper.core.text import _split_terminator
 
 # --- Scanning -----------------------------------------------------------------
@@ -556,8 +556,11 @@ def check_links(workspace: Workspace, paths: tuple[Path, ...] = ()) -> tuple[Lin
     reports: list[LinkReport] = []
     for path in _iter_target_paths(workspace, paths):
         if path == workspace.tasks_file:
+            # tasks.md carries both kinds: `links:` field ids, and ordinary
+            # markdown links in a task's text or its indented body (007). It
+            # gets the field pass *and* the same markdown scan every other file
+            # gets -- not one instead of the other.
             reports.extend(_task_field_reports(workspace, path))
-            continue
         file = _read_editable(path)
         if file is None:
             continue
@@ -576,8 +579,9 @@ def heal_links(
     reports: list[LinkReport] = []
     for path in _iter_target_paths(workspace, paths):
         if path == workspace.tasks_file:
+            # Field ids are never path-repaired, but markdown links in a task's
+            # text or body are -- so tasks.md falls through to the writer below.
             reports.extend(_task_field_reports(workspace, path))
-            continue
         file = _read_editable(path)
         if file is None:
             continue
@@ -600,18 +604,18 @@ def outbound_links(workspace: Workspace, source: Path) -> tuple[tuple[Link, Link
     directly -- this is the convenience form. Never raises; an unreadable file
     yields ().
     """
+    results: list[tuple[Link, LinkStatus]] = []
     if source == workspace.tasks_file:
-        results: list[tuple[Link, LinkStatus]] = []
         for link in _all_task_field_links(workspace, source):
             results.append((link, resolve_link(workspace, link)[1]))
-        return tuple(results)
 
     try:
         text = source.read_text(encoding="utf-8", errors="replace")
     except OSError:
-        return ()
-    links = find_links(text, source=source)
-    return tuple((link, resolve_link(workspace, link)[1]) for link in links)
+        return tuple(results)
+    for link in find_links(text, source=source):
+        results.append((link, resolve_link(workspace, link)[1]))
+    return tuple(results)
 
 
 def _all_task_field_links(workspace: Workspace, tasks_path: Path) -> list[Link]:
@@ -622,13 +626,45 @@ def _all_task_field_links(workspace: Workspace, tasks_path: Path) -> list[Link]:
     return links
 
 
+def _tasks_file_links(tasks_path: Path) -> tuple[tuple[int | None, Link], ...]:
+    """Markdown links written in `tasks.md` itself, each paired with the line of
+    the task that owns it.
+
+    A task owns its own checkbox line and every line of its indented body. A
+    link outside any task -- in a heading, or in preamble prose -- is owned by
+    nobody and pairs with None.
+
+    These are ordinary `[text](path#id)` links carrying real paths, and are
+    entirely separate from `links:` field ids, which carry no path and are
+    handled by `_task_links`. A task can have both.
+
+    Never raises; an unreadable file yields ().
+    """
+    try:
+        text = tasks_path.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return ()
+
+    parsed = parse_tasks(text)
+    owner_of_line: dict[int, int] = {}
+    for task, span in zip(parsed.tasks, parsed.bodies, strict=True):
+        owner_of_line[task.line - 1] = task.line
+        for idx in range(span.start, span.end):
+            owner_of_line[idx] = task.line
+
+    return tuple(
+        (owner_of_line.get(link.line - 1), link) for link in find_links(text, source=tasks_path)
+    )
+
+
 def outbound_for_target(
     workspace: Workspace, target: LinkTarget
 ) -> tuple[tuple[Link, LinkStatus], ...]:
     """Outbound links for one resolved record -- the building block behind
     `endpaper links <id> --direction out`. For a document this is exactly
-    `outbound_links`; for a task, only that task's own `links:` field, not
-    every task in tasks.md (tasks.md holds many records in one file). Never
+    `outbound_links`; for a task, only what that task itself points at -- its
+    `links:` field plus any markdown link in its own text or indented body --
+    never every task in tasks.md, which holds many records in one file. Never
     raises."""
     if target.kind != "task":
         return outbound_links(workspace, target.path)
@@ -637,8 +673,14 @@ def outbound_for_target(
     task = next((t for t in tasks if t.id == target.id), None)
     if task is None:
         return ()
-    field_links = _task_links(task, workspace.tasks_file)
-    return tuple((link, resolve_link(workspace, link)[1]) for link in field_links)
+
+    links = list(_task_links(task, workspace.tasks_file))
+    links.extend(
+        link
+        for owner_line, link in _tasks_file_links(workspace.tasks_file)
+        if owner_line == task.line
+    )
+    return tuple((link, resolve_link(workspace, link)[1]) for link in links)
 
 
 def inbound_links(workspace: Workspace, target_id: str) -> tuple[Link, ...]:
@@ -675,6 +717,11 @@ def inbound_links(workspace: Workspace, target_id: str) -> tuple[Link, ...]:
     tasks_path = workspace.tasks_file
     if tasks_path.is_file():
         for link in _all_task_field_links(workspace, tasks_path):
+            if link.target_id == target_id:
+                results.append(link)
+        # ...and markdown links written in tasks.md itself, which are ordinary
+        # links that happen to live in a task's text or body (007).
+        for _owner_line, link in _tasks_file_links(tasks_path):
             if link.target_id == target_id:
                 results.append(link)
 
