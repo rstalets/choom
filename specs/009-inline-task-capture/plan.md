@@ -47,6 +47,14 @@ reconcile-on-open.
 documents (SC-008), and reads no file at all when the document has no mirrors (SC-007). Capture completes
 in under 200 ms keypress to cursor (SC-012).
 
+SC-008's 50 ms is a claim about a user's machine and it holds — roughly 5 ms measured serially on
+5,840 tasks. It is deliberately not asserted as a wall-clock bound in CI, which runs `pytest -n auto`
+on a shared runner where the same code measured 0.055 s and 0.174 s on two runners of one build. The
+test asserts the engineering claim instead: reconciling costs within a small multiple of the single
+`tasks.md` read it cannot avoid, measured in the same process under the same load, with a loose
+absolute backstop. The regression it guards against — scanning the workspace instead of reading one
+file — is orders of magnitude, not a fraction, so the relative bound catches it and does not flake.
+
 **Constraints**: offline; no admin rights; no new external binary; the mirror's destination path is
 derived by 008's `relative_destination`, which already produces forward slashes on every platform and
 round-trips from every depth the layout produces.
