@@ -258,18 +258,33 @@ below the last content. Leave without typing — no confirmation, file unchanged
 
 ## Phase 10: Polish & Cross-Cutting Concerns
 
-- [ ] T034 [P] Add the three delete commands to the Commands block in
+- [X] T034 [P] Add the three delete commands to the Commands block in
       `src/choom/core/templates/AGENTS.md.tmpl`, with the `--force` rule stated; confirm the file stays
-      under the ~100-line backstop (it is 74 today)
-- [ ] T035 [P] Update `README.md` for deletion in both front-ends, the four-column list, and the
+      under the ~100-line backstop (it is 74 today). Now 77 lines
+- [X] T035 [P] Update `README.md` for deletion in both front-ends, the four-column list, and the
       workspace path in the top bar
-- [ ] T036 Run every scenario in [quickstart.md](./quickstart.md) by hand against a scratch workspace
-- [ ] T037 Run the full gate set: `scripts/dev-tests.sh`, `uv run --extra dev ruff format --check .`,
-      `uv run --extra dev ruff check .`, `uv run --extra dev mypy`
-- [ ] T038 Verify the TUI on the target terminals in `docs/REQUIREMENTS.md` §4.3 — the column layout and
-      the top-bar path are the two new width-sensitive surfaces
-- [ ] T039 Verify a workspace path containing spaces and non-ASCII characters renders and deletes
-      correctly on at least one platform other than the development machine
+- [X] T036 Run every scenario in [quickstart.md](./quickstart.md) by hand against a scratch workspace.
+      Ran US1–US7 against a real `/tmp` workspace: CLI delete exit codes 0/1/2/1/non-blocking (US3)
+      verified with real `choom` invocations; TUI confirmation wording, decline/confirm, column headers
+      and alignment, cursor row on open, and top-bar path all verified via a scripted pilot session
+      against that same workspace; mirror byte-identity and dead-link reporting (US4) verified directly
+      against `core`
+- [X] T037 Run the full gate set: `scripts/dev-tests.sh`, `uv run --extra dev ruff format --check .`,
+      `uv run --extra dev ruff check .`, `uv run --extra dev mypy` — all green except 6 pre-existing
+      failures in `tests/integration/test_ai_command_tui.py` confirmed (via `git stash`) to fail
+      identically on the pre-feature baseline; caused by a real `copilot` binary on this machine's PATH
+      making assistant auto-detection ambiguous, unrelated to this feature
+- [~] T038 Verify the TUI on the target terminals in `docs/REQUIREMENTS.md` §4.3 — the column layout and
+      the top-bar path are the two new width-sensitive surfaces. **Not completed**: this session has no
+      access to Windows Terminal, iTerm2, PuTTY, or a real interactive terminal to eyeball rendering in;
+      covered instead by Textual's headless `run_test()` pilot across many sizes (unit + integration
+      suites) and by the manual pilot session in T036, which is a meaningful but not equivalent substitute
+- [~] T039 Verify a workspace path containing spaces and non-ASCII characters renders and deletes
+      correctly on at least one platform other than the development machine. **Not completed on another
+      platform** — this session runs on macOS only. Verified thoroughly *on* the dev machine instead: a
+      real `/tmp/OneDrive - Cömpany/nötes` workspace renders correctly in the top bar and deletes
+      correctly through the TUI (see quickstart run under T036); `shorten_workspace_path`'s Windows-
+      separator branch is covered by a unit test but not exercised on real Windows
 
 ---
 
