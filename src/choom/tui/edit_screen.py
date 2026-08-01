@@ -26,6 +26,7 @@ from choom.core.editor_commands import parse_line
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import find_link_targets, format_link
 from choom.core.mirrors import (
+    capture_reply_tasks,
     capture_task,
     find_mirrors,
     reconcile_on_open,
@@ -35,6 +36,7 @@ from choom.core.mirrors import (
 from choom.core.models import (
     AssistantReply,
     ParsedCommand,
+    ReplyCapture,
     ResolvedAssistant,
     SaveResult,
     Task,
@@ -176,6 +178,27 @@ def open_task_editor(app: App[None], task: Task) -> None:
     app.push_screen(EditScreen(target))
 
 
+def _reply_capture_note(capture: ReplyCapture) -> tuple[str | None, bool]:
+    """The status note and its `warn` flag for a reply's capture result
+    (contracts/reply-capture.md §4). No eligible line at all is exactly
+    today's plain footer -- `(None, False)`. All captured is news, not a
+    warning. Any failure, partial or total, carries `⚠` and names the first
+    reason; the count in front of it, when there is one, carries the rest."""
+    if not capture.tasks and not capture.warnings:
+        return None, False
+    if not capture.warnings:
+        count = len(capture.tasks)
+        noun = "task" if count == 1 else "tasks"
+        return f"{count} {noun} captured", False
+    if not capture.tasks:
+        return capture.warnings[0].message, True
+    return (
+        f"{len(capture.tasks)} tasks captured; {len(capture.warnings)} could not be: "
+        f"{capture.warnings[0].message}",
+        True,
+    )
+
+
 def _resolution_message(resolved: ResolvedAssistant) -> str:
     if resolved.source == "none":
         return "no AI assistant configured (set to none); run /config assistant to change it"
@@ -303,9 +326,13 @@ class EditScreen(Screen[None]):
             return self._request is not None
         return True
 
-    def _render_status(self, note: str | None = None) -> None:
+    def _render_status(self, note: str | None = None, *, warn: bool = True) -> None:
         status = self.query_one(StatusBar)
-        status.update(f"⚠ {note}   {EDIT_HELP}" if note else EDIT_HELP)
+        if note is None:
+            status.update(EDIT_HELP)
+            return
+        prefix = "⚠ " if warn else ""
+        status.update(f"{prefix}{note}   {EDIT_HELP}")
 
     def _render_in_flight_status(self) -> None:
         if self._breadcrumb is None:
@@ -536,13 +563,33 @@ class EditScreen(Screen[None]):
         editor.read_only = False
 
         if reply.ok:
+            text = reply.text
+            note: str | None = None
+            warn = False
+
+            if self.target.captures_tasks:
+                workspace = self.app.workspace  # type: ignore[attr-defined]
+                document = _read_document(self.target.display_path)
+                if document is not None:
+                    capture = capture_reply_tasks(
+                        workspace,
+                        text,
+                        source=self.target.display_path,
+                        source_id=document.id,
+                    )
+                    text = capture.text
+                    for task in capture.tasks:
+                        assert task.id is not None
+                        self._mirror_baseline[task.id] = False
+                    note, warn = _reply_capture_note(capture)
+
             editor.replace(
-                reply.text,
+                text,
                 (line_index, 0),
                 (line_index, len(_PLACEHOLDER)),
                 maintain_selection_offset=False,
             )
-            self._render_status(None)
+            self._render_status(note, warn=warn)
         else:
             editor.replace(
                 original_line,

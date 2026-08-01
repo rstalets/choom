@@ -8,9 +8,7 @@ from choom.core.models import Workspace
 def test_no_eligible_lines_returns_the_input_unchanged(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     text = "just some prose\nand a second line"
-    capture = capture_reply_tasks(
-        tmp_workspace, text, source=meeting.path, source_id=meeting.id
-    )
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     assert capture.text is text  # identity, not equality
     assert capture.tasks == ()
     assert capture.warnings == ()
@@ -21,9 +19,7 @@ def test_each_eligible_line_is_replaced_by_its_mirror_others_untouched(
 ) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     text = "here is a summary\n/task call Terry\nsome closing prose"
-    capture = capture_reply_tasks(
-        tmp_workspace, text, source=meeting.path, source_id=meeting.id
-    )
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     lines = capture.text.split("\n")
     assert len(lines) == 3
     assert lines[0] == "here is a summary"
@@ -47,9 +43,7 @@ def test_line_count_and_order_are_preserved(tmp_workspace: Workspace) -> None:
             "outro",
         ]
     )
-    capture = capture_reply_tasks(
-        tmp_workspace, text, source=meeting.path, source_id=meeting.id
-    )
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     assert len(capture.text.split("\n")) == 5
     assert [t.text for t in capture.tasks] == ["first thing", "second thing"]
 
@@ -57,18 +51,14 @@ def test_line_count_and_order_are_preserved(tmp_workspace: Workspace) -> None:
 def test_tasks_are_returned_in_reply_order(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     text = "/task alpha\n/task beta\n/task gamma"
-    capture = capture_reply_tasks(
-        tmp_workspace, text, source=meeting.path, source_id=meeting.id
-    )
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     assert [t.text for t in capture.tasks] == ["alpha", "beta", "gamma"]
 
 
 def test_tags_and_type_suffix_reach_the_task(tmp_workspace: Workspace) -> None:
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
     text = "/task.followup call Terry #urgent #procurement"
-    capture = capture_reply_tasks(
-        tmp_workspace, text, source=meeting.path, source_id=meeting.id
-    )
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
     assert len(capture.tasks) == 1
     task = capture.tasks[0]
     assert task.type == "followup"

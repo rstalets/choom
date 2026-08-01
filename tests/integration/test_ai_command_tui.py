@@ -10,6 +10,7 @@ from textual.widgets import TextArea
 from choom.core.config import set_assistant
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
+from choom.core.tasks import load_tasks
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditScreen
 from choom.tui.status_bar import EDIT_HELP, StatusBar
@@ -48,6 +49,57 @@ async def test_reply_replaces_the_command_line(
 
         status = screen.query_one(StatusBar)
         assert EDIT_HELP in str(status.content)
+
+
+async def test_reply_with_task_lines_captures_real_linked_tasks(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("reply_with_tasks")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/ai summarise and track")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        reply_lines = [editor.get_line(line_index + offset).plain for offset in range(4)]
+        # Prose is byte-identical and in order; task lines are replaced by mirrors.
+        assert reply_lines[0] == "Here is a summary of the discussion."
+        assert reply_lines[2] == "One more thing worth tracking down the line."
+        assert reply_lines[1] != "/task call Terry about the renewal"
+        assert reply_lines[3] != "/task.followup review the budget numbers #finance"
+        assert reply_lines[1].startswith("- [ ] [call Terry about the renewal]")
+        assert reply_lines[3].startswith("- [ ] [review the budget numbers]")
+
+        tasks, warnings = load_tasks(tmp_workspace)
+        assert warnings == []
+        assert len(tasks) == 2
+        first, second = tasks
+        assert first.text == "call Terry about the renewal"
+        assert first.type == ""
+        assert first.links == (meeting.id,)
+        assert second.text == "review the budget numbers"
+        assert second.type == "followup"
+        assert second.tags == ("finance",)
+        assert second.links == (meeting.id,)
+
+        for task in tasks:
+            assert task.id is not None
+            assert f"#{task.id}" in editor.get_line(line_index + (1 if task is first else 3)).plain
+
+        status = screen.query_one(StatusBar)
+        status_text = str(status.content)
+        assert "2 tasks captured" in status_text
+        assert "⚠" not in status_text
+
+        # Still the same screen, editor focused -- no navigation happened.
+        assert isinstance(app.screen, EditScreen)
+        assert app.screen is screen
+        assert editor.has_focus
 
 
 async def test_reply_containing_a_slash_ai_line_is_inserted_as_literal_text(
