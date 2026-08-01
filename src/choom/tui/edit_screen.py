@@ -40,7 +40,7 @@ from choom.core.models import (
     Task,
 )
 from choom.core.tasks import parse_tasks, set_task_body
-from choom.tui.discard_dialog import DiscardDialog
+from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.status_bar import (
     EDIT_HELP,
     StatusBar,
@@ -205,6 +205,39 @@ class EditorTextArea(TextArea):
         await super()._on_key(event)
 
 
+def _pad_for_cursor(text: str) -> tuple[str, int]:
+    """The padded buffer and 0-indexed cursor row for entering edit mode
+    (US7, research R10): the cursor lands on an empty line exactly one blank
+    line below the last non-empty line, with existing trailing blank lines
+    collapsed rather than stacked on top of (FR-039, FR-040). Content with no
+    non-empty line at all -- including a genuinely empty string -- is
+    returned unchanged with the cursor at the first line: there is nothing
+    to separate a cursor from, and FR-041 forbids inserting anything above it.
+
+    Pure string arithmetic, and the buffer's own unedited state (research
+    R10): a caller that sets `original_text` to the padded result gets
+    FR-042 -- entering and leaving without typing raises no confirmation and
+    writes nothing -- without a special case, since padding alone is then
+    never a change. Never raises.
+    """
+    lines = text.split("\n")
+    last_content = -1
+    for index, line in enumerate(lines):
+        if line.strip() != "":
+            last_content = index
+
+    if last_content == -1:
+        return "", 0
+
+    kept = lines[: last_content + 1]
+    # Two empties, not one: the first is the blank line that separates the
+    # cursor from the content, the second is the line the cursor sits on.
+    # Padding with a single empty puts the cursor directly under the last
+    # content line with nothing between, which is the state FR-039 rules out.
+    padded = "\n".join([*kept, "", ""])
+    return padded, len(kept) + 1
+
+
 class EditScreen(Screen[None]):
     # TextArea itself binds ctrl+o is unbound but ctrl+s/ctrl+x are (cut); `priority=True`
     # means these are checked app-down-to-focused-widget, before TextArea's own
@@ -224,7 +257,13 @@ class EditScreen(Screen[None]):
     def __init__(self, target: EditTarget) -> None:
         super().__init__()
         self.target = target
-        self.original_text = target.text
+        self._padded_text, self._cursor_row = _pad_for_cursor(target.text)
+        # The buffer's unedited state is the padded text, not target.text --
+        # positioning the cursor is not itself an edit (FR-042). Any trailing
+        # blank line that ends up on disk arises only from what the user
+        # actually types or from a save that persists this unedited padding
+        # (research R10, accepted consequence).
+        self.original_text = self._padded_text
         self._request: AssistantRequest | None = None
         self._breadcrumb: str | None = None
         # What each mirror in `target.text` read at open (or last reconciled) --
@@ -241,12 +280,14 @@ class EditScreen(Screen[None]):
         return self.query_one("#editor", TextArea).text != self.original_text
 
     def compose(self) -> ComposeResult:
-        yield EditorTextArea(self.target.text, show_line_numbers=True, id="editor")
+        yield EditorTextArea(self._padded_text, show_line_numbers=True, id="editor")
         with Vertical(id="bottom-bar"):
             yield StatusBar(EDIT_HELP, id="status-bar")
 
     def on_mount(self) -> None:
-        self.query_one("#editor", TextArea).focus()
+        editor = self.query_one("#editor", TextArea)
+        editor.cursor_location = (self._cursor_row, 0)
+        editor.focus()
 
     def on_resize(self, event: events.Resize) -> None:
         if self._request is not None:
@@ -335,7 +376,12 @@ class EditScreen(Screen[None]):
             else:
                 self.query_one("#editor", TextArea).focus()
 
-        self.app.push_screen(DiscardDialog(), _handle_dismiss)
+        dialog = ConfirmDialog(
+            "You have unsaved changes. Are you sure you want to exit?",
+            cancel_label="Continue Editing",
+            confirm_label="Exit Without Saving",
+        )
+        self.app.push_screen(dialog, _handle_dismiss)
 
     # --- /ai in-editor command --------------------------------------------------
 
