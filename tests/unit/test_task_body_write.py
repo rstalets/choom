@@ -106,6 +106,54 @@ def test_saving_empty_body_when_none_existed_is_also_a_no_op(
     assert path.read_bytes() == before_bytes
 
 
+# --- trailing-blank normalisation (011, research R10) --------------------------
+
+
+def test_body_with_trailing_blank_lines_saves_the_same_as_without_them(
+    tmp_workspace: Workspace,
+) -> None:
+    write_tasks(tmp_workspace, "- [ ] call the vendor <!-- id:t_a1b2 -->\n")
+
+    task = set_task_body(tmp_workspace, "t_a1b2", "Need the Q3 comparison.\n\n\n")
+
+    assert task.body == "Need the Q3 comparison."
+    text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
+    assert text == "- [ ] call the vendor <!-- id:t_a1b2 -->\n\n  Need the Q3 comparison.\n"
+
+
+def test_body_identical_once_trailing_blanks_are_stripped_is_still_a_no_op(
+    tmp_workspace: Workspace,
+) -> None:
+    # A padded editor buffer (US7) ends with one blank line below the
+    # content -- saving it unedited must not grow the file by a blank line
+    # every time, or a save-without-typing would never be stable.
+    write_tasks(
+        tmp_workspace,
+        "- [ ] call the vendor <!-- id:t_a1b2 -->\n\n  Need the Q3 comparison.\n",
+    )
+    path = tasks_file(tmp_workspace)
+    before_bytes = path.read_bytes()
+
+    task = set_task_body(tmp_workspace, "t_a1b2", "Need the Q3 comparison.\n")
+
+    assert task.body == "Need the Q3 comparison."
+    assert path.read_bytes() == before_bytes
+
+
+def test_saving_a_padded_body_twice_in_a_row_is_idempotent(
+    tmp_workspace: Workspace,
+) -> None:
+    write_tasks(tmp_workspace, "- [ ] call the vendor <!-- id:t_a1b2 -->\n")
+
+    set_task_body(tmp_workspace, "t_a1b2", "Need the Q3 comparison.\n")
+    after_first = tasks_file(tmp_workspace).read_bytes()
+
+    set_task_body(tmp_workspace, "t_a1b2", "Need the Q3 comparison.\n")
+    after_second = tasks_file(tmp_workspace).read_bytes()
+
+    assert after_first == after_second
+
+
 # --- writer failure and preservation (T014) ----------------------------------
 
 

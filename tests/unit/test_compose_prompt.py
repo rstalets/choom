@@ -5,7 +5,8 @@ from pathlib import Path
 from choom.core.assistants import compose_prompt
 
 _INSTRUCTION_CLAUSES = [
-    "Answer directly. No preamble, no restating the question, no sign-off.",
+    "Answer directly. No preamble, no restating the question, no sign-off, and no",
+    "narration of what you're about to do.",
     "Do not wrap the whole reply in a",
     "code fence unless the entire answer is code.",
     "Match the length to the request. These are working notes, not a report.",

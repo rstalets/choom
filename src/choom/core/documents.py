@@ -7,7 +7,7 @@ from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
-from choom.core.errors import UsageError
+from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.frontmatter import FrontmatterError, read_frontmatter, render_frontmatter
 from choom.core.models import (
     Collection,
@@ -88,6 +88,25 @@ def create_document(
         with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(content)
         return replace(partial, path=candidate)
+
+
+def delete_document(path: Path) -> None:
+    """Remove a meeting or note file from the workspace.
+
+    Removes exactly `path` and nothing else -- the containing directory is left
+    in place even if it becomes empty, since that is a second filesystem effect
+    the user did not ask for (data-model.md §2).
+
+    Raises:
+        NotFoundError: no file exists at `path`.
+        WorkspaceError: the file could not be removed.
+    """
+    if not path.is_file():
+        raise NotFoundError(f"no file at {path}")
+    try:
+        path.unlink()
+    except OSError as exc:
+        raise WorkspaceError(f"could not delete {path}: {exc}") from exc
 
 
 def _parse_document(text: str, path: Path) -> tuple[Document | None, ScanWarning | None]:
