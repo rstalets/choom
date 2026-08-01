@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling", "hatch-vcs"]
+requires = ["hatchling==1.31.0", "hatch-vcs==0.5.0"]
 build-backend = "hatchling.build"
 
 [project]
@@ -10,8 +10,8 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
 dependencies = [
-    "textual>=8.2",
-    "PyYAML>=6.0",
+    "textual==8.2.8",
+    "PyYAML==6.0.3",
 ]
 
 [project.scripts]
@@ -19,16 +19,22 @@ choom = "choom.cli.main:main"
 
 [project.optional-dependencies]
 dev = [
-    "pytest",
-    "pytest-asyncio",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
     # The suite is dominated by Textual's message pump, not by CPU -- it is ~75%
     # idle, so it parallelises almost linearly. CI passes `-n auto`; local runs
     # stay serial by default so failure output remains readable.
-    "pytest-xdist",
-    "ruff",
-    "mypy",
-    "types-PyYAML",
+    "pytest-xdist==3.8.0",
+    "ruff==0.16.0",
+    "mypy==2.3.0",
+    "types-PyYAML==6.0.12.20260724",
 ]
+
+[tool.uv]
+# Supply-chain hardening: refuse to resolve any package version published less
+# than 48 hours ago, giving the community a window to catch and yank bad
+# releases before they land here (see issue #28).
+exclude-newer = "48 hours"
 
 [tool.hatch.version]
 source = "vcs"
