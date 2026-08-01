@@ -1,6 +1,78 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 1.3.0 → 2.0.0
+Bump rationale: MAJOR. Principle V's reserved-keys rule is redefined in a way that is not
+backward-compatible: the prior text forbade binding `ctrl+q` to any action, full stop, and
+the shipped behaviour (`ctrl+q` always exits immediately, dirty editor or not) was fully
+compliant with that. The new text carves out a narrow exception — `ctrl+q` MAY raise the
+existing discard confirmation when quitting would lose unsaved work — which means that
+same shipped behaviour (immediate, unconditional exit while an editor is dirty) is no
+longer compliant. Per Governance, a redefinition that turns previously-compliant behaviour
+non-compliant is MAJOR, not MINOR, regardless of how narrow the carve-out is. `ctrl+c`
+is untouched and, if anything, more strictly stated than before (still forbidden in every
+state, with the rationale spelled out).
+
+Trigger: GitHub issue #64 — pressing `ctrl+q` on a modified document exits without
+confirming, silently discarding the edit. FR-036 (spec 001-meeting-notes) and FR-033
+(spec 004-viewing-editing), both read literally as "`ctrl+q`/`ctrl+c` MUST NOT be bound to
+any action", are the source of the conflict this amendment resolves; their wording is
+intentionally left unchanged by this amendment and will be reconciled separately as part of
+implementing the code fix, alongside the plan-template gate row this report updates below.
+
+Modified principles:
+  - V. The Interface Is Specified, Not Improvised — the single "`ctrl+c` and `ctrl+q` are
+    reserved" clause splits into two: `ctrl+c` stays absolutely reserved (never bound, in
+    any state — a guaranteed way out if the interface is otherwise stuck); `ctrl+q` stays
+    an immediate, unconditional quit whenever nothing would be lost, but MAY raise the
+    interface's existing single confirmation (the same "something to lose" rule already
+    governing every other destructive action in this principle) when a dirty editor is
+    open. Confirming discard, or finding nothing dirty, still exits with no further delay.
+
+Added sections: none
+Removed sections: none
+
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md — Constitution Check gate V row reworded from
+     "bindings avoid `ctrl+c`, `ctrl+q`" to reflect the split (ctrl+c untouched, ctrl+q
+     immediate-unless-dirty), so a future plan is checked against the actual rule rather
+     than the old blanket phrasing
+  ✅ .specify/templates/spec-template.md — reviewed; left unchanged. No constitution-driven
+     mandatory section is added or removed
+  ✅ .specify/templates/tasks-template.md — reviewed; left unchanged. Carries no reserved-key
+     guidance to contradict
+  ✅ .specify/templates/checklist-template.md — reviewed; left unchanged
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; none reference the reserved-key rule
+  ✅ README.md — reviewed; its `ctrl+c` mentions are the in-editor AI-request cancel hint,
+     an unrelated feature, not the reserved-key rule. Left unchanged
+  ⚠ specs/001-meeting-notes/spec.md (FR-036), specs/004-viewing-editing/spec.md (FR-033),
+     specs/011-ui-refinements/spec.md — each states the old blanket rule for its own
+     feature; deliberately left as point-in-time records per this amendment's trigger note,
+     to be reconciled by the follow-up implementation work for issue #64, not by this
+     governance-only change
+
+Non-template files:
+  ✅ tests/ — reviewed; no existing test asserts `ctrl+q` exits unconditionally while
+     dirty (confirmed during issue #64 investigation), so nothing here becomes non-compliant
+     by this amendment landing; the follow-up implementation adds the missing coverage
+
+Follow-up TODOs:
+  - Reconcile FR-036 (001-meeting-notes) and FR-033 (004-viewing-editing) wording, and the
+    "reserved" row in specs/004-viewing-editing/contracts/tui.md, with this amendment —
+    tracked as part of the issue #64 code-fix work, not done here (scope guard: this command
+    touches governance and its template propagation only)
+
+Migration path:
+  - No code currently relies on `ctrl+q` staying unbound while an editor is dirty in a way
+    that this amendment breaks other than the gap it exists to close (issue #64 itself).
+    The implementation follow-up adds the dirty-check + confirmation and a regression test;
+    until it lands, current behaviour (immediate quit) remains what ships, simply no longer
+    the ideal the constitution states.
+-->
+
+<!--
+SYNC IMPACT REPORT
+==================
 Version change: 1.1.0 → 1.2.0
 Bump rationale: MINOR, covering two amendments in one bump. (1) Principle VI
 gains a new testing rule (tests must not depend on the wall clock), which
@@ -299,9 +371,15 @@ User-facing behaviour is decided in the spec, not at the keyboard.
 - Confirmations fire only when there is something to lose. A dialog that appears when
   nothing would be discarded teaches users to dismiss it reflexively, which disarms it
   for the one time it matters.
-- Key bindings MUST respect terminal reality: `ctrl` is the only portable modifier, `ctrl+c`
-  and `ctrl+q` are reserved, and `ctrl+s` is XOFF and MAY be bound only as an alias to a
-  canonical binding that is guaranteed to arrive.
+- Key bindings MUST respect terminal reality: `ctrl` is the only portable modifier, and
+  `ctrl+s` is XOFF and MAY be bound only as an alias to a canonical binding that is
+  guaranteed to arrive.
+- `ctrl+c` is fully reserved: it MUST NOT be bound to any action, in any state, so it stays
+  a guaranteed way out even if the rest of the interface is stuck.
+- `ctrl+q` MUST quit immediately and unconditionally whenever nothing would be lost. Its
+  one narrow exception: if quitting would discard unsaved work, `ctrl+q` MAY raise the same
+  confirmation any other destructive action raises, per the confirmations rule above — never
+  a second keystroke, and never a delay, when there is nothing to lose.
 - Error messages name what went wrong and what to do instead, including the directory or
   command the user should have used.
 
@@ -399,4 +477,4 @@ the exit code registry, and the target terminals — and is expected to change a
 ship. `AGENTS.md` in a workspace holds runtime guidance for AI assistants. Neither
 overrides this document.
 
-**Version**: 1.3.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-07-31
+**Version**: 2.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-08-01
