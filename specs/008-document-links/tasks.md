@@ -395,7 +395,7 @@ providers and the exact setting each needs.
       `↑↓`/`jk`, `enter`/`o`, and `esc` on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside
       tmux. Confirm the footer text from `src/endpaper/tui/status_bar.py` is not truncated at 80
       columns (constitution, Development Workflow).
-- [ ] T064 [P] Extend `tests/integration/test_unicode_paths.py` and `tests/unit/test_path_budget.py`
+- [X] T064 [P] Extend `tests/integration/test_unicode_paths.py` and `tests/unit/test_path_budget.py`
       to cover this feature: a workspace path with spaces and non-ASCII characters round-tripping a
       link, a destination requiring the angle-bracket form from `relative_destination`, and the
       worst-case relative destination (117 chars, research R3) staying well inside the Windows
