@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import os
 import re
-import tempfile
 from datetime import datetime
 from pathlib import Path
 
+from endpaper.core.atomic_write import write_text_atomic
+from endpaper.core.errors import WorkspaceError
 from endpaper.core.models import EditableFile, SaveResult, ScanWarning, Workspace
 
 _UPDATED_LINE = re.compile(r"^updated:.*$", re.MULTILINE)
@@ -98,17 +98,9 @@ def save_buffer(
     stamped_text, stamped = stamp_updated(text, timestamp)
     out_text = _apply_line_ending_policy(stamped_text, file.newline, file.trailing_newline)
 
-    tmp_path: Path | None = None
     try:
-        with tempfile.NamedTemporaryFile(
-            "w", encoding="utf-8", newline="", dir=path.parent, delete=False, suffix=".tmp"
-        ) as tmp_file:
-            tmp_file.write(out_text)
-            tmp_path = Path(tmp_file.name)
-        os.replace(tmp_path, path)
-    except OSError as exc:
-        if tmp_path is not None and tmp_path.exists():
-            tmp_path.unlink()
+        write_text_atomic(path, out_text)
+    except WorkspaceError as exc:
         return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
     return SaveResult(
         ok=True, saved_text=stamped_text, stamped=stamped, message="", warnings=warnings

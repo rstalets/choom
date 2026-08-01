@@ -1,17 +1,16 @@
 from __future__ import annotations
 
-import os
 import re
-import tempfile
 from collections.abc import Iterable, Sequence
 from dataclasses import replace
 from datetime import date, datetime
 from pathlib import Path
 
+from endpaper.core.atomic_write import write_text_atomic
 from endpaper.core.documents import _TOKEN_PATTERN, _validate_token
 from endpaper.core.errors import NotFoundError, UsageError, WorkspaceError
 from endpaper.core.models import ParsedTasks, ScanWarning, Task, TaskFilter, Workspace
-from endpaper.core.text import new_task_id, parse_tags
+from endpaper.core.text import _split_terminator, new_task_id, parse_tags
 
 _TASK_LINE = re.compile(
     r"^(?P<indent>[ \t]*)(?P<marker>[-*+])[ \t]+\[(?P<state>[ xX])\][ \t]+(?P<rest>.*)$"
@@ -19,16 +18,8 @@ _TASK_LINE = re.compile(
 _IDVAL = re.compile(r"^[A-Za-z0-9_-]+$")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 _RECOGNIZED_KEYS = frozenset({"id", "type", "tags", "links", "created"})
-_TERMINATORS = ("\r\n", "\n", "\r")
 
 TASKS_PATH = Path("tasks.md")
-
-
-def _split_terminator(line: str) -> tuple[str, str]:
-    for terminator in _TERMINATORS:
-        if line.endswith(terminator):
-            return line[: -len(terminator)], terminator
-    return line, ""
 
 
 def _split_comment(rest: str) -> tuple[str, str | None, bool]:
@@ -276,19 +267,10 @@ def match_task(task: Task, query: str) -> bool:
 
 
 def _atomic_write(path: Path, lines: Sequence[str]) -> None:
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_name = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
-        tmp_path = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8", newline="") as fh:
-                fh.write("".join(lines))
-            os.replace(tmp_path, path)
-        except BaseException:
-            tmp_path.unlink(missing_ok=True)
-            raise
-    except (PermissionError, OSError) as exc:
-        raise WorkspaceError(f"could not write {path}: {exc}") from exc
+    """Thin wrapper kept for tasks.py's own call sites, which all already hold
+    a list of lines rather than one string -- the shared primitive itself only
+    knows how to write text."""
+    write_text_atomic(path, "".join(lines))
 
 
 def _read_text(path: Path) -> str:

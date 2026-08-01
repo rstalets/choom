@@ -9,6 +9,18 @@ from datetime import date
 _NON_ALNUM = re.compile(r"[^a-z0-9]+")
 _TAG_TOKEN = re.compile(r"#([A-Za-z0-9][A-Za-z0-9_-]*)")
 _WHITESPACE = re.compile(r"\s+")
+_TERMINATORS = ("\r\n", "\n", "\r")
+
+
+def _split_terminator(line: str) -> tuple[str, str]:
+    """Split `line` into its content and line terminator (one of "\\r\\n", "\\n",
+    "\\r", or "" for none). Shared by every line-oriented scanner in `core` so a
+    fence/task-line/comment parser never has to special-case a mixed-line-ending
+    file itself."""
+    for terminator in _TERMINATORS:
+        if line.endswith(terminator):
+            return line[: -len(terminator)], terminator
+    return line, ""
 
 
 def slugify(text: str, *, max_length: int = 40) -> str:
