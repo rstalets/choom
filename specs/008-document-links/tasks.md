@@ -390,21 +390,27 @@ providers and the exact setting each needs.
 - [X] T062 Walk [quickstart.md](quickstart.md) Scenarios 1–8 by hand against a scratch workspace,
       including the code-fence non-rewrite check in Scenario 2 — the case that would silently corrupt
       a note explaining link syntax.
-- [ ] T063 Verify the new preview bindings from `src/endpaper/tui/preview_screen.py` on the target
-      terminals — launch `uv run endpaper` in a workspace, open a document, and exercise `l`,
-      `↑↓`/`jk`, `enter`/`o`, and `esc` on Windows Terminal, iTerm2, macOS Terminal, PuTTY, and inside
-      tmux. Confirm the footer text from `src/endpaper/tui/status_bar.py` is not truncated at 80
-      columns (constitution, Development Workflow).
+- [ ] T063 **[HUMAN-ONLY — requires real terminal emulators]** Verify the new preview bindings from
+      `src/endpaper/tui/preview_screen.py` on the target terminals — launch `uv run endpaper` in a
+      workspace, open a document, and exercise `l`, `↑↓`/`jk`, `enter`/`o`, and `esc` on Windows
+      Terminal, iTerm2, macOS Terminal, PuTTY, and inside tmux. Confirm the footer text from
+      `src/endpaper/tui/status_bar.py` is not truncated at 80 columns (constitution, Development
+      Workflow). Not completable by an agent: Windows Terminal and PuTTY are not reachable from this
+      environment, and the check is specifically about real terminal rendering, not the pilot-driven
+      TUI test suite (which already covers the binding logic itself — see US7's 17 tests).
 - [X] T064 [P] Extend `tests/integration/test_unicode_paths.py` and `tests/unit/test_path_budget.py`
       to cover this feature: a workspace path with spaces and non-ASCII characters round-tripping a
       link, a destination requiring the angle-bracket form from `relative_destination`, and the
       worst-case relative destination (117 chars, research R3) staying well inside the Windows
       260-character budget.
-- [ ] T065 Confirm SC-011 by hand: run `uv run endpaper init` in an empty directory, give a fresh
-      assistant only the generated `AGENTS.md` from that workspace, and ask it to write a link, ask
-      what points at a record, and repair stale paths. It should need nothing else. This is the real
-      test of T058 — if the assistant has to guess, the template is wrong regardless of its line
-      count.
+- [ ] T065 **[HUMAN-ONLY — requires a fresh assistant session]** Confirm SC-011 by hand: run
+      `uv run endpaper init` in an empty directory, give a fresh assistant only the generated
+      `AGENTS.md` from that workspace, and ask it to write a link, ask what points at a record, and
+      repair stale paths. It should need nothing else. This is the real test of T058 — if the
+      assistant has to guess, the template is wrong regardless of its line count. Not completable by
+      the implementing agent: "fresh" specifically means a session with no memory of this
+      conversation's context, which the implementing agent cannot itself instantiate as a genuine
+      test of AGENTS.md alone.
 
 ---
 
