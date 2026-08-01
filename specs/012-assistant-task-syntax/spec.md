@@ -220,6 +220,8 @@ the failure.
   The capture reports the failure per Story 5 and the reply text still lands.
 - **A reply arriving after the editor has moved on** (the request was superseded). Unchanged from today:
   the reply is discarded and no task is created.
+- **A task captured from a reply is later deleted.** Unchanged from 011: the checklist item left in the
+  document keeps the user's words rather than disappearing. This feature adds no deletion behaviour.
 - **A task line inside a fenced block that is never closed.** Treated as inside the fence — the reply is
   inserted as written and nothing is captured, which is the safe direction.
 - **A reply containing `/task` inside an inline code span.** The line is not entirely the command, so it
@@ -346,6 +348,11 @@ the failure.
 - **Builds on 006 (assistant invocation, issue #19).** The composed prompt, the in-flight and
   cancellation behaviour, and the reply insertion path all come from that feature; this changes what the
   prompt says and what happens to the reply text on the way in.
+- **Reads the reply after it has been reduced to the assistant's answer (issue #69).** Each assistant's
+  reply is already narrowed to its final answer — tool-call narration and status chatter stripped —
+  before anything inserts it. This feature reads that answer, so what counts as a line here is a line the
+  user would have seen in the document, and no line of an assistant's transport format can create a task.
+  That reduction stays per-assistant; the task syntax instruction (FR-006) does not.
 - **Builds on 009 (inline task capture, issue #21).** The capture path, the mirror checklist item, the
   provenance link, and reconciliation in both directions are reused unchanged. This feature adds no task
   behaviour of its own.
