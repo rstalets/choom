@@ -202,3 +202,54 @@ def test_install_failure_does_not_delete_the_previously_working_pointer(
     # The install for copilot failed before any removal happened, so claude's
     # still-working file must still be there (research R8/R11 ordering).
     assert claude_path.read_text(encoding="utf-8") == original_text
+
+
+# --- US5: init --assistant --------------------------------------------------------
+
+
+def test_init_with_assistant_installs_pointing_at_the_new_workspace(tmp_path: Path) -> None:
+    target = tmp_path / "fresh-workspace"
+    result = init_workspace(target, assistant="claude")
+
+    path = discovery_path(_CLAUDE)
+    assert path is not None
+    assert path.is_file()
+    assert str(result.workspace.root) in path.read_text(encoding="utf-8")
+
+
+def test_init_with_no_assistant_installs_nothing(tmp_path: Path) -> None:
+    init_workspace(tmp_path / "fresh-workspace")
+    assert installed_discovery_path() is None
+
+
+def test_init_with_assistant_none_installs_nothing(tmp_path: Path) -> None:
+    init_workspace(tmp_path / "fresh-workspace", assistant="none")
+    assert installed_discovery_path() is None
+
+
+def test_init_with_assistant_none_removes_a_previously_installed_file(
+    tmp_path: Path,
+) -> None:
+    # Simulate a stray choom-owned file already sitting at claude's path (e.g. from
+    # an earlier workspace on this machine) before this fresh workspace is created.
+    other_workspace = init_workspace(tmp_path / "other-workspace").workspace
+    install_discovery_file(other_workspace, _CLAUDE)
+    assert installed_discovery_path() is not None
+
+    init_workspace(tmp_path / "fresh-workspace", assistant="none")
+    assert installed_discovery_path() is None
+
+
+def test_init_discovery_failure_does_not_fail_workspace_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def _boom(path: Path, text: str) -> None:
+        raise WorkspaceError(f"simulated failure writing {path}")
+
+    monkeypatch.setattr("choom.core.discovery.write_text_atomic", _boom)
+
+    target = tmp_path / "fresh-workspace"
+    result = init_workspace(target, assistant="claude")
+
+    assert result.workspace.root == target.resolve()
+    assert (target / ".choom" / "config.toml").is_file()

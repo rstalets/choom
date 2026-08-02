@@ -145,8 +145,8 @@ and confirm the setting is still recorded and the problem named.
 **Independent test**: run `init` with an assistant named in a fresh directory and confirm the file
 exists and points at the new workspace.
 
-- [ ] T036 [US5] Install the discovery file at the end of `init_workspace` in `src/choom/core/workspace.py` when `assistant` names a supported assistant, and remove any choom-owned file when it is `none`; a failure here must not fail `init` (FR-020)
-- [ ] T037 [P] [US5] Add unit tests in `tests/unit/test_discovery_install.py`: `init --assistant claude` installs pointing at the new workspace; `init` with no assistant installs nothing; `init --assistant none` installs nothing; a discovery-file failure still leaves a valid workspace
+- [X] T036 [US5] Install the discovery file at the end of `init_workspace` in `src/choom/core/workspace.py` when `assistant` names a supported assistant, and remove any choom-owned file when it is `none`; a failure here must not fail `init` (FR-020)
+- [X] T037 [P] [US5] Add unit tests in `tests/unit/test_discovery_install.py`: `init --assistant claude` installs pointing at the new workspace; `init` with no assistant installs nothing; `init --assistant none` installs nothing; a discovery-file failure still leaves a valid workspace
 
 **Checkpoint**: all five stories delivered.
 
