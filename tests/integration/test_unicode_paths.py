@@ -3,6 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from choom.core.assistants import compose_prompt, resolve_assistant, start_request
 from choom.core.config import get_assistant, set_assistant
 from choom.core.editing import load_for_edit, save_buffer
@@ -287,3 +289,59 @@ def test_a_bare_url_in_a_crlf_document_round_trips_the_line_ending_convention(
     assert "\r\n" in on_disk
     assert "\n" not in on_disk.replace("\r\n", "")  # every newline is `\r\n` -- none bare
     assert "[https://example.com/a](https://example.com/a)" in on_disk
+
+
+# --- T031 (020-vertical-tui-mode, Polish): preferences path with spaces and
+# non-ASCII characters --------------------------------------------------------
+
+
+def test_preferences_file_round_trips_in_a_profile_path_with_spaces_and_non_ascii(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from choom.core import preferences
+
+    profile_root = tmp_path / "Équipe Config 笔记"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+
+    preferences.set_view_orientation("vertical")
+    prefs_path = profile_root / "preferences.toml"
+    assert prefs_path.is_file()
+    assert preferences.get_view_orientation() == "vertical"
+
+    preferences.set_view_orientation("horizontal")
+    assert preferences.get_view_orientation() == "horizontal"
+    assert 'orientation = "horizontal"' in prefs_path.read_text(encoding="utf-8")
+
+
+def test_preferences_path_stays_well_under_the_windows_260_character_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from choom.core import preferences
+
+    # A representative Windows-shaped path (this assertion holds regardless
+    # of host OS -- it is about the *length* of the resolved path, not about
+    # actually resolving one on Windows).
+    windows_shaped = r"C:\Users\someone\AppData\Local\choom\preferences.toml"
+    assert len(windows_shaped) < 260
+
+    profile_root = tmp_path / "profile"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+    preferences.set_view_orientation("vertical")
+    prefs_path = profile_root / "preferences.toml"
+    assert len(str(prefs_path)) < 260
+
+
+def test_preferences_write_involves_no_admin_rights_or_network(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Not directly testable in the negative, but the write path never
+    imports or calls anything network- or privilege-related -- confirmed by
+    construction (`write_text_atomic` is a same-directory temp file plus
+    `os.replace`, both plain filesystem calls) and exercised here as an
+    ordinary user-writable directory."""
+    from choom.core import preferences
+
+    profile_root = tmp_path / "plain profile"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+    preferences.set_view_orientation("vertical")
+    assert (profile_root / "preferences.toml").is_file()

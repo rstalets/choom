@@ -81,3 +81,17 @@ async def test_escape_dismisses_and_leaves_state_unchanged(tmp_workspace: Worksp
         assert isinstance(app.screen, ListScreen)
         assert app.active == active_before
         assert list_view(app).highlighted_child.document.id == highlighted_before  # type: ignore[union-attr]
+
+
+# --- T028 (020-vertical-tui-mode, US5, FR-046): /config's help entry names
+# both settings and both of view's accepted values -----------------------
+
+
+async def test_help_pane_names_view_and_both_accepted_values(tmp_workspace: Workspace) -> None:
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await _open_help(pilot)
+        body = str(app.screen.query_one("#help-body").content)  # type: ignore[attr-defined]
+        assert "view" in body
+        assert "horizontal" in body
+        assert "vertical" in body

@@ -17,7 +17,7 @@ Two steps, run together, for cutting a release:
 2. Use that draft, plus any screenshots the user supplies, to update `README.md`'s user-facing
    feature summary, and open a PR with the result.
 
-This is the "ship" end of the pipeline that starts at `/product-owner` (refine the issue) and
+This is the "ship" end of the pipeline that starts at `/regina` (refine the issue) and
 `/speckit-specify`/`/speckit-plan`/`/speckit-implement` (build it) -- once a milestone's work has
 landed, this turns it into the documentation update that tells users what changed.
 

@@ -17,9 +17,9 @@ driving. The core decides who goes where, inspects every arrival, and is the onl
 gets to call a job finished -- and the only one that notices when a copy has started
 drifting off its route.
 
-This sits between `/product-owner` (which refines an issue into a real problem statement)
-and `/release` (which ships what landed). It does not refine issues and it does not cut
-releases.
+This sits between `/regina` (which refines an issue into a real problem statement and the
+decisions a spec needs) and `/release` (which ships what landed). It does not refine issues
+and it does not cut releases.
 
 **You are the orchestrator, not the implementer.** You run on Opus. You do not write
 feature code yourself. Your job is routing, review, verification, and merge decisions.
@@ -106,6 +106,48 @@ checks was never running; restart it rather than waiting on it. `git worktree li
 worktree whose branch has no commits is the signature of a job that died before it produced
 anything.
 
+## Step 0 -- Resuming, and running under `/loop`
+
+**Before Step 1, check whether this run is already in progress.** Read
+`$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`. If a ledger exists for this work set, you are
+*resuming*, not starting, and two things change:
+
+- **Do not re-ask for the Step 4 go-ahead.** It was given once and it still holds. Re-asking
+  on every resume is how an unattended run turns into a queue of unanswered questions. Skip
+  straight to the first unfinished job in the ledger. The gate is per *run*, not per turn.
+- **Verify before you trust.** Every row claiming to be in flight is a claim, not evidence --
+  see "Keeping the run alive". Check each against the filesystem, and treat a job that fails
+  those checks as never having started: restart it rather than waiting on it.
+
+Re-present the run plan only if the work set itself has changed -- an issue added to or removed
+from the milestone, or a job you are about to park.
+
+### Running under `/loop`
+
+This skill is built to be driven by `/loop`, which fires on a wall-clock interval rather than
+waiting on a turn to complete. That matters because the orchestrator only wakes when a subagent
+finishes, so a turn that ends with an empty queue stalls the run until a human notices. A
+periodic tick is the external heartbeat that recovers from exactly that:
+
+```
+/loop 20m /delamain <milestone-or-issues>
+```
+
+Twenty to thirty minutes is the right order. The stall it guards against is rare and a tick that
+finds everything healthy costs almost nothing -- verify the queue, report nothing new, end the
+turn. Do not set a short interval to "watch" a job: subagent completions already re-invoke you,
+so a fast tick buys nothing and burns tokens.
+
+On each firing, do this and nothing more when the run is healthy:
+
+1. Read the ledger.
+2. Verify every in-flight claim against the filesystem.
+3. Restart anything dead; advance anything finished; spawn the next job if the queue is empty.
+4. If every job is merged or parked, the run is complete -- say so and stop the loop.
+
+A tick that finds a live agent and outstanding work should end quietly. Do not re-review a gate
+you have already passed, do not re-run a smoke test that already passed, and do not re-merge.
+
 ## Step 1 -- Resolve the work set
 
 - `milestone:<name-or-number>` or a bare version like `v0.0.4`: take every **open** issue on
@@ -185,7 +227,7 @@ What changes when `<TARGET>` is not `main`:
 | Labels | Lane | Path |
 |---|---|---|
 | `enhancement` + `ready` | **Feature** | speckit: specify → plan → tasks → implement |
-| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/product-owner <n>` and skip. |
+| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/regina <n>` and skip. |
 | `bug` | **Direct** | Single subagent: reproduce → fix → test → PR |
 | `maintenance`, `documentation`, `dependencies`, `github_actions` | **Direct** | Single subagent: change → test → PR |
 | No label, or ambiguous | **Parked** | Ask rather than guess a lane. |
@@ -220,6 +262,10 @@ serialization. List anything parked at Step 2 and why.
 
 Ask for a single go-ahead. **This is the only approval gate.** After it, run to completion
 without checking back except to report a parked job or a constitution escalation.
+
+**Once per run, not once per turn.** If Step 0 found an existing ledger, the go-ahead has
+already been given -- do not ask again. Under `/loop` this is the difference between a heartbeat
+and an interrogation.
 
 ## Step 5 -- Model and agent routing
 
@@ -507,7 +553,7 @@ At the end, give the user:
   `specs/<feature>/` survived so a re-run starts from the reviewed design rather than from
   scratch. Lead with this section if it is non-empty -- it is the first thing the user needs
   to know and the reason they will want the ledger.
-- **Parked**: issue, the reason, and the specific next action (usually `/product-owner <n>`
+- **Parked**: issue, the reason, and the specific next action (usually `/regina <n>`
   or a constitution decision only they can make).
 
 When the run targeted an integration branch, close by handing it back explicitly -- the user

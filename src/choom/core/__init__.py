@@ -73,6 +73,13 @@ from choom.core.models import (
     Workspace,
 )
 from choom.core.notes import create_note, open_daily_note, scan_notes
+from choom.core.preferences import (
+    DEFAULT_VIEW_ORIENTATION,
+    LEGAL_VIEW_ORIENTATIONS,
+    get_view_orientation,
+    preferences_root,
+    set_view_orientation,
+)
 from choom.core.task_store import (
     done_file_for,
     iter_done_files,
@@ -105,11 +112,13 @@ from choom.core.workspace import find_workspace, init_workspace, workspace_title
 __all__ = [
     "ChoomError",
     "Collection",
+    "DEFAULT_VIEW_ORIENTATION",
     "DailyNote",
     "Document",
     "DocumentFilter",
     "EditableFile",
     "InitResult",
+    "LEGAL_VIEW_ORIENTATIONS",
     "Link",
     "LinkCandidate",
     "LinkDirection",
@@ -157,6 +166,7 @@ __all__ = [
     "format_bare_urls",
     "format_link",
     "get_task",
+    "get_view_orientation",
     "heal_links",
     "heal_text",
     "inbound_links",
@@ -184,6 +194,7 @@ __all__ = [
     "parse_tags",
     "parse_tasks",
     "plan_mirror_deletion",
+    "preferences_root",
     "propagate_to_documents",
     "read_frontmatter",
     "reconcile_on_open",
@@ -199,6 +210,7 @@ __all__ = [
     "scan_meetings",
     "scan_notes",
     "set_task_state",
+    "set_view_orientation",
     "slugify",
     "stamp_updated",
     "store_fingerprint",

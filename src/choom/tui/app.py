@@ -42,6 +42,12 @@ from choom.core.models import (
     YearMonth,
 )
 from choom.core.notes import NOTES, create_note, open_daily_note
+from choom.core.preferences import (
+    DEFAULT_VIEW_ORIENTATION,
+    LEGAL_VIEW_ORIENTATIONS,
+    get_view_orientation,
+    set_view_orientation,
+)
 from choom.core.task_store import load_task_store
 from choom.core.tasks import (
     add_task,
@@ -51,6 +57,7 @@ from choom.core.tasks import (
     match_task,
     set_task_state,
 )
+from choom.tui.layout import MIN_VERTICAL_SCREEN_HEIGHT, effective_orientation
 
 if TYPE_CHECKING:
     from choom.tui.list_screen import ListScreen
@@ -86,6 +93,13 @@ class ChoomApp(App[None]):
         super().__init__()
         self.workspace = workspace
         self.active: str = "tasks"
+
+        # 020-vertical-tui-mode: the *stored* preference, read once here --
+        # never the effective one. The fallback against the terminal's
+        # current height is resolved per-render, in exactly one place
+        # (`ListScreen.effective_orientation`), because the terminal can be
+        # resized after startup (research R12, data-model.md 2.2).
+        self.view_orientation: str = get_view_orientation()
 
         # Notes/Meetings: which month (or "unfiled") the scope pane shows.
         self.month_scope: dict[str, YearMonth] = {}
@@ -391,12 +405,15 @@ class ChoomApp(App[None]):
 
     def handle_config_command(self, argument: str) -> str | None:
         """Handle `/config <setting> [<value>]` from the command bar (research
-        R11). Returns a status-bar message; a set always reports the discovery-file
-        outcome (FR-015), matching the CLI peer's stderr line in substance -- the two
-        interfaces report the same result in their own idiom."""
+        R11; view added by 020-vertical-tui-mode, contracts/tui.md C1). Returns a
+        status-bar message; a set always reports the outcome, matching the CLI
+        peer's stderr line in substance where one exists -- the two interfaces
+        report the same result in their own idiom."""
         setting_name, _, value = argument.partition(" ")
+        if setting_name == "view":
+            return self._handle_view_command(value)
         if setting_name != "assistant":
-            return f"unknown setting: {setting_name!r}"
+            return f"unknown setting: {setting_name!r}; known settings: assistant, view"
 
         if not value:
             configured = get_assistant(self.workspace)
@@ -420,6 +437,56 @@ class ChoomApp(App[None]):
         except WorkspaceError:
             pass
         return self._describe_discovery_outcome(value)
+
+    def _handle_view_command(self, value: str) -> str:
+        """`/config view [<value>]` (020-vertical-tui-mode, contracts/tui.md C1).
+
+        Set: a legal value persists via `set_view_orientation`, updates
+        `self.view_orientation` immediately (FR-004, FR-005), and reports
+        both facts at once when the terminal is too short for vertical to
+        take effect yet (FR-038). A store failure degrades to a
+        session-only switch rather than aborting the interface (FR-013).
+
+        Get (no `value`): reports the stored setting and the accepted
+        values, naming both the stored value and the fallback when it is in
+        effect (FR-037).
+
+        `self.screen.size.height` -- not a `ListScreen`-specific height --
+        is used to resolve the fallback: the command bar (and therefore
+        this command) is only reachable from `ListScreen`, whose height is
+        the terminal's total height, matching what `effective_orientation`
+        expects (contracts/layout.md).
+        """
+        accepted = ", ".join(LEGAL_VIEW_ORIENTATIONS)
+        screen_height = self.screen.size.height
+
+        if not value:
+            stored = self.view_orientation
+            if stored == DEFAULT_VIEW_ORIENTATION:
+                return f"view: {stored} (default); accepted: {accepted}"
+            if effective_orientation(stored, screen_height) != stored:
+                return (
+                    f"view: {stored}, but horizontal is in effect — the terminal is "
+                    f"too short; accepted: {accepted}"
+                )
+            return f"view: {stored}; accepted: {accepted}"
+
+        if value not in LEGAL_VIEW_ORIENTATIONS:
+            return f"view must be one of {accepted}; got {value!r}"
+
+        try:
+            set_view_orientation(value)
+        except WorkspaceError as exc:
+            self.view_orientation = value
+            return f"view set to {value} for this session; could not save the preference: {exc}"
+
+        self.view_orientation = value
+        if value == "vertical" and effective_orientation(value, screen_height) != "vertical":
+            return (
+                f"view set to {value}; terminal is too short — horizontal is in "
+                f"effect until it is at least {MIN_VERTICAL_SCREEN_HEIGHT} rows tall"
+            )
+        return f"view set to {value}"
 
     def _describe_discovery_outcome(self, value: str) -> str:
         """The discovery-file side effect of a successful `/config assistant <value>`,

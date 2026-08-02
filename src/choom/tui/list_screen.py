@@ -8,7 +8,7 @@ from typing import cast
 from textual import events, on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.timer import Timer
@@ -33,6 +33,7 @@ from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditorPane, EditTarget
 from choom.tui.help_screen import HelpScreen
+from choom.tui.layout import effective_orientation as _resolve_effective_orientation
 from choom.tui.link_picker import LinkPicker
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
@@ -165,6 +166,54 @@ class TaskRow(ListItem):
         self.query_one(Label).update(self._row_text(self.record, layout))
 
 
+class _Body(Container):
+    """The recomposable container holding the scope pane, record list, and
+    preview -- the one structure that differs between orientations (research
+    R1, data-model.md §4). `ListScreen.compose()` yields exactly one of
+    these, with `id="body"`; the switch (`ListScreen._on_config_requested`)
+    and the resize guard (`ListScreen.on_resize`) both call
+    `self.query_one("#body").recompose()` to rebuild it in place.
+
+    `Widget.recompose()` tears down and rebuilds only the recomposed
+    widget's *own* children, by re-running *its own* `compose()` -- never
+    its parent's. That is why this branch cannot live in `ListScreen.compose()`
+    the way a first read of the contract might suggest: `ListScreen` is never
+    the widget being recomposed, `#body` is, so `#body` needs its own
+    `compose()` to have anything to rebuild.
+
+    Reads `self.has_class("-vertical")` rather than re-deriving the
+    orientation itself, so there is exactly one place (the caller, before
+    it toggles the class and calls `recompose()`) that decides which tree
+    this produces -- the class is the single source of truth `app.tcss`'s
+    `#body.-vertical` selector already keys off. Horizontal composes
+    **exactly today's tree, unchanged** (FR-020 holds by construction); every
+    id is identical in both trees, which is what lets the inline editor's
+    mount target (`ListScreen.open_inline_editor`) and every existing
+    `query_one` call keep working untouched.
+    """
+
+    def compose(self) -> ComposeResult:
+        if self.has_class("-vertical"):
+            with Horizontal(id="upper-band"):
+                yield ScopePane(id="scope-pane")
+                with Vertical(id="list-pane"):
+                    yield Static(id="list-header")
+                    yield ListView(id="meeting-list")
+            with Vertical(id="preview-pane"):
+                yield Markdown(id="preview", open_links=False)
+                with Vertical(id="preview-links-section"):
+                    yield ListView(id="preview-links-list")
+        else:
+            yield ScopePane(id="scope-pane")
+            with Vertical(id="list-pane"):
+                yield Static(id="list-header")
+                yield ListView(id="meeting-list")
+            with Vertical(id="preview-pane"):
+                yield Markdown(id="preview", open_links=False)
+                with Vertical(id="preview-links-section"):
+                    yield ListView(id="preview-links-list")
+
+
 class ListScreen(Screen[None]):
     BINDINGS = [
         Binding("tab", "next_collection", "Collection", show=True),
@@ -230,19 +279,50 @@ class ListScreen(Screen[None]):
             str(self.app.workspace.root),  # type: ignore[attr-defined]
             id="collection-bar",
         )
-        with Horizontal(id="body"):
-            yield ScopePane(id="scope-pane")
-            with Vertical(id="list-pane"):
-                yield Static(id="list-header")
-                yield ListView(id="meeting-list")
-            with Vertical(id="preview-pane"):
-                yield Markdown(id="preview", open_links=False)
-                with Vertical(id="preview-links-section"):
-                    yield ListView(id="preview-links-list")
+        # 020-vertical-tui-mode: `#body`'s own compose() (below, `_Body`) is
+        # what decides the tree, not this one -- `Widget.recompose()` only
+        # re-invokes the *recomposed widget's own* compose(), never its
+        # parent's, so the orientation branch has to live there for the
+        # switch (`_on_config_requested`) and the resize guard (`on_resize`)
+        # to be able to rebuild it in place.
+        vertical = self.effective_orientation() == "vertical"
+        yield _Body(id="body", classes="-vertical" if vertical else "")
         with Vertical(id="bottom-bar"):
             yield LinkPicker(id="link-picker")
             yield CommandBar(id="command-bar")
             yield StatusBar(LIST_HELP, id="status-bar")
+
+    def effective_orientation(self) -> str:
+        """The orientation actually rendered right now: `app.view_orientation`
+        (the stored preference) resolved against this screen's current
+        height (research R12, contracts/layout.md). The one place the two
+        combine -- every other caller asks this rather than reading
+        `app.view_orientation` directly, so the fallback cannot drift out of
+        step between callers."""
+        return _resolve_effective_orientation(
+            self.app.view_orientation,  # type: ignore[attr-defined]
+            self.size.height,
+        )
+
+    async def _recompose_body(self, orientation: str) -> None:
+        """Toggle `#body`'s `-vertical` class to match `orientation` and
+        rebuild it in place. `_Body.compose()` (module level, above) reads
+        the class rather than re-deriving the orientation itself, so this is
+        the one place that decides which tree the next `recompose()`
+        produces -- shared by the switch (`_on_config_requested`) and the
+        resize guard (`on_resize`) so the two recompose paths cannot drift
+        apart."""
+        body = self.query_one("#body")
+        if orientation == "vertical":
+            body.add_class("-vertical")
+        else:
+            body.remove_class("-vertical")
+        await body.recompose()
+        # A freshly composed #preview-links-section defaults to visible
+        # (Vertical's own default), unlike the one on_mount hides once at
+        # startup -- restore that same default here so the caller's own
+        # FR-021 re-show logic is the only reason it would end up visible.
+        self.query_one("#preview-links-section").display = False
 
     async def on_mount(self) -> None:
         self.query_one("#preview-links-section").display = False
@@ -312,11 +392,40 @@ class ListScreen(Screen[None]):
         if self._editor_pane is not None:
             self._editor_pane.handle_link_cancelled(message.message)
 
-    def on_resize(self, event: events.Resize) -> None:
-        # Column widths are a pure function of the pane's width (research
-        # R8) -- re-render the header and every already-rendered row's text
-        # in place, with no disk read, rather than re-running the whole
-        # refresh (US5).
+    async def on_resize(self, event: events.Resize) -> None:
+        # 020-vertical-tui-mode, contracts/tui.md C4, FR-025 -- see "The one
+        # way this feature loses the user's words" in tasks.md. Branch one,
+        # unconditionally, first: an inline editor is mounted *inside*
+        # #preview-pane, so recomposing #body while it is open would remove
+        # the editor and the user's unsaved buffer along with it, with no
+        # confirmation and no way back. This is the single line of defence
+        # against that -- there is no second guard behind it -- so it is
+        # checked before the effective orientation is even read.
+        if self._editor_pane is not None:
+            self._rerender_columns()
+            return
+
+        # Branch two: the effective orientation, resolved against the *new*
+        # size, may not have crossed the threshold at all -- the common
+        # case, and today's whole behaviour before this feature existed.
+        # `#body`'s own `-vertical` class (not a separately tracked field)
+        # is the ground truth for what is currently rendered, matching
+        # `_recompose_body`'s single source of truth.
+        effective = self.effective_orientation()
+        body = self.query_one("#body")
+        if body.has_class("-vertical") == (effective == "vertical"):
+            self._rerender_columns()
+            return
+
+        # Branch three: the threshold was crossed -- rebuild #body for the
+        # new orientation and repopulate exactly as the command path does
+        # (data-model.md §5.2), then re-render columns for the new widths.
+        await self._recompose_body(effective)
+        await self._refresh_scope_pane()
+        await self.refresh_rows()
+        if self._preview_links_expanded:
+            self.query_one("#preview-links-section").display = True
+            await self._populate_preview_links()
         self._rerender_columns()
 
     def _column_layout(self) -> ColumnLayout:
@@ -1025,8 +1134,42 @@ class ListScreen(Screen[None]):
         await self._activate_collection(message.name)
 
     @on(CommandBar.ConfigRequested)
-    def _on_config_requested(self, message: CommandBar.ConfigRequested) -> None:
+    async def _on_config_requested(self, message: CommandBar.ConfigRequested) -> None:
+        """`/config <setting> [<value>]` (research R11; 020-vertical-tui-mode
+        data-model.md §5.1). `handle_config_command` validates, persists, and
+        updates `app.view_orientation` on its own -- this handler's only job
+        is to notice whether the *effective* orientation actually changed
+        (an assistant-setting command, an error, a get, or setting the value
+        already in effect never does, contracts/tui.md C3's idempotence
+        clause) and, only then, rebuild `#body` in place.
+
+        Recomposes `#body`, never the screen (FR-026): a screen-level
+        recompose would destroy the command bar mid-dispatch of the very
+        message this handler is responding to.
+        """
+        before = self.effective_orientation()
         self._pending_error = self.app.handle_config_command(message.argument)  # type: ignore[attr-defined]
+        after = self.effective_orientation()
+        if after == before:
+            return
+
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+        select_id: str | None = None
+        if isinstance(highlighted, DocumentRow):
+            select_id = highlighted.document.id
+        elif isinstance(highlighted, TaskRow):
+            select_id = highlighted.record.id
+
+        await self._recompose_body(after)
+        await self._refresh_scope_pane()
+        await self.refresh_rows(select_id=select_id)
+        if self._preview_links_expanded:
+            # FR-021: the recompose built a fresh #preview-links-section that
+            # defaults to hidden -- without this, backlinks silently
+            # collapses on every orientation switch.
+            self.query_one("#preview-links-section").display = True
+            await self._populate_preview_links()
 
     @on(CommandBar.HelpRequested)
     def _on_help_requested(self, message: CommandBar.HelpRequested) -> None:
