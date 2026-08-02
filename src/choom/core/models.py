@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Literal
 
 
@@ -291,6 +291,12 @@ class AssistantProfile:
     binary: str
     build_args: Callable[[str], list[str]]
     parse_reply: Callable[[str], str]
+    #: The discovery file's path relative to the user's profile root (013-assistant-
+    #: discovery-file, research R1-R3), or None when this assistant has no user-scope
+    #: location that it reads regardless of working directory (FR-017) -- a case that
+    #: exists in the type so a future profile can express it without a crash, though
+    #: neither assistant supported today hits it (research R2).
+    discovery_relpath: PurePosixPath | None = None
 
 
 @dataclass(frozen=True, slots=True)

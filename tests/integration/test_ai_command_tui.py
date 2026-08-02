@@ -8,7 +8,7 @@ import pytest
 from textual.widgets import TextArea
 
 from choom.core.assistants import PROFILES, AssistantRequest
-from choom.core.config import set_assistant
+from choom.core.config import set_assistant, set_launch_offer_made
 from choom.core.meetings import create_meeting
 from choom.core.models import AssistantReply, Workspace
 from choom.core.tasks import load_tasks
@@ -17,6 +17,24 @@ from choom.tui.edit_screen import _PLACEHOLDER, EditScreen
 from choom.tui.status_bar import EDIT_HELP, StatusBar
 from tests.conftest import STUB_REPLY_TEXT
 from tests.helpers import list_view, open_edit, submit_editor_line, task_rows, to_collection
+
+
+@pytest.fixture(autouse=True)
+def _offer_already_made(tmp_workspace: Workspace) -> None:
+    """Record the discovery offer as already made, for every test in this module.
+
+    These tests are about `/ai`, and they reach it by putting exactly one assistant
+    on PATH (`stub_assistant`, or an emptied PATH plus an explicit setting). That is
+    precisely the condition 013-assistant-discovery-file's launch offer fires on, so
+    without this the app opens onto a `ConfirmDialog` and every query for a widget on
+    the list underneath fails with `NoMatches`. First-run discovery has its own
+    coverage in `test_launch_offer.py`; here it is noise.
+
+    Module-scoped rather than in `tmp_workspace` itself: the unit tests for the config
+    writer and for `should_offer_discovery` need a workspace that has *not* been
+    through this, and pre-recording it globally would quietly gut them.
+    """
+    set_launch_offer_made(tmp_workspace, True)
 
 
 async def test_reply_replaces_the_command_line(

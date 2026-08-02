@@ -245,6 +245,15 @@ class ListScreen(Screen[None]):
                 except NoMatches:
                     continue  # this row's Label has not finished mounting yet
 
+    def set_pending_status(self, message: str | None) -> None:
+        """Receive the outcome of the launch offer raised by `ChoomApp.on_mount`
+        (013-assistant-discovery-file, US2, research R6). Stored rather than rendered
+        immediately: popping `ConfirmDialog` always triggers this screen's own
+        `on_screen_resume` refresh, and rendering here too would race it -- whichever
+        finished last would silently overwrite the other's status text. This mirrors
+        `_delete_record`'s use of `_pending_error` for exactly the same reason."""
+        self._pending_error = message
+
     async def on_screen_resume(self) -> None:
         # Coming back from PreviewScreen/EditScreen: a document may have been
         # created or edited while we were away, and a create moves the active

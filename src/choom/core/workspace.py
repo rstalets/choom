@@ -5,7 +5,9 @@ import tomllib
 from datetime import datetime
 from pathlib import Path
 
+from choom.core.assistants import resolve_assistant
 from choom.core.config import LEGAL_ASSISTANT_VALUES
+from choom.core.discovery import install_discovery_file, remove_discovery_files
 from choom.core.errors import UsageError, WorkspaceError
 from choom.core.models import InitResult, Workspace
 
@@ -96,6 +98,29 @@ def init_workspace(target: Path, *, assistant: str | None = None) -> InitResult:
         config_text += f'\n[assistant]\nname = "{assistant}"\n'
     (choom_dir / "config.toml").write_text(config_text, encoding="utf-8")
 
-    return InitResult(
-        workspace=Workspace(root=target), written=tuple(written), skipped=tuple(skipped)
-    )
+    workspace = Workspace(root=target)
+    if assistant is not None:
+        _install_or_remove_discovery(workspace, assistant)
+
+    return InitResult(workspace=workspace, written=tuple(written), skipped=tuple(skipped))
+
+
+def _install_or_remove_discovery(workspace: Workspace, assistant: str) -> None:
+    """The discovery-file side effect of naming an assistant at init (US5, FR-020):
+    `assistant` is a supported name installs its pointer at the new workspace;
+    `"none"` installs nothing and removes any choom-owned file that happened to
+    already exist. `init` with no `--assistant` never calls this at all.
+
+    Never raises: a discovery-file failure must not fail workspace creation -- the
+    workspace this function is called for already exists by this point. The file can
+    always be installed later with `config assistant`.
+    """
+    try:
+        if assistant == "none":
+            remove_discovery_files()
+            return
+        profile = resolve_assistant(assistant).profile
+        if profile is not None:
+            install_discovery_file(workspace, profile)
+    except WorkspaceError:
+        pass

@@ -4,7 +4,12 @@ import tomllib
 
 import pytest
 
-from choom.core.config import get_assistant, set_assistant
+from choom.core.config import (
+    get_assistant,
+    get_launch_offer_made,
+    set_assistant,
+    set_launch_offer_made,
+)
 from choom.core.errors import UsageError
 from choom.core.models import Workspace
 
@@ -77,6 +82,78 @@ def test_workspace_schema_is_untouched(tmp_workspace: Workspace) -> None:
     text = _config_path(tmp_workspace).read_text(encoding="utf-8")
     data = tomllib.loads(text)
     assert data["workspace"]["schema"] == 1
+
+
+def test_crlf_config_file_stays_crlf_after_a_write(tmp_workspace: Workspace) -> None:
+    # research R5/T011: the generalised `_apply_assistant_key` writer must preserve a
+    # hand-edited file's own line endings, exactly as the original name-only writer did.
+    path = _config_path(tmp_workspace)
+    original = path.read_text(encoding="utf-8")
+    path.write_bytes(original.replace("\n", "\r\n").encode("utf-8"))
+
+    set_assistant(tmp_workspace, "claude")
+
+    raw = path.read_bytes()
+    assert b"\r\n" in raw
+    assert raw.replace(b"\r\n", b"").find(b"\n") == -1  # no bare LF snuck in
+    data = tomllib.loads(raw.decode("utf-8"))
+    assert data["assistant"]["name"] == "claude"
+
+
+# --- the generalised writer's second key: launch_offer_made ------------------------
+
+
+def test_launch_offer_made_round_trips(tmp_workspace: Workspace) -> None:
+    assert get_launch_offer_made(tmp_workspace) is False
+    set_launch_offer_made(tmp_workspace, True)
+    assert get_launch_offer_made(tmp_workspace) is True
+    set_launch_offer_made(tmp_workspace, False)
+    assert get_launch_offer_made(tmp_workspace) is False
+
+
+def test_launch_offer_made_absent_key_reads_false(tmp_workspace: Workspace) -> None:
+    set_assistant(tmp_workspace, "claude")  # writes [assistant] with only `name`
+    assert get_launch_offer_made(tmp_workspace) is False
+
+
+def test_launch_offer_made_malformed_toml_reads_false(tmp_workspace: Workspace) -> None:
+    path = _config_path(tmp_workspace)
+    path.write_text("not valid toml [[[", encoding="utf-8")
+    assert get_launch_offer_made(tmp_workspace) is False
+
+
+def test_launch_offer_made_non_boolean_value_reads_false(tmp_workspace: Workspace) -> None:
+    path = _config_path(tmp_workspace)
+    path.write_text(
+        path.read_text(encoding="utf-8") + '\n[assistant]\nlaunch_offer_made = "yes"\n',
+        encoding="utf-8",
+    )
+    assert get_launch_offer_made(tmp_workspace) is False
+
+
+def test_setting_launch_offer_made_leaves_name_and_unknown_keys_untouched(
+    tmp_workspace: Workspace,
+) -> None:
+    path = _config_path(tmp_workspace)
+    path.write_text(
+        path.read_text(encoding="utf-8") + '\n[assistant]\nname = "claude"\nnickname = "cc"\n',
+        encoding="utf-8",
+    )
+    set_launch_offer_made(tmp_workspace, True)
+    text = path.read_text(encoding="utf-8")
+    data = tomllib.loads(text)
+    assert data["assistant"]["name"] == "claude"
+    assert data["assistant"]["nickname"] == "cc"
+    assert data["assistant"]["launch_offer_made"] is True
+
+
+def test_setting_name_leaves_launch_offer_made_untouched(tmp_workspace: Workspace) -> None:
+    set_launch_offer_made(tmp_workspace, True)
+    set_assistant(tmp_workspace, "copilot")
+    text = _config_path(tmp_workspace).read_text(encoding="utf-8")
+    data = tomllib.loads(text)
+    assert data["assistant"]["name"] == "copilot"
+    assert data["assistant"]["launch_offer_made"] is True
 
 
 def test_get_assistant_missing_file_returns_none(tmp_workspace: Workspace) -> None:

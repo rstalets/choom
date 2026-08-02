@@ -2,13 +2,23 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from textual.app import App
 from textual.binding import Binding
 
 from choom.core.assistants import resolve_assistant
-from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
+from choom.core.config import (
+    LEGAL_ASSISTANT_VALUES,
+    get_assistant,
+    set_assistant,
+    set_launch_offer_made,
+)
+from choom.core.discovery import (
+    install_discovery_file,
+    remove_discovery_files,
+    should_offer_discovery,
+)
 from choom.core.documents import (
     list_months,
     match_document,
@@ -16,10 +26,11 @@ from choom.core.documents import (
     scan_month,
     scan_unfiled,
 )
-from choom.core.errors import ChoomError, UsageError
+from choom.core.errors import ChoomError, UsageError, WorkspaceError
 from choom.core.meetings import MEETINGS, create_meeting
 from choom.core.mirrors import propagate_to_documents
 from choom.core.models import (
+    AssistantProfile,
     Collection,
     DailyNote,
     Document,
@@ -39,6 +50,9 @@ from choom.core.tasks import (
     match_task,
     set_task_state,
 )
+
+if TYPE_CHECKING:
+    from choom.tui.list_screen import ListScreen
 
 DOCUMENT_COLLECTIONS: dict[str, Collection] = {"meetings": MEETINGS, "notes": NOTES}
 ScopeSelection = YearMonth | Literal["unfiled"]
@@ -90,13 +104,76 @@ class ChoomApp(App[None]):
         # §3.3). Read by `visible_warnings()`; never consulted for anything else.
         self._last_warnings: list[ScanWarning] = []
 
+        #: The one `ListScreen` this session ever pushes (research R6) -- kept so the
+        #: launch offer's dismiss callback, which fires from here rather than from the
+        #: screen itself, has somewhere to hand its outcome via `set_pending_status`.
+        self._list_screen: ListScreen | None = None
+
         for name in DOCUMENT_COLLECTIONS:
             self._reset_scope(name)
 
     def on_mount(self) -> None:
         from choom.tui.list_screen import ListScreen
 
-        self.push_screen(ListScreen())
+        self._list_screen = ListScreen()
+        self.push_screen(self._list_screen)
+        # Deferred past the first refresh (FR-034): the list must be up and painted
+        # behind the question before it appears (research R6).
+        self.call_after_refresh(self._maybe_offer_discovery)
+
+    def _maybe_offer_discovery(self) -> None:
+        """Raise the once-only launch offer if `should_offer_discovery` says to
+        (US2). Runs once, from `on_mount`, never from `ListScreen` itself -- that
+        screen is re-entered on every resume, and raising it there would need its own
+        suppression logic to avoid re-asking within one run (research R6)."""
+        from choom.tui.confirm_dialog import ConfirmDialog
+
+        configured = get_assistant(self.workspace)
+        resolved = resolve_assistant(configured)
+        profile = should_offer_discovery(self.workspace, resolved)
+        if profile is None:
+            return
+
+        dialog = ConfirmDialog(
+            f"Let {profile.display_name} know this workspace is at {self.workspace.root}?",
+            cancel_label="Not Now",
+            confirm_label="Tell It",
+        )
+
+        def _handle_dismiss(confirmed: bool | None) -> None:
+            self._resolve_launch_offer(profile, confirmed=bool(confirmed))
+
+        self.push_screen(dialog, _handle_dismiss)
+
+    def _resolve_launch_offer(self, profile: AssistantProfile, *, confirmed: bool) -> None:
+        """`Enter` installs the file exactly as the set command does and records the
+        assistant as the workspace's setting (FR-025); `Esc` installs nothing and
+        writes nothing into the user's profile (FR-026). Either way,
+        `launch_offer_made` is recorded so the question is never asked again
+        (FR-027) -- including when the install itself fails, so a permanently
+        unwritable profile directory does not raise the same question at every
+        launch (research R7)."""
+        message: str | None = None
+        if confirmed:
+            set_assistant(self.workspace, profile.name)
+            try:
+                path = install_discovery_file(self.workspace, profile)
+            except WorkspaceError as exc:
+                message = f"could not tell {profile.display_name}: {exc}"
+            else:
+                message = (
+                    f"told {profile.display_name} about this workspace"
+                    if path is not None
+                    else f"assistant set to {profile.name}; no discovery file for {profile.name}"
+                )
+
+        try:
+            set_launch_offer_made(self.workspace, True)
+        except WorkspaceError:
+            pass
+
+        if self._list_screen is not None:
+            self._list_screen.set_pending_status(message)
 
     async def action_quit(self) -> None:
         """`ctrl+q` (bug #64): quit immediately when nothing would be lost, exactly
@@ -306,9 +383,9 @@ class ChoomApp(App[None]):
 
     def handle_config_command(self, argument: str) -> str | None:
         """Handle `/config <setting> [<value>]` from the command bar (research
-        R11). Returns a status-bar message, or None on a silent successful
-        write -- reading or a bad value always reports something, matching
-        the CLI peer's behaviour (FR-025-029)."""
+        R11). Returns a status-bar message; a set always reports the discovery-file
+        outcome (FR-015), matching the CLI peer's stderr line in substance -- the two
+        interfaces report the same result in their own idiom."""
         setting_name, _, value = argument.partition(" ")
         if setting_name != "assistant":
             return f"unknown setting: {setting_name!r}"
@@ -328,7 +405,38 @@ class ChoomApp(App[None]):
             return f"assistant must be one of {accepted}; got {value!r}"
 
         set_assistant(self.workspace, value)
-        return None
+        # An explicit set outranks an earlier declined launch offer (FR-028); see
+        # the CLI's _report_discovery_outcome for why this is best-effort.
+        try:
+            set_launch_offer_made(self.workspace, False)
+        except WorkspaceError:
+            pass
+        return self._describe_discovery_outcome(value)
+
+    def _describe_discovery_outcome(self, value: str) -> str:
+        """The discovery-file side effect of a successful `/config assistant <value>`,
+        worded for the status bar (FR-014, FR-015) -- the TUI's peer to the CLI's
+        `_report_discovery_outcome`. `none` removes every choom-owned file (FR-009);
+        any other legal value installs the file for that assistant."""
+        if value == "none":
+            removed, warnings = remove_discovery_files()
+            if warnings:
+                return "; ".join(warnings)
+            return (
+                "assistant set to none; discovery file removed"
+                if removed
+                else "assistant set to none"
+            )
+
+        profile = resolve_assistant(value).profile
+        assert profile is not None  # value is "claude" or "copilot" here
+        try:
+            path = install_discovery_file(self.workspace, profile)
+        except WorkspaceError as exc:
+            return f"assistant set to {value}; discovery file not installed: {exc}"
+        if path is None:
+            return f"assistant set to {value}; no discovery file for {value}"
+        return f"assistant set to {value}; discovery file installed at {path}"
 
     def toggle_task_and_track(self, task_id: str) -> None:
         """Flip one task's state and, once that write has succeeded, push it
