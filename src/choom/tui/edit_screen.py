@@ -22,7 +22,7 @@ from choom.core.assistants import (
 from choom.core.config import get_assistant
 from choom.core.documents import _read_document
 from choom.core.editing import load_for_edit, save_buffer
-from choom.core.editor_commands import parse_line
+from choom.core.editor_commands import parse_line, parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import find_link_targets, format_link
 from choom.core.mirrors import (
@@ -186,15 +186,13 @@ def _reply_capture_note(capture: ReplyCapture) -> tuple[str | None, bool]:
     reason; the count in front of it, when there is one, carries the rest."""
     if not capture.tasks and not capture.warnings:
         return None, False
+    captured = f"{len(capture.tasks)} {'task' if len(capture.tasks) == 1 else 'tasks'} captured"
     if not capture.warnings:
-        count = len(capture.tasks)
-        noun = "task" if count == 1 else "tasks"
-        return f"{count} {noun} captured", False
+        return captured, False
     if not capture.tasks:
         return capture.warnings[0].message, True
     return (
-        f"{len(capture.tasks)} tasks captured; {len(capture.warnings)} could not be: "
-        f"{capture.warnings[0].message}",
+        f"{captured}; {len(capture.warnings)} could not be: {capture.warnings[0].message}",
         True,
     )
 
@@ -572,8 +570,23 @@ class EditScreen(Screen[None]):
 
             if self.target.captures_tasks:
                 workspace = self.app.workspace  # type: ignore[attr-defined]
-                document = _read_document(self.target.display_path)
-                if document is not None:
+                try:
+                    document = _read_document(self.target.display_path)
+                except OSError:
+                    # Deleted or renamed while the assistant was working. `/task`
+                    # reads the document it saved microseconds earlier; a reply is
+                    # seconds or minutes later, so this window is real here.
+                    document = None
+                if document is None:
+                    # No id to link a capture from -- the reply still lands in full,
+                    # and a reply that wanted tasks says why it has none rather than
+                    # leaving the user to notice (FR-017, FR-018).
+                    if any(line.task is not None for line in parse_reply_lines(text)):
+                        note, warn = (
+                            "could not identify this document; task lines left as written",
+                            True,
+                        )
+                else:
                     capture = capture_reply_tasks(
                         workspace,
                         text,

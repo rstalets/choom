@@ -7,12 +7,13 @@ from pathlib import Path
 import pytest
 from textual.widgets import TextArea
 
+from choom.core.assistants import PROFILES, AssistantRequest
 from choom.core.config import set_assistant
 from choom.core.meetings import create_meeting
-from choom.core.models import Workspace
+from choom.core.models import AssistantReply, Workspace
 from choom.core.tasks import load_tasks
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import _PLACEHOLDER, EditScreen
 from choom.tui.status_bar import EDIT_HELP, StatusBar
 from tests.conftest import STUB_REPLY_TEXT
 from tests.helpers import list_view, open_edit, submit_editor_line, task_rows, to_collection
@@ -573,3 +574,55 @@ async def test_save_failure_never_invokes_the_assistant(
             assert "⚠" in str(status.content)
     finally:
         directory.chmod(original_mode)
+
+
+async def test_a_document_deleted_mid_request_lands_the_reply_and_says_why(
+    tmp_workspace: Workspace,
+) -> None:
+    """The spec's edge case: the source document is deleted or renamed between the
+    request going out and the reply arriving, so there is no id to link a capture
+    from. The reply must still land in full, and a reply that wanted tasks must say
+    why it has none (FR-017, FR-018).
+
+    The reply is delivered through `_finish_request` directly rather than through a
+    stub, because the window between "document deleted" and "reply arrives" is a race
+    no stub can hit deterministically -- the stub prints and exits before the test
+    could unlink anything.
+    """
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        # Stand the buffer where `_start_ai_request` leaves it: the submitted line
+        # replaced by the placeholder the reply will overwrite.
+        editor.text = editor.text.rstrip("\n") + "\n" + _PLACEHOLDER
+        line_index = editor.document.line_count - 1
+        await pilot.pause()
+
+        # The document is gone by the time the reply comes back.
+        screen.target.display_path.unlink()
+
+        request = AssistantRequest(PROFILES[0], None, "")
+        screen._request = request
+        reply_text = "Here is the summary.\n/task call Terry about the renewal"
+        screen._finish_request(
+            request,
+            line_index,
+            "/ai summarise and track",
+            AssistantReply(ok=True, text=reply_text, message="", cancelled=False),
+        )
+        await pilot.pause()
+
+        # Every line of the reply reached the buffer, the task line as written.
+        assert editor.get_line(line_index).plain == "Here is the summary."
+        assert editor.get_line(line_index + 1).plain == "/task call Terry about the renewal"
+
+        tasks, _ = load_tasks(tmp_workspace)
+        assert tasks == []
+
+        status = str(screen.query_one(StatusBar).content)
+        assert "could not identify this document" in status
+        assert "⚠" in status

@@ -112,8 +112,16 @@ freshly inserted mirror is not read at the next save as a state change the user 
 |---------|---------|-----|
 | No eligible lines | none — the plain `EDIT_HELP` footer, exactly as today | — |
 | All captured, ≥1 | `1 task captured` / `3 tasks captured` | no |
-| Some captured, some failed | `2 tasks captured; 1 could not be: <first reason>` | yes |
+| Some captured, some failed | `1 task captured; 1 could not be: <first reason>` (the count is singular at one, in both halves) | yes |
 | All failed | `<first reason>` | yes |
+| The document has gone, and the reply had eligible lines | `could not identify this document; task lines left as written` | yes |
+| The document has gone, and the reply had none | none — nothing was wanted, so nothing is said | — |
+
+**The document has gone** means `_read_document` raised `OSError` (deleted or renamed mid-request) or
+returned `None` (frontmatter no longer parses). Both are treated alike: no capture is attempted, the whole
+reply still lands, and the task lines stay as the assistant wrote them. `/task` reads a document it saved
+microseconds earlier; a reply arrives seconds or minutes later, so this window is real here and the read
+must not be allowed to raise into the reply handler.
 
 This requires `_render_status(note, *, warn: bool = True)`; a successful capture is news, not a warning,
 and prefixing it with `⚠` would teach the user to ignore the marker (Principle V).
