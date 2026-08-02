@@ -55,6 +55,14 @@ _TASK_SYNTAX = """\
   list of captured tasks appended to it. Capturing something the user did not
   ask you to capture puts real records in their workspace that they then have
   to go and delete.
+- Keep the description short: three to five words, thirty characters or so,
+  the way a subject line reads. `send the vendor comparison`, not `Follow up
+  with purchasing on the delayed hardware order by end of week`. The tasks
+  list truncates it at about 34 characters, so anything longer is invisible
+  where it matters. Lower case unless a word is a proper noun, and no full
+  stop at the end. Dates, conditions, owners and reasoning go in the prose
+  around the task line, where they stay readable -- not inside the
+  description, where they push it out of view.
 - If you are explaining or demonstrating this syntax rather than capturing
   something -- the user asked how it works -- put every example inside a code
   fence. A bare example line is indistinguishable from a real one and creates

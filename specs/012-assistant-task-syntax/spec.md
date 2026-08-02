@@ -105,8 +105,10 @@ syntax instruction, stating the form, that the line must be the whole line, and 
    that such a line becomes a link to the task choom creates.
 2. **Given** two different configured assistants, **When** prompts are composed for the same request,
    **Then** the task syntax instruction is identical in both.
-3. **Given** the composed prompt, **When** it is read, **Then** it presents task lines as available, not
-   required — a reply with none is a normal reply.
+3. **Given** the composed prompt, **When** it is read, **Then** it directs that content which is a thing
+   to be done is written as a task line rather than a markdown list item, bounds capture to what the
+   request asked for, requires examples to be fenced, and asks for descriptions short enough to survive
+   the tasks list. A reply with nothing to capture still uses no task lines.
 4. **Given** an `/ai` request made while editing a task's own body rather than a document, **When** the
    prompt is composed, **Then** it does not offer the task syntax, because there is no document identity
    to capture from.
@@ -252,6 +254,10 @@ the failure.
 - **FR-005b**: The instruction MUST tell the assistant to put every example inside a code fence when it is
   explaining or demonstrating the syntax rather than capturing something. The classifier's fence rule
   (FR-012) only protects the user if the assistant actually fences.
+- **FR-005c**: The instruction MUST direct that a description is short — a few words, the length of a
+  subject line — and MUST give the tasks list's truncation width as the reason, so the constraint is
+  grounded in something the user can see rather than an arbitrary budget. Detail that does not fit
+  belongs in the prose around the task line.
 - **FR-006**: The instruction MUST be identical for every configured assistant. No assistant-specific
   wording, and no assistant may receive a different grammar.
 - **FR-007**: The instruction MUST be omitted when the request originates somewhere with no document

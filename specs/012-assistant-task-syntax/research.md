@@ -357,3 +357,43 @@ block separation changes.
   is exactly what FR-010 exists to prevent.
 - *Tighten in the TUI before inserting.* Rejected under Principle I — it is a rule about reply content, and
   the unit tests for it should not need an event loop.
+
+---
+
+## R15: Description length is a prompt constraint, grounded in the column width
+
+**Added after implementation**, from a bug report: every captured task truncated in the tasks list.
+
+**Decision**: the clause asks for three to five words, around thirty characters, and names the tasks
+list's 34-character truncation point as the reason. It also asks for lower case unless a word is a proper
+noun and no trailing full stop, which is the house style every hand-typed task already follows.
+
+**Rationale**: nothing in the original clause said anything about length, and an assistant summarising a
+meeting writes a *sentence* — it has no reason to know a list column exists. Measured against a
+six-commitment fixture note, descriptions came back at a mean of 75 characters and a maximum of 105, and
+**12 of 12 truncated**. The title column is 34 characters wide at the 80-column layout target that
+Principle V and 011 both design against, so every captured task lost its tail exactly where the user reads
+it.
+
+Giving the reason rather than only the number matters: the first attempt said "about 34 characters, treat
+40 as the ceiling" and landed at a mean of 34 with 5 of 12 still over. Anchoring on a word count as well —
+models follow "three to five words" more reliably than a character budget — brought it to a mean of 30, a
+maximum of 36, and 2 of 11 grazing the limit by a character or two.
+
+| Wording | Mean | Max | Over 34 |
+|---------|------|-----|---------|
+| No length guidance | 75 | 105 | 12 of 12 |
+| Character budget only | 34 | 49 | 5 of 12 |
+| Word count + budget + reason | 30 | 36 | 2 of 11 |
+
+Stopping there is deliberate: squeezing the last two costs meaning, and a description a couple of
+characters over is legible where an 80-character one is not.
+
+**Alternatives considered**:
+
+- *Truncate or summarise the description in `capture_task`.* Rejected outright — choom would be editing
+  the words the assistant chose, and Principle IV's whole premise is that it does not.
+- *Widen the title column.* Rejected: it is not the column that is wrong, and the space would come out of
+  the tags column, which 011 sized deliberately.
+- *Let the description run long and rely on the preview pane.* Rejected: the list is where a user scans
+  for a task, and a list of identical prefixes is not scannable.

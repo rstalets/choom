@@ -99,3 +99,15 @@ def test_task_syntax_clause_is_identical_across_every_profile() -> None:
     }
     texts = list(prompts.values())
     assert all(text == texts[0] for text in texts)
+
+
+def test_task_syntax_clause_asks_for_short_descriptions(tmp_path: Path) -> None:
+    """Left unsaid, the assistant wrote whole sentences as descriptions -- mean 75
+    characters against a title column that is 34 wide at the 80-column layout target,
+    so every one of them truncated in the tasks list. The clause carries both a word
+    count and the truncation width, because a character budget alone was followed
+    loosely."""
+    composed = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=True)
+    assert "three to five words" in composed
+    assert "34 characters" in composed
+    assert "Lower case unless a word is a proper noun" in composed
