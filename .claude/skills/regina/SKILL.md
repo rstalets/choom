@@ -56,6 +56,28 @@ choom will and will not do, and half of refinement is knowing which ideas are al
 out by a principle. Also skim `README.md` (what has shipped) and `docs/REQUIREMENTS.md` (the
 conventions every feature must honour).
 
+## The `regina` label
+
+**Every issue you create or refine gets the `regina` label** — `This issue was created or
+refined by /regina, the agentic product owner.` Apply it in the same `gh` call that files or
+edits the issue, never as a follow-up.
+
+It is a **provenance marker, not a routing signal**. It says an agentic pass shaped this
+issue's wording, which someone reading the issue a month later deserves to know — especially
+where a problem statement was informed by simulated interviews rather than by the filer.
+`/delamain` has the same convention for what it merges.
+
+Consequences worth being exact about:
+
+- It is independent of `ready`. An issue you refined but could not complete still gets
+  `regina`; the label records who wrote it, not whether it is finished.
+- It is not a claim of quality or correctness, and it never substitutes for the user's
+  approval in Step 8 of Refine.
+- Never remove it, including when a later pass trims the issue back down.
+- If the label does not exist in the repo, create it once
+  (`gh label create regina --color 58eab2 --description "This issue was created or refined by /regina, the agentic product owner."`)
+  rather than silently skipping it.
+
 ---
 
 ## Mode: Discuss
@@ -84,7 +106,8 @@ make it sharper, not to agree with it.
 End a discussion by naming the outcome and offering the next step:
 
 - *Worth building, and clear* → offer to file it (`gh issue create` against
-  `.github/ISSUE_TEMPLATE/enhancement.yml`'s shape) and then refine it.
+  `.github/ISSUE_TEMPLATE/enhancement.yml`'s shape, with `--label enhancement --label regina`)
+  and then refine it.
 - *Worth building, but the problem is a guess* → offer an interview (below).
 - *Not worth building now* → say why, and offer to leave it as a note in an existing issue or
   drop it entirely. Do not file an issue to be polite.
@@ -348,7 +371,7 @@ Before calling either:
 
 On confirmation:
 
-- `gh issue edit <n> --body "<refined body>"`.
+- `gh issue edit <n> --body "<refined body>" --add-label regina`.
 - Add the **`ready`** label only if the issue passes Step 5's readiness test.
   `ready` now means *a spec can be generated from this unsupervised* — a stronger claim than
   "has a problem and a solution", and the signal `/delamain` routes on. An issue that is well
