@@ -51,3 +51,7 @@ does not keep.
 - **Never insert a Claude session URL (or similar self-referential link) into a PR title or
   description.** This is a public repository. Omit any `Claude-Session:` line and
   `claude.ai/code/...` link that a default PR template might otherwise include.
+- **Link the issue at PR creation time.** When a PR addresses a tracked issue (a feature,
+  bug, or maintenance item), link that issue in the PR description as part of the same
+  `gh pr create` call — don't open the PR first and add the link in a follow-up edit. Use a
+  closing keyword (e.g. `Closes #123`) so the link also auto-closes the issue on merge.
