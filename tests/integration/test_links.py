@@ -213,6 +213,45 @@ async def test_link_several_matches_on_a_short_terminal_leaves_the_line_and_name
         assert "Q3 planning beta" in text
 
 
+async def test_resize_keeps_the_pending_choice_and_its_highlight(
+    tmp_workspace: Workspace,
+) -> None:
+    """FR-018: a pending choice survives a resize. The candidates and the
+    highlighted row are a decision in progress, not a rendering -- narrowing
+    the terminal re-lays the rows out at the new width and leaves the choice
+    exactly where the user put it, with the typed line untouched."""
+    create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(100, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+        await pilot.press("down")
+        await pilot.pause()
+
+        picker = app.screen.query_one(LinkPicker)
+        chosen_before = picker.candidates[1].target.id
+        assert picker.index == 1
+
+        await pilot.resize_terminal(64, 24)
+        await pilot.pause()
+
+        assert picker.display is True
+        assert picker.index == 1
+        assert picker.candidates[1].target.id == chosen_before
+        assert [row.highlighted for row in picker.children] == [False, True]
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+
+        # And the surviving choice still inserts the record it points at.
+        await pilot.press("enter")
+        await pilot.pause()
+        assert chosen_before in editor.get_line(line_index).plain
+
+
 # --- US1: the link picker (015) --------------------------------------------------
 
 
@@ -234,6 +273,12 @@ async def test_link_several_matches_opens_a_picker_with_the_first_row_highlighte
         assert picker.display is True
         assert picker.index == 0
         assert len(picker.candidates) == 2
+        # The first row is *visibly* highlighted, not merely current. Asserting
+        # the index alone passed while the row rendered unhighlighted, because
+        # the index took and the highlight did not -- `↓` then looked like it
+        # skipped the first row. The rendered flag is what the user sees.
+        rows = list(picker.children)
+        assert [row.highlighted for row in rows] == [True, False]
         # The document is unchanged -- the picker opening does not touch it.
         assert editor.get_line(line_index).plain == "/link q3 planning"
 

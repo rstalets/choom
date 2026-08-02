@@ -14,6 +14,7 @@ from textual import events
 from textual._loop import loop_from_index
 from textual.binding import Binding
 from textual.message import Message
+from textual.widget import AwaitMount
 from textual.widgets import Label, ListItem, ListView
 
 from choom.core.models import LinkCandidate
@@ -76,9 +77,8 @@ class LinkPicker(ListView):
     def open(self, candidates: tuple[LinkCandidate, ...]) -> None:
         """Show the picker with `candidates`, first row highlighted."""
         self.candidates = candidates
-        self._rebuild_rows()
         self.display = True
-        self.index = 0
+        self._rebuild_rows(select=0)
 
     def close(self) -> None:
         """Hide the picker and drop its candidates -- the resting state."""
@@ -86,13 +86,37 @@ class LinkPicker(ListView):
         self.candidates = ()
         self.clear()
 
-    def _rebuild_rows(self) -> None:
+    def _rebuild_rows(self, *, select: int) -> None:
+        """Rebuild every row's text at the current width and leave `select`
+        highlighted.
+
+        The highlight is applied *after* the rebuild has settled, not inline.
+        `clear()` resets the index to `None` and `extend()` mounts the new rows
+        asynchronously, so an index assigned here lands while `ListView`'s own
+        `watch_index` still has nothing it can highlight: the index takes, the
+        highlight does not, and the list opens with a current row that does not
+        look current -- pressing `↓` then appears to skip past the first row.
+        """
         width = self.size.width
         self.clear()
-        self.extend(
+        mounted = self.extend(
             _CandidateRow(candidate, render_candidate_row(candidate, width))
             for candidate in self.candidates
         )
+        self.call_next(self._highlight, mounted, select)
+
+    async def _highlight(self, mounted: AwaitMount, index: int) -> None:
+        """Highlight `index` once the rows it refers to actually exist.
+
+        Waits on the mount itself rather than on the next refresh: a refresh can
+        land while the new rows are still being mounted, and `watch_index` needs
+        them present to apply the highlight. A no-op if the picker closed, or
+        lost its rows, while the mount was in flight.
+        """
+        await mounted
+        if not self.display or not self._nodes:
+            return
+        self.index = min(index, len(self._nodes) - 1)
 
     def on_resize(self, event: events.Resize) -> None:
         """Keep a pending choice alive across a resize (research R9, FR-018).
@@ -114,9 +138,7 @@ class LinkPicker(ListView):
             self.post_message(self.Cancelled(link_ambiguous_status(titles)))
             return
 
-        highlighted = self.index
-        self._rebuild_rows()
-        self.index = highlighted
+        self._rebuild_rows(select=self.index if self.index is not None else 0)
 
     def action_cursor_down(self) -> None:
         """Highlight the next item, wrapping from the last row to the first
