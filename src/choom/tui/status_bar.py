@@ -21,6 +21,9 @@ PREVIEW_HELP = "e edit   b backlinks   esc back   ↑↓/pgup/pgdn scroll   ctrl
 #: never grow past what fits, so the two never concatenate (research R10).
 LINKS_SECTION_HELP = "↑↓ move   enter/o open   esc close   ctrl+q quit"
 EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
+#: Swapped in for EDIT_HELP while the link picker is open, on the same terms as
+#: LINKS_SECTION_HELP above -- never concatenated with EDIT_HELP.
+LINK_PICKER_HELP = "↑↓ move   enter insert   esc cancel   ctrl+q quit"
 
 #: Shown in the status bar while `/ai` is in flight (contracts/editor-commands.md). One
 #: phrase is picked per request and held for its whole duration -- no cycling, no timer.
@@ -83,8 +86,10 @@ def link_no_match_status(query: str) -> str:
 
 
 def link_ambiguous_status(candidates: Sequence[str]) -> str:
-    """`/link` matched more than one record. Names every candidate so the user
-    can retype with more specific terms rather than facing a picker (FR-044)."""
+    """`/link` matched more than one record, but the terminal is too short for
+    the picker (015-link-picker, `MIN_PICKER_SCREEN_HEIGHT`) to raise a usable
+    list -- this is the fallback, not the ordinary path. Names every candidate
+    so the user can retype with more specific terms instead."""
     return f"{len(candidates)} records match -- retype with more terms: {', '.join(candidates)}"
 
 

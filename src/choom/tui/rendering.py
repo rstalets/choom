@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from choom.core.models import Document, Link, LinkStatus, LinkTarget, Task
+from choom.core.models import Document, Link, LinkCandidate, LinkStatus, LinkTarget, Task
 
 _KIND_LABEL = {"meeting": "meetings", "note": "notes", "task": "tasks"}
 
@@ -25,6 +25,36 @@ def render_link_row(
 
 NO_OUTBOUND_LINKS = "(this record points at nothing)"
 NO_INBOUND_LINKS = "(nothing points at this record)"
+
+
+def render_candidate_row(candidate: LinkCandidate, width: int) -> str:
+    """One row in the link picker (contracts/tui.md C3): `title · collection ·
+    date`. The title is truncated with an ellipsis so the collection and date
+    -- the two fields that do the disambiguating when titles collide -- always
+    survive intact; an undated candidate shows `—` where the date goes.
+
+    `width` is a parameter, not read off a widget, so this is a pure string
+    function a unit test can drive without a terminal -- the same shape as
+    `in_flight_status(breadcrumb, width)`. Never raises, including for a
+    `width` of 0 or a blank title.
+    """
+    title = candidate.target.title
+    date = candidate.date if candidate.date is not None else "—"
+    suffix = f" · {candidate.collection} · {date}"
+
+    if width <= 0:
+        return ""
+
+    budget = width - len(suffix)
+    if budget < 0:
+        # Not even the suffix fits in `width` -- there is no room left to
+        # disambiguate with, so show as much of the title as fits instead.
+        return title[:width]
+    if len(title) <= budget:
+        return f"{title}{suffix}"
+    if budget == 0:
+        return suffix
+    return f"{title[: budget - 1]}…{suffix}"
 
 
 def _strip_frontmatter(text: str) -> str:

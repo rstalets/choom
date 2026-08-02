@@ -223,6 +223,20 @@ class LinkTarget:
     line: int | None
 
 
+@dataclass(frozen=True, slots=True)
+class LinkCandidate:
+    """One record a `/link` search matched, with the facts a picker row needs.
+
+    Wraps `LinkTarget` rather than extending it: a link's resolved destination and
+    a row in a chooser are different jobs, and `LinkTarget` is built in a dozen
+    places that have nothing to do with choosing.
+    """
+
+    target: LinkTarget
+    collection: str
+    date: str | None
+
+
 MirrorOutcome = Literal[
     "unchanged", "task_written", "mirror_corrected", "conflict", "ambiguous", "dead"
 ]

@@ -23,6 +23,7 @@ from choom.core.meetings import scan_meetings
 from choom.core.models import (
     EditableFile,
     Link,
+    LinkCandidate,
     LinkDirection,
     LinkReport,
     LinkStatus,
@@ -817,28 +818,39 @@ def links_for_id(
 # --- Search, for /link ---------------------------------------------------------
 
 
-def find_link_targets(workspace: Workspace, query: str) -> tuple[LinkTarget, ...]:
-    """Records whose title or id matches `query`, case-insensitive substring.
+def link_candidates(workspace: Workspace, query: str) -> tuple[LinkCandidate, ...]:
+    """Records whose title, id, type, or tags match `query`, ready to be chosen from.
 
-    Reuses the same matching rule as the list filter (`match_document`) so
-    `/link` and the TUI filter never disagree about what "matches" means.
-    Caller decides what to do with zero or several results; this reports, it
-    does not choose.
+    The same matching rule as the list filter (`match_document` / `match_task`) and
+    the same records `find_link_targets` reports -- this is that search plus the
+    ordering and the per-row facts a picker needs. Newest first, ties by title,
+    undated records last.
+
+    Caller decides what to do with zero, one, or several results; this reports,
+    it does not choose.
 
     Never raises.
     """
-    results: list[LinkTarget] = []
+    results: list[LinkCandidate] = []
 
     meetings, _warnings = scan_meetings(workspace)
     for document in meetings:
         if match_document(document, query) or query.lower() in document.id.lower():
             results.append(
-                LinkTarget(
-                    id=document.id,
-                    path=document.path,
-                    title=document.title,
-                    kind="meeting",
-                    line=None,
+                LinkCandidate(
+                    target=LinkTarget(
+                        id=document.id,
+                        path=document.path,
+                        title=document.title,
+                        kind="meeting",
+                        line=None,
+                    ),
+                    collection="meeting",
+                    # `Document.created` is a full ISO timestamp; the row (and
+                    # every other date the TUI shows -- DocumentRow, the
+                    # preview meta line) shows the date only, the same slice
+                    # `document.created[:10]` already used there.
+                    date=document.created[:10],
                 )
             )
 
@@ -846,12 +858,16 @@ def find_link_targets(workspace: Workspace, query: str) -> tuple[LinkTarget, ...
     for document in notes:
         if match_document(document, query) or query.lower() in document.id.lower():
             results.append(
-                LinkTarget(
-                    id=document.id,
-                    path=document.path,
-                    title=document.title,
-                    kind="note",
-                    line=None,
+                LinkCandidate(
+                    target=LinkTarget(
+                        id=document.id,
+                        path=document.path,
+                        title=document.title,
+                        kind="note",
+                        line=None,
+                    ),
+                    collection="note",
+                    date=document.created[:10],
                 )
             )
 
@@ -861,13 +877,37 @@ def find_link_targets(workspace: Workspace, query: str) -> tuple[LinkTarget, ...
             continue
         if match_task(task, query) or query.lower() in task.id.lower():
             results.append(
-                LinkTarget(
-                    id=task.id,
-                    path=workspace.tasks_file,
-                    title=task.text,
-                    kind="task",
-                    line=task.line,
+                LinkCandidate(
+                    target=LinkTarget(
+                        id=task.id,
+                        path=workspace.tasks_file,
+                        title=task.text,
+                        kind="task",
+                        line=task.line,
+                    ),
+                    collection="task",
+                    date=task.created.isoformat() if task.created else None,
                 )
             )
 
+    # Two stable passes, the same idiom core/documents.py already uses for
+    # newest-first ordering: sort by title first so it survives as the
+    # tie-break, then sort by (has date, date) descending so dated candidates
+    # come first, newest to oldest, and undated candidates land last, still in
+    # title order among themselves.
+    results.sort(key=lambda c: c.target.title.lower())
+    results.sort(key=lambda c: (c.date is not None, c.date or ""), reverse=True)
     return tuple(results)
+
+
+def find_link_targets(workspace: Workspace, query: str) -> tuple[LinkTarget, ...]:
+    """Records whose title or id matches `query`, case-insensitive substring.
+
+    A thin projection of `link_candidates` -- one scan and one definition of
+    "matches", so this and the picker it backs can never disagree about what
+    counts as a match. Caller decides what to do with zero or several results;
+    this reports, it does not choose.
+
+    Never raises.
+    """
+    return tuple(candidate.target for candidate in link_candidates(workspace, query))
