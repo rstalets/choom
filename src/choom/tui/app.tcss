@@ -100,6 +100,11 @@ StatusBar {
     width: 1fr;
 }
 
+EditorPane {
+    height: 1fr;
+    width: 1fr;
+}
+
 #confirm-dialog {
     width: auto;
     height: auto;

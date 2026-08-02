@@ -177,18 +177,16 @@ class ChoomApp(App[None]):
 
     async def action_quit(self) -> None:
         """`ctrl+q` (bug #64): quit immediately when nothing would be lost, exactly
-        as before -- but if a dirty `EditScreen` is on the stack, raise the same
-        confirmation `EditScreen.action_close` raises rather than silently
-        discarding the edit (constitution Principle V, amended 2.0.0)."""
+        as before -- but if a dirty editor is on the stack, inline or full-screen,
+        raise the same confirmation `EditorPane.action_close` raises rather than
+        silently discarding the edit (constitution Principle V, amended 2.0.0)."""
         from choom.tui.confirm_dialog import ConfirmDialog
-        from choom.tui.edit_screen import EditScreen
+        from choom.tui.edit_screen import open_editors
 
         if isinstance(self.screen, ConfirmDialog):
             return  # already confirming a quit or a close; don't stack a second dialog
 
-        dirty = any(
-            isinstance(screen, EditScreen) and screen.is_dirty for screen in self.screen_stack
-        )
+        dirty = any(pane.is_dirty for pane in open_editors(self))
         if not dirty:
             self.exit()
             return
@@ -457,13 +455,9 @@ class ChoomApp(App[None]):
             return
         self.last_task_error = None
 
-        from choom.tui.edit_screen import EditScreen
+        from choom.tui.edit_screen import open_editors
 
-        skip = tuple(
-            screen.target.display_path
-            for screen in self.screen_stack
-            if isinstance(screen, EditScreen) and screen.is_dirty
-        )
+        skip = tuple(pane.target.display_path for pane in open_editors(self) if pane.is_dirty)
         _written, warnings = propagate_to_documents(self.workspace, updated, skip=skip)
         if warnings:
             self.last_task_error = "; ".join(w.message for w in warnings)

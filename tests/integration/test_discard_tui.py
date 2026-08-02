@@ -6,9 +6,10 @@ from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
 from choom.tui.confirm_dialog import ConfirmDialog
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditorPane, EditScreen
+from choom.tui.list_screen import ListScreen
 from choom.tui.preview_screen import PreviewScreen
-from tests.helpers import open_edit
+from tests.helpers import editor_pane, open_edit, to_collection
 
 
 async def test_esc_with_changes_raises_dialog_with_nothing_written(
@@ -30,6 +31,51 @@ async def test_esc_with_changes_raises_dialog_with_nothing_written(
 
         assert isinstance(app.screen, ConfirmDialog)
         assert path.read_bytes() == before_bytes
+
+
+async def test_esc_with_changes_over_inline_editor_raises_dialog_over_the_list(
+    tmp_workspace: Workspace,
+) -> None:
+    """The discard confirmation for an inline editor is raised over
+    `ListScreen`, not a pushed `EditScreen` (research R5, T031): declining
+    returns to the still-mounted pane with the buffer intact and the list
+    beside it; confirming unmounts the pane and leaves the file unchanged."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    before_bytes = meeting.path.read_bytes()
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        editor = pane.query_one("#editor", TextArea)
+        editor.text = editor.text + "unsaved change"
+        expected_text = editor.text
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmDialog)
+        assert meeting.path.read_bytes() == before_bytes
+
+        # Decline ("Continue Editing"): back to the same pane, buffer intact.
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, ListScreen)
+        assert editor_pane(app) is pane
+        assert pane.query_one("#editor", TextArea).text == expected_text
+
+        # Confirm ("Exit Without Saving"): the pane unmounts, file untouched.
+        await pilot.press("escape")
+        await pilot.pause()
+        assert isinstance(app.screen, ConfirmDialog)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert isinstance(app.screen, ListScreen)
+        assert not app.screen.query(EditorPane)
+
+    assert meeting.path.read_bytes() == before_bytes
 
 
 async def test_dialog_is_a_slim_bar_with_two_named_keys(tmp_workspace: Workspace) -> None:

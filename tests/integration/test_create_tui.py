@@ -6,10 +6,9 @@ from choom.core.documents import _read_document
 from choom.core.meetings import scan_meetings
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import ListScreen
 from choom.tui.status_bar import StatusBar
-from tests.helpers import type_command, type_literally
+from tests.helpers import editor_pane, type_command, type_literally
 
 
 @pytest.mark.parametrize(
@@ -46,8 +45,8 @@ async def test_dotted_command_creates_typed_document_with_tags(
         await pilot.pause()
         await type_command(app, pilot, command_text)
 
-        assert isinstance(app.screen, EditScreen)
-        document = _read_document(app.screen.target.display_path)
+        assert isinstance(app.screen, ListScreen)
+        document = _read_document(editor_pane(app).target.display_path)
         assert document is not None
         assert document.title == title
         assert document.tags == tags
@@ -102,8 +101,8 @@ async def test_bare_note_with_description_creates_untyped_note_not_daily(
         await pilot.pause()
         await type_command(app, pilot, "note vendor landscape")
 
-        assert isinstance(app.screen, EditScreen)
-        document = _read_document(app.screen.target.display_path)
+        assert isinstance(app.screen, ListScreen)
+        document = _read_document(editor_pane(app).target.display_path)
         assert document is not None
         assert document.title == "vendor landscape"
         assert document.type == ""

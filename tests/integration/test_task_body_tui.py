@@ -6,7 +6,6 @@ from choom.core.models import Workspace
 from choom.core.tasks import add_task, load_tasks
 from choom.tui.app import ChoomApp
 from choom.tui.confirm_dialog import ConfirmDialog
-from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import ListScreen
 from tests.conftest import tasks_file, write_tasks
 from tests.helpers import list_view
@@ -80,7 +79,8 @@ async def test_e_on_a_body_less_task_opens_an_empty_buffer(tmp_workspace: Worksp
         await pilot.press("e")
         await pilot.pause()
 
-        assert isinstance(app.screen, EditScreen)
+        # e from the list opens inline (contract C1) -- the list is never left.
+        assert isinstance(app.screen, ListScreen)
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text == ""
 
@@ -97,7 +97,7 @@ async def test_e_on_a_task_with_a_body_opens_exactly_that_body(tmp_workspace: Wo
         await pilot.press("e")
         await pilot.pause()
 
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
         editor = app.screen.query_one("#editor", TextArea)
         # A blank separator line and then the cursor's own line below the body's
         # content, per the cursor-placement rule (US7, FR-039/FR-043) -- the body
@@ -121,7 +121,7 @@ async def test_save_lands_in_file_and_pane_with_same_task_highlighted(
 
         await pilot.press("e")
         await pilot.pause()
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
 
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = "Need the Q3 comparison."
