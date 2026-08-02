@@ -61,3 +61,7 @@ does not keep.
   - If a PR that started as spec-only is later expanded in place to carry the full
     implementation (e.g. its title changes from a `spec:` PR to a `feat:` PR), upgrade the
     reference to a closing keyword at that point.
+- **Set the PR's milestone at creation time.** When the PR addresses a tracked issue, give
+  the PR the same milestone as that issue (e.g. `gh pr edit <n> --milestone "<name>"` right
+  after `gh pr create`). If there's no tracked issue, don't guess a milestone — ask the user
+  which milestone the PR belongs to.
