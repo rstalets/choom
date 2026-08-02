@@ -64,6 +64,44 @@ construct mid-run.
 - **No `Claude-Session:` line or `claude.ai/code` link in any PR title or body.** Public repo.
 - **Park, don't halt.** One blocked job does not stop the run. Park it, keep the rest moving,
   and report everything parked at the end.
+- **Never end a turn with nothing in flight.** You only wake up when a background agent
+  completes. A turn that ends with no agent running is a run that has silently died -- see
+  "Keeping the run alive" below. This is the single failure mode that costs a whole night.
+
+## Keeping the run alive
+
+You advance turn by turn, and the only thing that re-invokes you is a background agent
+finishing. Nothing polls on your behalf. That makes one specific mistake fatal in a way it
+would not be in an interactive session: **if you end a turn without a live agent, nothing
+will ever wake you, and the run stops until a human notices.** From the user's side a dead
+run and a slow one look identical, so it can burn hours before anyone asks.
+
+This has happened. An orchestrator wrote "now running #39", updated the ledger to match, and
+ended the turn -- having never made the `Agent` call. Two hours of real work, then six and a
+half hours of nothing. The wrong status line was not the damage; ending the turn with an
+empty queue was.
+
+Three rules, in order of how much they save you:
+
+1. **Act, then record.** Never write a ledger row, a status sentence, or a chat report that
+   describes an action you have not yet taken. Make the `Agent` call, confirm it returned an
+   agent id, and only then write it down. Prose that runs ahead of the tool call is how a
+   phantom job enters the ledger, and the ledger is what a resumed session trusts.
+2. **Check the queue before you stop.** Before ending any turn, ask: is at least one agent
+   actually in flight, or is the run genuinely complete? If neither, you are not finished --
+   keep working in this same turn. Spawn the next job, run the next review, do the next
+   verification. Do not hand off to a notification that is never going to arrive.
+3. **If a spawn fails, retry in the same turn.** A failed or refused `Agent` call leaves the
+   queue empty. Fix it and re-issue immediately rather than reporting the intent and stopping.
+
+**On resume, trust the filesystem over the ledger.** A ledger row saying "in progress" is a
+claim, not evidence -- it may describe an agent that was never spawned, or one that died. Before
+continuing a run you did not personally start this turn, verify each claimed in-flight job is
+real: does its branch exist (`git branch -a`), does its worktree exist (`git worktree list`),
+is there an open PR, and is its agent's output file still being written? A job that fails these
+checks was never running; restart it rather than waiting on it. `git worktree list` showing a
+worktree whose branch has no commits is the signature of a job that died before it produced
+anything.
 
 ## Step 1 -- Resolve the work set
 
@@ -188,6 +226,10 @@ without checking back except to report a parked job or a constitution escalation
 | `/speckit-implement` | fresh `general-purpose` agent | **sonnet** | enters the feature's existing worktree |
 | Bugfix / maintenance / docs / CI | one `general-purpose` agent per issue | **sonnet** | `worktree` |
 | Follow-up fixes on an open PR | reuse that job's agent via `SendMessage` | same as the job | same worktree |
+
+Every `Agent` call returns an agent id. Treat that id as the receipt: until you have seen it,
+the job does not exist, is not in the ledger, and is not something you may describe as running.
+Ending a turn on an unconfirmed spawn stalls the run indefinitely (see "Keeping the run alive").
 
 Run every agent with `run_in_background: true` and react to completion notifications. That is
 what lets the serial feature lane and the parallel direct lane advance at the same time.
@@ -424,6 +466,11 @@ conflict in two or three sentences.
 Keep a running ledger at `$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`: one row per issue with lane,
 agent, worktree, branch, PR, stage, and outcome. Update it as each stage lands so a resumed
 session can pick the run back up.
+
+Write a row **after** the action it records, never before, and put the real agent id in it. A
+row written in advance is a claim about the future, and a resumed session cannot tell it apart
+from a fact -- it will wait on a job that was never started. If you catch a row that turned out
+to be wrong, correct it in place and say so in the row rather than deleting the evidence.
 
 Report progress in chat as waves complete -- what merged, what is in flight, what is parked.
 At the end, give the user:
