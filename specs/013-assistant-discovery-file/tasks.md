@@ -90,13 +90,13 @@ and confirm the pointer is installed.
 Tracking. If that trade is rejected, this whole phase is the unit to cut; nothing in Phases 3, 5, 6,
 or 7 depends on it.
 
-- [ ] T018 [US2] Implement `get_launch_offer_made(workspace) -> bool` and `set_launch_offer_made(workspace, value)` in `src/choom/core/config.py` on top of the T010 helper; the reader must never raise on a missing file, missing table, malformed TOML, or non-boolean value (Principle IV)
-- [ ] T019 [P] [US2] Add unit tests in `tests/unit/test_config_write.py` for the new key: round-trip, absent-key default, malformed TOML, non-boolean value, and that writing it leaves `name` and any unknown keys untouched
-- [ ] T020 [US2] Implement `should_offer_discovery(workspace, resolved: ResolvedAssistant) -> AssistantProfile | None` in `src/choom/core/discovery.py` — the whole suppression matrix in one pure function: no offer when a file is installed, when the setting is `none`, when resolution is ambiguous or unset, or when the offer has already been made; otherwise the profile to offer (FR-022, FR-029)
-- [ ] T021 [P] [US2] Add unit tests in `tests/unit/test_discovery_offer.py` covering every row of that matrix, including the configured-assistant-with-missing-file case the spec deliberately includes
-- [ ] T022 [US2] Raise the offer in `ChoomApp.on_mount` in `src/choom/tui/app.py`: push `ListScreen`, then `call_after_refresh` a `ConfirmDialog` built from the profile and workspace, with a dismiss callback that installs on `Enter`, installs nothing on `Esc`, and records `launch_offer_made` on either key (research R6, R7)
-- [ ] T023 [US2] Hand the outcome to `ListScreen` through the existing pending-status mechanism in `src/choom/tui/list_screen.py` rather than rendering directly, so the dialog's pop-triggered refresh cannot race and overwrite the message
-- [ ] T024 [US2] Add an integration test in `tests/integration/test_launch_offer.py` driving the TUI: the question appears once; `Enter` installs and records; `Esc` installs nothing and still records; a second launch asks nothing; and each suppression case shows no dialog
+- [X] T018 [US2] Implement `get_launch_offer_made(workspace) -> bool` and `set_launch_offer_made(workspace, value)` in `src/choom/core/config.py` on top of the T010 helper; the reader must never raise on a missing file, missing table, malformed TOML, or non-boolean value (Principle IV)
+- [X] T019 [P] [US2] Add unit tests in `tests/unit/test_config_write.py` for the new key: round-trip, absent-key default, malformed TOML, non-boolean value, and that writing it leaves `name` and any unknown keys untouched
+- [X] T020 [US2] Implement `should_offer_discovery(workspace, resolved: ResolvedAssistant) -> AssistantProfile | None` in `src/choom/core/discovery.py` — the whole suppression matrix in one pure function: no offer when a file is installed, when the setting is `none`, when resolution is ambiguous or unset, or when the offer has already been made; otherwise the profile to offer (FR-022, FR-029)
+- [X] T021 [P] [US2] Add unit tests in `tests/unit/test_discovery_offer.py` covering every row of that matrix, including the configured-assistant-with-missing-file case the spec deliberately includes
+- [X] T022 [US2] Raise the offer in `ChoomApp.on_mount` in `src/choom/tui/app.py`: push `ListScreen`, then `call_after_refresh` a `ConfirmDialog` built from the profile and workspace, with a dismiss callback that installs on `Enter`, installs nothing on `Esc`, and records `launch_offer_made` on either key (research R6, R7)
+- [X] T023 [US2] Hand the outcome to `ListScreen` through the existing pending-status mechanism in `src/choom/tui/list_screen.py` rather than rendering directly, so the dialog's pop-triggered refresh cannot race and overwrite the message
+- [X] T024 [US2] Add an integration test in `tests/integration/test_launch_offer.py` driving the TUI: the question appears once; `Enter` installs and records; `Esc` installs nothing and still records; a second launch asks nothing; and each suppression case shows no dialog
 
 **Checkpoint**: the feature now reaches users who never type a command.
 

@@ -20,7 +20,8 @@ from pathlib import Path
 
 from choom.core.assistants import PROFILES
 from choom.core.atomic_write import write_text_atomic
-from choom.core.models import AssistantProfile, Workspace
+from choom.core.config import get_launch_offer_made
+from choom.core.models import AssistantProfile, ResolvedAssistant, Workspace
 
 #: The fixed, greppable string every discovery file carries (FR-005), naming choom and
 #: the command that rewrites it. Doing double duty (contracts/discovery-file.md, R11):
@@ -182,3 +183,41 @@ def install_discovery_file(workspace: Workspace, profile: AssistantProfile) -> P
         write_text_atomic(path, render_discovery_file(workspace, profile))
     remove_discovery_files(keep=profile)
     return path
+
+
+def should_offer_discovery(
+    workspace: Workspace, resolved: ResolvedAssistant
+) -> AssistantProfile | None:
+    """Whether to raise the once-only launch offer (US2, FR-022, FR-029), and for which
+    profile.
+
+    Pure: reads the workspace's recorded offer and the discovery paths already on disk,
+    decides, and returns -- the caller does the asking and, on `Enter`, the installing
+    (data-model.md's launch-offer state machine).
+
+    Suppressed when: the offer has already been made for this workspace; the assistant
+    is configured as "none"; resolution is ambiguous (two or more assistants installed,
+    none configured); no assistant is installed at all; or a discovery file is already
+    installed for the assistant that would be offered. Otherwise, the profile choom
+    would use -- either detected (exactly one installed, nothing configured) or
+    explicitly configured with its file missing (FR-022's "will be used" also covers
+    this case) -- is returned.
+    """
+    if get_launch_offer_made(workspace):
+        return None
+    if resolved.source in ("none", "ambiguous", "unset"):
+        return None
+    profile = resolved.profile
+    if profile is None:
+        return None
+
+    path = discovery_path(profile)
+    if path is not None and path.is_file():
+        try:
+            already_installed = MARKER in path.read_text(encoding="utf-8")
+        except OSError:
+            already_installed = False
+        if already_installed:
+            return None
+
+    return profile

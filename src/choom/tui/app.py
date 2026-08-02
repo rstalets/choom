@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 from textual.app import App
 from textual.binding import Binding
 
 from choom.core.assistants import resolve_assistant
-from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
-from choom.core.discovery import install_discovery_file
+from choom.core.config import (
+    LEGAL_ASSISTANT_VALUES,
+    get_assistant,
+    set_assistant,
+    set_launch_offer_made,
+)
+from choom.core.discovery import install_discovery_file, should_offer_discovery
 from choom.core.documents import (
     list_months,
     match_document,
@@ -21,6 +26,7 @@ from choom.core.errors import ChoomError, UsageError, WorkspaceError
 from choom.core.meetings import MEETINGS, create_meeting
 from choom.core.mirrors import propagate_to_documents
 from choom.core.models import (
+    AssistantProfile,
     Collection,
     DailyNote,
     Document,
@@ -40,6 +46,9 @@ from choom.core.tasks import (
     match_task,
     set_task_state,
 )
+
+if TYPE_CHECKING:
+    from choom.tui.list_screen import ListScreen
 
 DOCUMENT_COLLECTIONS: dict[str, Collection] = {"meetings": MEETINGS, "notes": NOTES}
 ScopeSelection = YearMonth | Literal["unfiled"]
@@ -91,13 +100,76 @@ class ChoomApp(App[None]):
         # §3.3). Read by `visible_warnings()`; never consulted for anything else.
         self._last_warnings: list[ScanWarning] = []
 
+        #: The one `ListScreen` this session ever pushes (research R6) -- kept so the
+        #: launch offer's dismiss callback, which fires from here rather than from the
+        #: screen itself, has somewhere to hand its outcome via `set_pending_status`.
+        self._list_screen: ListScreen | None = None
+
         for name in DOCUMENT_COLLECTIONS:
             self._reset_scope(name)
 
     def on_mount(self) -> None:
         from choom.tui.list_screen import ListScreen
 
-        self.push_screen(ListScreen())
+        self._list_screen = ListScreen()
+        self.push_screen(self._list_screen)
+        # Deferred past the first refresh (FR-034): the list must be up and painted
+        # behind the question before it appears (research R6).
+        self.call_after_refresh(self._maybe_offer_discovery)
+
+    def _maybe_offer_discovery(self) -> None:
+        """Raise the once-only launch offer if `should_offer_discovery` says to
+        (US2). Runs once, from `on_mount`, never from `ListScreen` itself -- that
+        screen is re-entered on every resume, and raising it there would need its own
+        suppression logic to avoid re-asking within one run (research R6)."""
+        from choom.tui.confirm_dialog import ConfirmDialog
+
+        configured = get_assistant(self.workspace)
+        resolved = resolve_assistant(configured)
+        profile = should_offer_discovery(self.workspace, resolved)
+        if profile is None:
+            return
+
+        dialog = ConfirmDialog(
+            f"Let {profile.display_name} know this workspace is at {self.workspace.root}?",
+            cancel_label="Not Now",
+            confirm_label="Tell It",
+        )
+
+        def _handle_dismiss(confirmed: bool | None) -> None:
+            self._resolve_launch_offer(profile, confirmed=bool(confirmed))
+
+        self.push_screen(dialog, _handle_dismiss)
+
+    def _resolve_launch_offer(self, profile: AssistantProfile, *, confirmed: bool) -> None:
+        """`Enter` installs the file exactly as the set command does and records the
+        assistant as the workspace's setting (FR-025); `Esc` installs nothing and
+        writes nothing into the user's profile (FR-026). Either way,
+        `launch_offer_made` is recorded so the question is never asked again
+        (FR-027) -- including when the install itself fails, so a permanently
+        unwritable profile directory does not raise the same question at every
+        launch (research R7)."""
+        message: str | None = None
+        if confirmed:
+            set_assistant(self.workspace, profile.name)
+            try:
+                path = install_discovery_file(self.workspace, profile)
+            except WorkspaceError as exc:
+                message = f"could not tell {profile.display_name}: {exc}"
+            else:
+                message = (
+                    f"told {profile.display_name} about this workspace"
+                    if path is not None
+                    else f"assistant set to {profile.name}; no discovery file for {profile.name}"
+                )
+
+        try:
+            set_launch_offer_made(self.workspace, True)
+        except WorkspaceError:
+            pass
+
+        if self._list_screen is not None:
+            self._list_screen.set_pending_status(message)
 
     # --- scope (month / unfiled / category) -----------------------------------
 

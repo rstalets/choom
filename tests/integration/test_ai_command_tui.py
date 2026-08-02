@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 from textual.widgets import TextArea
 
-from choom.core.config import set_assistant
+from choom.core.config import set_assistant, set_launch_offer_made
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
@@ -191,6 +191,11 @@ async def test_configured_but_missing_binary_names_the_assistant(
     empty_bin.mkdir()
     monkeypatch.setenv("PATH", str(empty_bin))
     set_assistant(tmp_workspace, "claude")
+    # An explicitly configured assistant with no discovery file installed is exactly
+    # what 013-assistant-discovery-file's launch offer would raise a ConfirmDialog
+    # for (FR-022) -- irrelevant to what this test exercises, so pre-record the offer
+    # as already made to keep the app landing straight on ListScreen.
+    set_launch_offer_made(tmp_workspace, True)
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
