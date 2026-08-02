@@ -74,9 +74,11 @@ class EditTarget:
 
 
 def open_editor(app: App[None], path: Path) -> bool:
-    """Push the editor for `path` -- the one route into `EditScreen` for a whole
-    file, used by list `e`, preview `e`, and every create path (research R10).
-    Returns False and reports the reason in the caller's status bar if the file
+    """Open the editor for `path` -- the one route into an edit session for a
+    whole file, used by list `e`, preview `e`, and every create path (research
+    R10). Routes to an inline pane in `#preview-pane` when `ListScreen` is the
+    active screen, full-screen otherwise (research R1, contract C1). Returns
+    False and reports the reason in the caller's status bar if the file
     cannot be read, leaving the caller's screen in place rather than raising.
 
     Reconciles every mirror in the file against tasks.md before the buffer is
@@ -114,7 +116,7 @@ def open_editor(app: App[None], path: Path) -> bool:
         stamps_frontmatter=True,
         captures_tasks=True,
     )
-    app.push_screen(EditScreen(target))
+    _open(app, target)
     return True
 
 
@@ -137,9 +139,10 @@ def _task_ai_line_offset(app: App[None], task_id: str) -> int:
 
 
 def open_task_editor(app: App[None], task: Task) -> None:
-    """Push the editor scoped to `task`'s body (research R5). Never fails to
-    open: the buffer is the dedented body text already held in memory, so
-    there is no file read on the way in -- only the save can fail, and that is
+    """Open the editor scoped to `task`'s body (research R5), routing the same
+    way `open_editor` does (research R1, contract C1). Never fails to open:
+    the buffer is the dedented body text already held in memory, so there is
+    no file read on the way in -- only the save can fail, and that is
     reported in the status bar without discarding what the user typed
     (FR-023).
 
@@ -175,6 +178,20 @@ def open_task_editor(app: App[None], task: Task) -> None:
         stamps_frontmatter=False,
         captures_tasks=False,
     )
+    _open(app, target)
+
+
+def _open(app: App[None], target: EditTarget) -> None:
+    """Route an edit session by the active screen (research R1, contract C1):
+    inline in `#preview-pane` when `ListScreen` is active, full-screen
+    otherwise. The only place `open_editor`/`open_task_editor` diverge --
+    deferred import to avoid a cycle, since `ListScreen` imports from this
+    module at its own top level."""
+    from choom.tui.list_screen import ListScreen
+
+    if isinstance(app.screen, ListScreen):
+        app.screen.open_inline_editor(target)
+        return
     app.push_screen(EditScreen(target))
 
 

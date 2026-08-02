@@ -5,9 +5,9 @@ import datetime
 from choom.core.documents import _read_document
 from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditorPane
 from choom.tui.list_screen import ListScreen
-from tests.helpers import type_command
+from tests.helpers import editor_pane, type_command
 
 
 def _todays_notes(app: ChoomApp) -> list:  # type: ignore[type-arg]
@@ -23,11 +23,12 @@ async def test_bare_note_creates_and_opens_todays_daily_note(tmp_workspace: Work
         await pilot.pause()
         await type_command(app, pilot, "note")
 
-        assert isinstance(app.screen, EditScreen)
-        document = _read_document(app.screen.pane.target.display_path)
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        document = _read_document(pane.target.display_path)
         assert document is not None
         assert document.type == "daily"
-        assert _todays_notes(app)[0].path == app.screen.pane.target.display_path
+        assert _todays_notes(app)[0].path == pane.target.display_path
 
 
 async def test_bare_note_second_time_reopens_same_note_without_creating(
@@ -37,16 +38,17 @@ async def test_bare_note_second_time_reopens_same_note_without_creating(
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note")
-        first_path = app.screen.pane.target.display_path  # type: ignore[union-attr]
+        first_path = editor_pane(app).target.display_path
 
         await pilot.press("escape")
         await pilot.pause()
         assert isinstance(app.screen, ListScreen)
+        assert not app.screen.query(EditorPane)
 
         await type_command(app, pilot, "note")
 
-        assert isinstance(app.screen, EditScreen)
-        assert app.screen.pane.target.display_path == first_path
+        assert isinstance(app.screen, ListScreen)
+        assert editor_pane(app).target.display_path == first_path
         assert len(_todays_notes(app)) == 1
 
 
@@ -65,6 +67,7 @@ async def test_bare_note_with_unparseable_existing_file_still_opens_the_editor(
 
         # The editor works on raw text regardless of whether frontmatter parses
         # (FR-022) -- a malformed existing daily note is still editable.
-        assert isinstance(app.screen, EditScreen)
-        assert app.screen.pane.target.display_path == path
-        assert app.screen.pane.target.text == "not frontmatter at all"
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        assert pane.target.display_path == path
+        assert pane.target.text == "not frontmatter at all"

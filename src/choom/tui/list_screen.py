@@ -28,11 +28,18 @@ from choom.tui.columns import (
 )
 from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
+from choom.tui.edit_screen import EditorPane, EditTarget
 from choom.tui.help_screen import HelpScreen
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
 from choom.tui.scope_pane import CategoryRow, MonthRow, ScopePane, UnfiledRow
-from choom.tui.status_bar import LIST_HELP, TASK_LIST_HELP, StatusBar, collection_indicator
+from choom.tui.status_bar import (
+    EDIT_HELP,
+    LIST_HELP,
+    TASK_LIST_HELP,
+    StatusBar,
+    collection_indicator,
+)
 
 _EMPTY_STATE = {
     "meetings": "No meetings yet. Press / then 'meeting <description>' to create one.",
@@ -167,6 +174,10 @@ class ListScreen(Screen[None]):
         self._pending_select_id: str | None = None
         self._preview_links_expanded = False
         self._pending_error: str | None = None
+        #: The inline editor, while one is open (research R1, data-model
+        #: "New state"). `None` is the whole of "not editing" -- every guard
+        #: in this screen tests this one field.
+        self._editor_pane: EditorPane | None = None
         #: The warning count from `refresh_rows`'s own read, kept as render
         #: output so `_render_status` -- called on every command-bar keystroke
         #: via `ModeChanged` -- never triggers a scan of its own (research R3).
@@ -217,6 +228,45 @@ class ListScreen(Screen[None]):
         if self._refresh_timer is not None:
             self._refresh_timer.pause()
 
+    # --- inline editor (research R1, contract C1/C2) ---------------------------
+
+    def open_inline_editor(self, target: EditTarget) -> None:
+        """Mount an `EditorPane` in `#preview-pane` in place of the rendered
+        preview (FR-001, FR-003): the collection bar, scope pane, and list
+        stay exactly as they are -- only the preview swaps for an editor.
+        Freezes the periodic refresh for the duration (research R6) and swaps
+        the footer to `EDIT_HELP` (FR-009)."""
+        self.query_one("#preview").display = False
+        self.query_one("#preview-links-section").display = False
+        if self._refresh_timer is not None:
+            self._refresh_timer.pause()
+        self._editor_pane = EditorPane(target)
+        self.query_one("#preview-pane").mount(self._editor_pane)
+        self.query_one(StatusBar).update(EDIT_HELP)
+
+    @on(EditorPane.Closed)
+    async def _on_editor_pane_closed(self, message: EditorPane.Closed) -> None:
+        """The inline editor is done -- unmount it, bring the preview back,
+        run the one refresh that a full-screen edit's `on_screen_resume` would
+        have run, and land focus back on the list (FR-011, FR-013, contract
+        C5). `_pending_select_id` is set by every opener (`action_edit`,
+        create, daily-note) the same way it is for the full-screen path."""
+        pane = self._editor_pane
+        if pane is None:
+            return
+        self._editor_pane = None
+        await pane.remove()
+        self.query_one("#preview").display = True
+        if self._preview_links_expanded:
+            self.query_one("#preview-links-section").display = True
+        if self._refresh_timer is not None:
+            self._refresh_timer.resume()
+        self.query_one(CollectionBar).set_active(self.app.active)  # type: ignore[attr-defined]
+        await self._refresh_scope_pane()
+        await self.refresh_rows(select_id=self._pending_select_id)
+        self._pending_select_id = None
+        self.query_one("#meeting-list", ListView).focus()
+
     def on_resize(self, event: events.Resize) -> None:
         # Column widths are a pure function of the pane's width (research
         # R8) -- re-render the header and every already-rendered row's text
@@ -255,6 +305,14 @@ class ListScreen(Screen[None]):
         self._pending_error = message
 
     async def on_screen_resume(self) -> None:
+        # A ConfirmDialog pushed over an open inline editor (research R5) --
+        # e.g. the discard confirmation -- resumes this screen when it pops.
+        # Refreshing here would call `_update_preview` and overwrite the pane
+        # the editor is sitting in, mid-edit; refocus the editor instead and
+        # leave the timer paused, exactly as R6 requires while it is mounted.
+        if self._editor_pane is not None:
+            self._editor_pane.query_one("#editor").focus()
+            return
         # Coming back from PreviewScreen/EditScreen: a document may have been
         # created or edited while we were away, and a create moves the active
         # collection/month too -- rebuild everything rather than assume nothing
@@ -358,6 +416,12 @@ class ListScreen(Screen[None]):
         return hydration.result
 
     def _update_preview(self) -> None:
+        if self._editor_pane is not None:
+            # research R6: a render reached here (e.g. via `refresh_rows` from
+            # a filter keystroke) while the inline editor covers `#preview` --
+            # writing to it now would be invisible today and stale the moment
+            # the editor closes, so skip it rather than waste the render.
+            return
         list_view = self.query_one("#meeting-list", ListView)
         preview = self.query_one("#preview", Markdown)
         highlighted = list_view.highlighted_child
@@ -436,7 +500,12 @@ class ListScreen(Screen[None]):
         unobstructed (the timer itself is paused otherwise, `on_screen_suspend`/
         `on_screen_resume`). Does nothing while the command bar is open
         (FR-013) or a filter is active (FR-012) -- both are point-in-time
-        views that reconcile on their own terms, not the timer's (research R5)."""
+        views that reconcile on their own terms, not the timer's (research R5).
+        Also does nothing while the inline editor is open (FR-021, research
+        R6) -- the timer is paused on open too; this is the belt to that
+        braces, in case a tick was already queued the instant it opened."""
+        if self._editor_pane is not None:
+            return
         if self.query_one(CommandBar).display or self.app.filter_query:  # type: ignore[attr-defined]
             return
         _items, _is_tasks, key = self._refresh_tick_read()
@@ -445,6 +514,11 @@ class ListScreen(Screen[None]):
     # --- collection switching (Tab / shift+Tab) --------------------------------
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if self._editor_pane is not None:
+            # research R2 "belt and braces": no list action runs while the
+            # inline editor is open, whether or not the key that triggers it
+            # is one `TextArea` would otherwise have absorbed.
+            return False
         if action in ("next_collection", "previous_collection", "delete"):
             return not self.query_one(CommandBar).display
         return True
@@ -489,6 +563,8 @@ class ListScreen(Screen[None]):
         self.query_one("#meeting-list", ListView).focus()
 
     def action_open_command_bar(self) -> None:
+        if self._editor_pane is not None:
+            return  # FR-008: the command bar cannot open while the pane is mounted
         self.query_one(CommandBar).open()
         # Started here, not from `CommandBar.ModeChanged` -- that message is
         # posted on every keystroke, so starting the hydration there would

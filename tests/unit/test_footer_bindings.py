@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 from textual.binding import Binding
 
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditorPane
 from choom.tui.list_screen import ListScreen
 from choom.tui.preview_screen import PreviewScreen
 from choom.tui.status_bar import (
@@ -37,7 +37,11 @@ def _shown_keys(screen_cls: type) -> set[str]:
         # union of both footers this single screen can show.
         (ListScreen, f"{LIST_HELP}   {TASK_LIST_HELP}"),
         (PreviewScreen, PREVIEW_HELP),
-        (EditScreen, EDIT_HELP),
+        # The editor's BINDINGS live on EditorPane (014-inline-editor-pane,
+        # research R1) -- it is what's mounted, inline or full-screen, so it
+        # is what carries the footer's own binding source of truth. EditScreen
+        # itself now carries none.
+        (EditorPane, EDIT_HELP),
     ],
 )
 def test_footer_advertises_every_shown_binding(screen_cls: type, help_text: str) -> None:

@@ -101,29 +101,29 @@ with the new content in the preview.
 
 ### Implementation for User Story 1
 
-- [ ] T015 [US1] Add `_editor_pane: EditorPane | None` to `ListScreen.__init__` in
+- [X] T015 [US1] Add `_editor_pane: EditorPane | None` to `ListScreen.__init__` in
       `src/choom/tui/list_screen.py` — the single field every guard in this story tests
-- [ ] T016 [US1] Add `ListScreen.open_inline_editor(target)` in `src/choom/tui/list_screen.py`: hide
+- [X] T016 [US1] Add `ListScreen.open_inline_editor(target)` in `src/choom/tui/list_screen.py`: hide
       `#preview` and `#preview-links-section`, mount an `EditorPane` in `#preview-pane`, focus `#editor`,
       and leave the collection bar, scope pane, and list pane untouched (FR-001, FR-003)
-- [ ] T017 [US1] Route by active screen in `open_editor` and `open_task_editor` in
+- [X] T017 [US1] Route by active screen in `open_editor` and `open_task_editor` in
       `src/choom/tui/edit_screen.py`: when the active screen is `ListScreen`, call its
       `open_inline_editor`; otherwise push `EditScreen` as today (FR-002, contract C1)
-- [ ] T018 [US1] Swap the status bar to `EDIT_HELP` on open in `src/choom/tui/list_screen.py`, and
+- [X] T018 [US1] Swap the status bar to `EDIT_HELP` on open in `src/choom/tui/list_screen.py`, and
       restore `_render_status()` on close, so the footer never concatenates the two (FR-009, contract C4)
-- [ ] T019 [US1] Handle `EditorPane.Closed` in `ListScreen` in `src/choom/tui/list_screen.py`: unmount
+- [X] T019 [US1] Handle `EditorPane.Closed` in `ListScreen` in `src/choom/tui/list_screen.py`: unmount
       the pane, clear `_editor_pane`, unhide `#preview`, refresh the list once with the edited record
       selected, restore the status bar, and focus `#meeting-list` (FR-011, FR-013, contract C5)
-- [ ] T020 [US1] Block the command bar while the pane is mounted in
+- [X] T020 [US1] Block the command bar while the pane is mounted in
       `ListScreen.action_open_command_bar` in `src/choom/tui/list_screen.py` (FR-008)
-- [ ] T021 [US1] Widen `ListScreen.check_action` in `src/choom/tui/list_screen.py` to return `False` for
+- [X] T021 [US1] Widen `ListScreen.check_action` in `src/choom/tui/list_screen.py` to return `False` for
       every list action while `_editor_pane` is set (FR-007, research R2)
-- [ ] T022 [US1] Bind `tab` and `shift+tab` to a no-op on `EditorPane` in
+- [X] T022 [US1] Bind `tab` and `shift+tab` to a no-op on `EditorPane` in
       `src/choom/tui/edit_screen.py` — the only keys `TextArea` lets through to the host (research R2)
-- [ ] T023 [US1] Freeze the list while the pane is mounted in `src/choom/tui/list_screen.py`: pause
+- [X] T023 [US1] Freeze the list while the pane is mounted in `src/choom/tui/list_screen.py`: pause
       `_refresh_timer` on open and resume on close, and return early from `_refresh_tick`,
       `_update_preview`, and `on_screen_resume` while `_editor_pane` is set (FR-021, research R6)
-- [ ] T024 [US1] Refocus `#editor` rather than the list when a `ConfirmDialog` is declined over an open
+- [X] T024 [US1] Refocus `#editor` rather than the list when a `ConfirmDialog` is declined over an open
       inline editor, in `src/choom/tui/edit_screen.py` and `src/choom/tui/list_screen.py` (FR-014,
       research R5)
 
@@ -133,29 +133,29 @@ with the new content in the preview.
 > the list, `ctrl+x` losing to `TextArea`'s cut, a refresh touching the buffer, and focus escaping the
 > editor. They are not one test per acceptance scenario.
 
-- [ ] T025 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: pressing `e` on a
+- [X] T025 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: pressing `e` on a
       highlighted document mounts the editor in `#preview-pane`, `#meeting-list` and `#scope-pane` are
       still displayed, `#preview` is hidden, and the status bar reads `EDIT_HELP`
-- [ ] T026 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: typing `j`, `k`,
+- [X] T026 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: typing `j`, `k`,
       `e`, `b`, `space`, and `/` inserts those characters, the highlighted index does not change, the
       command bar stays closed, and `ctrl+d` deletes a character rather than a record
-- [ ] T027 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: `ctrl+x` writes
+- [X] T027 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: `ctrl+x` writes
       the file and closes the pane (the priority-binding risk of research R3), `#preview` shows the saved
       content, the same row is highlighted, and focus is back on `#meeting-list`
-- [ ] T028 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: `tab` and
+- [X] T028 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: `tab` and
       `shift+tab` leave focus on `#editor` and do not change the active collection
-- [ ] T029 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: with the pane
+- [X] T029 [P] [US1] Integration test in `tests/integration/test_inline_editor_tui.py`: with the pane
       open, a record created on disk out of process does not change the list, the buffer, or the cursor;
       after close, the list shows it (FR-021, FR-022)
-- [ ] T030 [US1] Update `tests/integration/test_edit_from_list_tui.py` for the inline path — the list
+- [X] T030 [US1] Update `tests/integration/test_edit_from_list_tui.py` for the inline path — the list
       screen is never left, and the assertions become "an editor is open" rather than "a screen was
       pushed"
-- [ ] T031 [P] [US1] Update `tests/integration/test_discard_tui.py`: the confirmation is raised over the
+- [X] T031 [P] [US1] Update `tests/integration/test_discard_tui.py`: the confirmation is raised over the
       list screen, declining returns to a still-mounted editor with the buffer intact, confirming
       unmounts it and leaves the file unchanged
-- [ ] T032 [P] [US1] Update `tests/integration/test_ctrl_q_confirm.py` to cover a dirty **inline** editor
+- [X] T032 [P] [US1] Update `tests/integration/test_ctrl_q_confirm.py` to cover a dirty **inline** editor
       raising the same confirmation (T010's path)
-- [ ] T033 [P] [US1] Update `tests/unit/test_footer_bindings.py` for the footer text shown while an
+- [X] T033 [P] [US1] Update `tests/unit/test_footer_bindings.py` for the footer text shown while an
       inline editor is open
 
 **Checkpoint**: US1 is the MVP — quick edits from the list no longer leave the list.
