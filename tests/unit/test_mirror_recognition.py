@@ -117,3 +117,28 @@ def test_never_raises_on_arbitrary_text() -> None:
 
 def test_no_mirrors_when_document_has_no_links_at_all() -> None:
     assert find_mirrors("just some prose\n\nmore prose\n", source=_SOURCE) == ()
+
+
+# --- link_start / link_end (017-editor-task-delete) -----------------------------
+
+
+def test_link_span_bounds_the_links_own_text_on_a_plain_mirror_line() -> None:
+    text = "- [ ] [call Terry](../../../tasks.md#task_a1b2)\n"
+    mirror = find_mirrors(text, source=_SOURCE)[0]
+    assert text[mirror.link_start : mirror.link_end] == "[call Terry](../../../tasks.md#task_a1b2)"
+
+
+def test_link_span_bounds_the_links_own_text_on_an_indented_mirror_line() -> None:
+    text = "  - [ ] [call Terry](../../../tasks.md#task_a1b2)\n"
+    mirror = find_mirrors(text, source=_SOURCE)[0]
+    assert text[mirror.link_start : mirror.link_end] == "[call Terry](../../../tasks.md#task_a1b2)"
+
+
+def test_link_span_picks_the_first_of_several_task_links_on_one_line() -> None:
+    text = (
+        "- [ ] [call Terry](../../../tasks.md#task_first) "
+        "and [Jan](../../../tasks.md#task_second)\n"
+    )
+    mirror = find_mirrors(text, source=_SOURCE)[0]
+    assert mirror.task_id == "task_first"
+    assert text[mirror.link_start : mirror.link_end] == "[call Terry](../../../tasks.md#task_first)"
