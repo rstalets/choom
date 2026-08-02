@@ -154,10 +154,10 @@ exists and points at the new workspace.
 
 ## Phase 8: Polish & Cross-Cutting Concerns
 
-- [ ] T038 [P] Document the discovery file in `README.md` where `config assistant` is described: what it installs, where, that it is rewritten on every run, and that `none` removes it
-- [ ] T039 Run `uv run ruff format`, `uv run ruff check`, and the type checker over the changed files, fixing what they report
-- [ ] T040 Run the full suite with `uv run pytest` and confirm the pre-existing `AGENTS.md` line-budget contract test still passes untouched
-- [ ] T041 Walk `specs/013-assistant-discovery-file/quickstart.md` end to end against a scratch workspace, and correct the quickstart if reality differs
+- [X] T038 [P] Document the discovery file in `README.md` where `config assistant` is described: what it installs, where, that it is rewritten on every run, and that `none` removes it
+- [X] T039 Run `uv run ruff format`, `uv run ruff check`, and the type checker over the changed files, fixing what they report
+- [X] T040 Run the full suite with `uv run pytest` and confirm the pre-existing `AGENTS.md` line-budget contract test still passes untouched
+- [X] T041 Walk `specs/013-assistant-discovery-file/quickstart.md` end to end against a scratch workspace, and correct the quickstart if reality differs
 
 ---
 
