@@ -1,5 +1,5 @@
 ---
-name: "fixer"
+name: "delamain"
 description: "Autonomously deliver a set of issues or a whole milestone -- routing enhancements through speckit on Opus subagents and bugfix/maintenance work through Sonnet subagents, scheduling what can run in parallel, reviewing every gate, smoke-testing the TUI, and merging green PRs."
 argument-hint: "milestone:<name-or-number> | <issue numbers, e.g. 39 43 60> (omit to be asked)"
 metadata:
@@ -11,8 +11,11 @@ disable-model-invocation: false
 ## Purpose
 
 Take a batch of work -- a handful of issues, or a whole milestone -- and deliver it end to
-end without supervision. You are the fixer: you take the job, break it into gigs, put the
-right crew on each one, check their work, and pay out only when it's clean.
+end without supervision. You are Delamain: one core that dispatches autonomous copies of
+itself, each driving its own route, all held to a single standard. The copies do the
+driving. The core decides who goes where, inspects every arrival, and is the only one that
+gets to call a job finished -- and the only one that notices when a copy has started
+drifting off its route.
 
 This sits between `/product-owner` (which refines an issue into a real problem statement)
 and `/release` (which ships what landed). It does not refine issues and it does not cut
@@ -215,21 +218,21 @@ If a gate fails on the constitution, park it and escalate. That is the line.
    (cd "$W" && uv sync --extra dev)              # warm the venv before tmux, not during
    mkdir -p "$WS" && (cd "$WS" && "$W/.venv/bin/choom" init)
 
-   tmux kill-session -t fixer 2>/dev/null
-   tmux new-session -d -s fixer -x 120 -y 40 -c "$WS" "$W/.venv/bin/choom"
+   tmux kill-session -t delamain 2>/dev/null
+   tmux new-session -d -s delamain -x 120 -y 40 -c "$WS" "$W/.venv/bin/choom"
 
    # Wait for first paint. A bare foreground `sleep` is blocked, so poll in a loop.
    ready=0
    for i in $(seq 40); do
-     tmux capture-pane -p -t fixer | grep -qi "choom" && { ready=1; break; }
+     tmux capture-pane -p -t delamain | grep -qi "choom" && { ready=1; break; }
      sleep 0.25
    done
    [ "$ready" = 1 ] || echo "TUI NEVER PAINTED -- treat as a failed smoke test"
 
-   tmux send-keys -t fixer <keys>
+   tmux send-keys -t delamain <keys>
    for i in $(seq 8); do sleep 0.15; done          # let the redraw settle
-   tmux capture-pane -p -t fixer
-   tmux kill-session -t fixer
+   tmux capture-pane -p -t delamain
+   tmux kill-session -t delamain
    ```
 
    Poll for a marker you have confirmed is in the real output, case-insensitively (the header
@@ -283,7 +286,7 @@ conflict in two or three sentences.
 
 ## Step 11 -- Ledger and final report
 
-Keep a running ledger at `$CLAUDE_JOB_DIR/tmp/fixer-ledger.md`: one row per issue with lane,
+Keep a running ledger at `$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`: one row per issue with lane,
 agent, worktree, branch, PR, stage, and outcome. Update it as each stage lands so a resumed
 session can pick the run back up.
 
