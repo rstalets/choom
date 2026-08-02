@@ -58,7 +58,7 @@ def test_ai_and_config_assistant_work_in_a_workspace_with_spaces_and_non_ascii(
     assert get_assistant(workspace) == "claude"
 
     meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
-    prompt = compose_prompt("résumé the café notes", meeting.path, 3)
+    prompt = compose_prompt("résumé the café notes", meeting.path, 3, task_capture=True)
     assert str(meeting.path) in prompt
 
     resolved = resolve_assistant(get_assistant(workspace))

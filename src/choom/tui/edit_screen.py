@@ -22,10 +22,11 @@ from choom.core.assistants import (
 from choom.core.config import get_assistant
 from choom.core.documents import _read_document
 from choom.core.editing import load_for_edit, save_buffer
-from choom.core.editor_commands import parse_line
+from choom.core.editor_commands import parse_line, parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import find_link_targets, format_link
 from choom.core.mirrors import (
+    capture_reply_tasks,
     capture_task,
     find_mirrors,
     reconcile_on_open,
@@ -35,6 +36,7 @@ from choom.core.mirrors import (
 from choom.core.models import (
     AssistantReply,
     ParsedCommand,
+    ReplyCapture,
     ResolvedAssistant,
     SaveResult,
     Task,
@@ -57,15 +59,18 @@ _PLACEHOLDER = "⋯"
 class EditTarget:
     """What `EditScreen` edits: the buffer's starting text, how to save it, the
     path shown to the user and handed to `/ai`, the line offset that positions
-    an `/ai` prompt within that file, and whether the target has frontmatter to
-    stamp (research R5). A file and a task's body are its two implementations
-    -- `EditScreen` itself knows neither one, only this shape."""
+    an `/ai` prompt within that file, whether the target has frontmatter to
+    stamp (research R5), and whether it has a document identity a `/task`
+    capture -- typed or from a reply -- can link from (research R3). A file
+    and a task's body are its two implementations -- `EditScreen` itself
+    knows neither one, only this shape."""
 
     text: str
     display_path: Path
     save: Callable[[str], SaveResult]
     ai_line_offset: int
     stamps_frontmatter: bool
+    captures_tasks: bool
 
 
 def open_editor(app: App[None], path: Path) -> bool:
@@ -107,6 +112,7 @@ def open_editor(app: App[None], path: Path) -> bool:
         save=_save,
         ai_line_offset=0,
         stamps_frontmatter=True,
+        captures_tasks=True,
     )
     app.push_screen(EditScreen(target))
     return True
@@ -167,8 +173,28 @@ def open_task_editor(app: App[None], task: Task) -> None:
         save=_save,
         ai_line_offset=_task_ai_line_offset(app, task_id),
         stamps_frontmatter=False,
+        captures_tasks=False,
     )
     app.push_screen(EditScreen(target))
+
+
+def _reply_capture_note(capture: ReplyCapture) -> tuple[str | None, bool]:
+    """The status note and its `warn` flag for a reply's capture result
+    (contracts/reply-capture.md §4). No eligible line at all is exactly
+    today's plain footer -- `(None, False)`. All captured is news, not a
+    warning. Any failure, partial or total, carries `⚠` and names the first
+    reason; the count in front of it, when there is one, carries the rest."""
+    if not capture.tasks and not capture.warnings:
+        return None, False
+    captured = f"{len(capture.tasks)} {'task' if len(capture.tasks) == 1 else 'tasks'} captured"
+    if not capture.warnings:
+        return captured, False
+    if not capture.tasks:
+        return capture.warnings[0].message, True
+    return (
+        f"{captured}; {len(capture.warnings)} could not be: {capture.warnings[0].message}",
+        True,
+    )
 
 
 def _resolution_message(resolved: ResolvedAssistant) -> str:
@@ -298,9 +324,13 @@ class EditScreen(Screen[None]):
             return self._request is not None
         return True
 
-    def _render_status(self, note: str | None = None) -> None:
+    def _render_status(self, note: str | None = None, *, warn: bool = True) -> None:
         status = self.query_one(StatusBar)
-        status.update(f"⚠ {note}   {EDIT_HELP}" if note else EDIT_HELP)
+        if note is None:
+            status.update(EDIT_HELP)
+            return
+        prefix = "⚠ " if warn else ""
+        status.update(f"{prefix}{note}   {EDIT_HELP}")
 
     def _render_in_flight_status(self) -> None:
         if self._breadcrumb is None:
@@ -404,7 +434,7 @@ class EditScreen(Screen[None]):
             self._render_status(f"/{parsed.command.name} needs a description")
             return
 
-        if not self.target.stamps_frontmatter:
+        if not self.target.captures_tasks:
             # A task's own body has no document identity of its own to link
             # from -- only `open_editor` targets are documents.
             self._render_status("/task is only available while editing a document")
@@ -492,7 +522,10 @@ class EditScreen(Screen[None]):
             return
 
         prompt = compose_prompt(
-            parsed.argument, self.target.display_path, self.target.ai_line_offset + line_index + 1
+            parsed.argument,
+            self.target.display_path,
+            self.target.ai_line_offset + line_index + 1,
+            task_capture=self.target.captures_tasks,
         )
         request = start_request(
             resolved.profile,
@@ -531,13 +564,48 @@ class EditScreen(Screen[None]):
         editor.read_only = False
 
         if reply.ok:
+            text = reply.text
+            note: str | None = None
+            warn = False
+
+            if self.target.captures_tasks:
+                workspace = self.app.workspace  # type: ignore[attr-defined]
+                try:
+                    document = _read_document(self.target.display_path)
+                except OSError:
+                    # Deleted or renamed while the assistant was working. `/task`
+                    # reads the document it saved microseconds earlier; a reply is
+                    # seconds or minutes later, so this window is real here.
+                    document = None
+                if document is None:
+                    # No id to link a capture from -- the reply still lands in full,
+                    # and a reply that wanted tasks says why it has none rather than
+                    # leaving the user to notice (FR-017, FR-018).
+                    if any(line.task is not None for line in parse_reply_lines(text)):
+                        note, warn = (
+                            "could not identify this document; task lines left as written",
+                            True,
+                        )
+                else:
+                    capture = capture_reply_tasks(
+                        workspace,
+                        text,
+                        source=self.target.display_path,
+                        source_id=document.id,
+                    )
+                    text = capture.text
+                    for task in capture.tasks:
+                        assert task.id is not None
+                        self._mirror_baseline[task.id] = False
+                    note, warn = _reply_capture_note(capture)
+
             editor.replace(
-                reply.text,
+                text,
                 (line_index, 0),
                 (line_index, len(_PLACEHOLDER)),
                 maintain_selection_offset=False,
             )
-            self._render_status(None)
+            self._render_status(note, warn=warn)
         else:
             editor.replace(
                 original_line,

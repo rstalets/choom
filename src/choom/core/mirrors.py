@@ -24,6 +24,7 @@ from pathlib import Path
 
 from choom.core.atomic_write import write_text_atomic
 from choom.core.editing import _apply_line_ending_policy, load_for_edit
+from choom.core.editor_commands import parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import find_links, format_link, resolve_id
 from choom.core.models import (
@@ -32,6 +33,7 @@ from choom.core.models import (
     Mirror,
     MirrorReport,
     MirrorResolution,
+    ReplyCapture,
     SaveResult,
     ScanWarning,
     Task,
@@ -162,6 +164,96 @@ def capture_task(
     task = add_task(workspace, description, type=type, links=(source_id,), now=now)
     line = mirror_line(task, source=source, tasks_file=workspace.tasks_file)
     return task, line
+
+
+def _tighten_captured_runs(out_lines: list[str], captured: set[int]) -> list[str]:
+    """Drop blank lines that sit between two captured task lines.
+
+    An assistant may write its task lines as a loose list -- one blank line between
+    each -- and both shapes are ordinary markdown, so which one arrives is not
+    something the reply can be relied on to settle. Substituting each line for its
+    mirror then leaves a gappy checklist in the user's note, which is not what a
+    captured list of commitments should look like.
+
+    Only a run of blank lines with a captured line on *both* sides is dropped. A blank
+    line between prose and the first task is block separation and stays; so does one
+    after the last task, and so does one beside a task line whose capture failed --
+    that line is still the assistant's text, not a checklist item.
+    """
+    if len(captured) < 2:
+        return out_lines
+    drop: set[int] = set()
+    ordered = sorted(captured)
+    for start, end in zip(ordered, ordered[1:], strict=False):
+        between = range(start + 1, end)
+        if between and all(out_lines[i].strip() == "" for i in between):
+            drop.update(between)
+    return [line for index, line in enumerate(out_lines) if index not in drop]
+
+
+def capture_reply_tasks(
+    workspace: Workspace, text: str, *, source: Path, source_id: str
+) -> ReplyCapture:
+    """Walk an assistant reply, capturing every eligible task line through `capture_task`.
+
+    Classifies `text` with `parse_reply_lines`, then for each eligible line -- top to
+    bottom, so tasks reach tasks.md in the reply's own order -- calls `capture_task` with
+    that line's argument and type suffix and substitutes the returned mirror line for the
+    text of that line. Every other line is carried through byte-identical. Writes
+    tasks.md through `capture_task`, once per eligible line, and nothing else.
+
+    The one line this does not carry through is a blank one sitting between two
+    captured lines, which is dropped so a loose list of task lines becomes a tight
+    checklist (`_tighten_captured_runs`, FR-010a). No line carrying any character is
+    ever dropped.
+
+    Returns `ReplyCapture(text, tasks, warnings)`. When `text` has no eligible line, the
+    returned `text` is `text` itself -- the same object -- and no read or write happens
+    (FR-011). No line is ever lost, under any failure: a line whose capture raises
+    `UsageError` (an empty description after `#tag` removal, or a rejected type or tag
+    token) or `WorkspaceError` (tasks.md could not be written) is left exactly as the
+    assistant wrote it, with a `ScanWarning(reason="reply_capture_failed")` recorded for
+    it, and the walk continues to the next line (FR-016, FR-017, research R10).
+
+    Raises: nothing from the two documented failure modes above -- both are caught and
+    reported as warnings. Any other exception propagates; a bug here should be loud.
+    """
+    lines = parse_reply_lines(text)
+    if not any(line.task is not None for line in lines):
+        return ReplyCapture(text=text, tasks=(), warnings=())
+
+    tasks: list[Task] = []
+    warnings: list[ScanWarning] = []
+    out_lines: list[str] = []
+    captured: set[int] = set()
+    for line in lines:
+        if line.task is None:
+            out_lines.append(line.text)
+            continue
+        try:
+            task, mirror = capture_task(
+                workspace,
+                line.task.argument,
+                type=line.task.suffix,
+                source=source,
+                source_id=source_id,
+            )
+        except (UsageError, WorkspaceError) as exc:
+            warnings.append(
+                ScanWarning(
+                    path=workspace.tasks_file,
+                    reason="reply_capture_failed",
+                    message=str(exc),
+                )
+            )
+            out_lines.append(line.text)
+            continue
+        tasks.append(task)
+        captured.add(len(out_lines))
+        out_lines.append(mirror)
+
+    tightened = _tighten_captured_runs(out_lines, captured)
+    return ReplyCapture(text="\n".join(tightened), tasks=tuple(tasks), warnings=tuple(warnings))
 
 
 # --- The non-stamping write -------------------------------------------------------

@@ -37,6 +37,23 @@ elif mode == "reply":
 elif mode == "reply_with_slash":
     print("/ai nested attempt\\nstill here")
     sys.exit(0)
+elif mode == "reply_with_tasks":
+    print(
+        "Here is a summary of the discussion.\\n"
+        "/task call Terry about the renewal\\n"
+        "One more thing worth tracking down the line.\\n"
+        "/task.followup review the budget numbers #finance"
+    )
+    sys.exit(0)
+elif mode == "reply_explaining":
+    print(
+        "You can ask choom to capture a task by writing a line like this:\\n"
+        "```\\n"
+        "/task call Terry about the renewal\\n"
+        "```\\n"
+        "Just mention /task on its own line and choom does the rest."
+    )
+    sys.exit(0)
 elif mode == "empty":
     sys.exit(0)
 elif mode == "fail":
