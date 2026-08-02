@@ -47,7 +47,7 @@ async def test_dotted_command_creates_typed_document_with_tags(
         await type_command(app, pilot, command_text)
 
         assert isinstance(app.screen, EditScreen)
-        document = _read_document(app.screen.target.display_path)
+        document = _read_document(app.screen.pane.target.display_path)
         assert document is not None
         assert document.title == title
         assert document.tags == tags
@@ -103,7 +103,7 @@ async def test_bare_note_with_description_creates_untyped_note_not_daily(
         await type_command(app, pilot, "note vendor landscape")
 
         assert isinstance(app.screen, EditScreen)
-        document = _read_document(app.screen.target.display_path)
+        document = _read_document(app.screen.pane.target.display_path)
         assert document is not None
         assert document.title == "vendor landscape"
         assert document.type == ""

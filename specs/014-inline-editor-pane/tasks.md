@@ -34,9 +34,9 @@ Single project: `src/choom/` and `tests/` at the repository root.
 **Purpose**: Establish the baseline this change is measured against. No project initialization is needed
 — the repository, dependencies, and tooling already exist.
 
-- [ ] T001 Run `uv run pytest` and record the passing baseline, so any later failure is attributable to
+- [X] T001 Run `uv run pytest` and record the passing baseline, so any later failure is attributable to
       this feature rather than inherited; note the count in the PR description
-- [ ] T002 [P] Confirm the editor's current presentation contract still holds by running
+- [X] T002 [P] Confirm the editor's current presentation contract still holds by running
       `uv run pytest tests/integration/test_edit_presentation.py tests/integration/test_edit_from_list_tui.py`
       — these two files are the regression net for everything Phase 2 moves
 
@@ -51,38 +51,38 @@ behaviour. Nothing renders inline yet.
 
 **⚠️ CRITICAL**: No user story can begin until this phase is complete and the suite is green again.
 
-- [ ] T003 Extract an `EditorPane(Vertical)` widget in `src/choom/tui/edit_screen.py` holding the
+- [X] T003 Extract an `EditorPane(Vertical)` widget in `src/choom/tui/edit_screen.py` holding the
       `EditorTextArea` and every field listed in `data-model.md` (`target`, `original_text`, `_request`,
       `_breadcrumb`, `_mirror_baseline`, `_cursor_row`), plus the `is_dirty` property
-- [ ] T004 Move `EditScreen`'s `BINDINGS` (`ctrl+o`, `ctrl+s`, `ctrl+x`, `escape`, `ctrl+c`) and its
+- [X] T004 Move `EditScreen`'s `BINDINGS` (`ctrl+o`, `ctrl+s`, `ctrl+x`, `escape`, `ctrl+c`) and its
       `check_action` gate onto `EditorPane` in `src/choom/tui/edit_screen.py`, keeping `priority=True`
       on the four that carry it (research R3)
-- [ ] T005 Move `_save`, `action_save`, `action_save_and_close`, `action_close`, `action_cancel_request`,
+- [X] T005 Move `_save`, `action_save`, `action_save_and_close`, `action_close`, `action_cancel_request`,
       `_render_status`, `_render_in_flight_status`, and `on_resize` onto `EditorPane` in
       `src/choom/tui/edit_screen.py`; status lookups become `self.screen.query_one(StatusBar)` so the
       pane writes to whichever host's bar is present (research R4)
-- [ ] T006 Move the in-editor command handlers (`_on_editor_command_submitted`, `_capture_task`,
+- [X] T006 Move the in-editor command handlers (`_on_editor_command_submitted`, `_capture_task`,
       `_insert_link`, `_start_ai_request`, `_run_assistant`, `_finish_request`) onto `EditorPane` in
       `src/choom/tui/edit_screen.py` unchanged (research R7)
-- [ ] T007 Add an `EditorPane.Closed` message in `src/choom/tui/edit_screen.py`, posted where
+- [X] T007 Add an `EditorPane.Closed` message in `src/choom/tui/edit_screen.py`, posted where
       `action_close` and `action_save_and_close` previously called `app.pop_screen()`, so the pane never
       decides how it disappears (research R1)
-- [ ] T008 Reduce `EditScreen` in `src/choom/tui/edit_screen.py` to a host: compose `EditorPane` plus its
+- [X] T008 Reduce `EditScreen` in `src/choom/tui/edit_screen.py` to a host: compose `EditorPane` plus its
       own `StatusBar`, handle `EditorPane.Closed` by popping itself, and expose the pane for callers that
       need it
-- [ ] T009 Add `open_editors(app) -> list[EditorPane]` in `src/choom/tui/edit_screen.py`, iterating
+- [X] T009 Add `open_editors(app) -> list[EditorPane]` in `src/choom/tui/edit_screen.py`, iterating
       `app.screen_stack` and querying each screen for mounted panes (research R9)
-- [ ] T010 Replace the `isinstance(screen, EditScreen)` dirty scan in `ChoomApp.action_quit` in
+- [X] T010 Replace the `isinstance(screen, EditScreen)` dirty scan in `ChoomApp.action_quit` in
       `src/choom/tui/app.py` with `open_editors(...)`, so `ctrl+q` finds an inline editor (bug #64 must
       not reopen in a new shape)
-- [ ] T011 Replace the `isinstance(screen, EditScreen)` scan in `ChoomApp.toggle_task_and_track` in
+- [X] T011 Replace the `isinstance(screen, EditScreen)` scan in `ChoomApp.toggle_task_and_track` in
       `src/choom/tui/app.py` with `open_editors(...)`, so a toggle still skips documents whose editor is
       open and dirty
-- [ ] T012 [P] Add `EditorPane` sizing to `src/choom/tui/app.tcss` so it fills its host in both
+- [X] T012 [P] Add `EditorPane` sizing to `src/choom/tui/app.tcss` so it fills its host in both
       presentations (`height: 1fr; width: 1fr`), leaving the existing `#editor` rule intact
-- [ ] T013 Update `open_edit` in `tests/helpers.py` to assert an editor is open (an `EditorPane` is
+- [X] T013 Update `open_edit` in `tests/helpers.py` to assert an editor is open (an `EditorPane` is
       mounted) rather than that `app.screen` is an `EditScreen`, and return the pane (research R10)
-- [ ] T014 Run `uv run pytest` and fix fallout until green. Behaviour must be **identical** to T001's
+- [X] T014 Run `uv run pytest` and fix fallout until green. Behaviour must be **identical** to T001's
       baseline at this point — if a test needed a behavioural change to pass here, the extraction leaked
       something and that is the bug to fix
 

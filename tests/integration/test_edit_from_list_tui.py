@@ -22,7 +22,7 @@ async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> N
         await pilot.pause()
 
         assert isinstance(app.screen, EditScreen)
-        assert app.screen.target.display_path == meeting.path
+        assert app.screen.pane.target.display_path == meeting.path
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text.startswith("---\n")
         assert "Q3 planning" in editor.text
@@ -188,7 +188,7 @@ async def test_entering_and_leaving_a_document_without_typing_raises_no_confirma
         await pilot.press("e")
         await pilot.pause()
         assert isinstance(app.screen, EditScreen)
-        assert app.screen.is_dirty is False
+        assert app.screen.pane.is_dirty is False
 
         await pilot.press("escape")
         await pilot.pause()
@@ -210,7 +210,7 @@ async def test_entering_and_leaving_a_task_body_without_typing_raises_no_confirm
         await pilot.press("e")
         await pilot.pause()
         assert isinstance(app.screen, EditScreen)
-        assert app.screen.is_dirty is False
+        assert app.screen.pane.is_dirty is False
 
         await pilot.press("escape")
         await pilot.pause()

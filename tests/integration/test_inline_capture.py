@@ -39,7 +39,7 @@ async def test_capture_creates_a_task_and_leaves_a_mirror(tmp_workspace: Workspa
 
         # The editor never moved -- no screen push, no scroll change.
         assert isinstance(app.screen, EditScreen)
-        assert app.screen is screen
+        assert app.screen.pane is screen
         assert editor.scroll_offset == scroll_before
 
         # The cursor sits at the end of the inserted line.
@@ -116,7 +116,7 @@ async def test_a_bare_task_dot_followup_with_no_description_reports_and_writes_n
 
         from choom.tui.status_bar import StatusBar
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "needs a description" in str(status.content)
         assert editor.get_line(line_index).plain == "/task.followup"
 

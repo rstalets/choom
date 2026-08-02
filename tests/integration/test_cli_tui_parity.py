@@ -26,7 +26,7 @@ async def _create_via_tui(workspace, command_text: str) -> Path:  # type: ignore
         await pilot.pause()
         await type_command(app, pilot, command_text)
         assert isinstance(app.screen, EditScreen)
-        return app.screen.target.display_path
+        return app.screen.pane.target.display_path
 
 
 @pytest.mark.parametrize(

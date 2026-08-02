@@ -57,12 +57,12 @@ _PLACEHOLDER = "⋯"
 
 @dataclass(frozen=True, slots=True)
 class EditTarget:
-    """What `EditScreen` edits: the buffer's starting text, how to save it, the
+    """What `EditorPane` edits: the buffer's starting text, how to save it, the
     path shown to the user and handed to `/ai`, the line offset that positions
     an `/ai` prompt within that file, whether the target has frontmatter to
     stamp (research R5), and whether it has a document identity a `/task`
     capture -- typed or from a reply -- can link from (research R3). A file
-    and a task's body are its two implementations -- `EditScreen` itself
+    and a task's body are its two implementations -- `EditorPane` itself
     knows neither one, only this shape."""
 
     text: str
@@ -80,7 +80,7 @@ def open_editor(app: App[None], path: Path) -> bool:
     cannot be read, leaving the caller's screen in place rather than raising.
 
     Reconciles every mirror in the file against tasks.md before the buffer is
-    handed to `EditScreen` (research R6, FR-026), so the buffer and the file
+    handed to the editor (research R6, FR-026), so the buffer and the file
     agree from the first keystroke. A reconcile failure is best-effort and never
     turns a successful open into a `False` -- 009's own contract on top of the
     one this function already carried.
@@ -178,6 +178,18 @@ def open_task_editor(app: App[None], task: Task) -> None:
     app.push_screen(EditScreen(target))
 
 
+def open_editors(app: App[None]) -> list[EditorPane]:
+    """Every mounted `EditorPane` across the screen stack (research R9) --
+    inline or full-screen, whichever is open. After R1 an editor's dirty state
+    lives on the pane, not the screen, so `ChoomApp.action_quit` (bug #64) and
+    `ChoomApp.toggle_task_and_track` both consume this rather than scanning for
+    an `EditScreen` -- missing either one is a silent data-loss bug."""
+    panes: list[EditorPane] = []
+    for screen in app.screen_stack:
+        panes.extend(screen.query(EditorPane))
+    return panes
+
+
 def _reply_capture_note(capture: ReplyCapture) -> tuple[str | None, bool]:
     """The status note and its `warn` flag for a reply's capture result
     (contracts/reply-capture.md §4). No eligible line at all is exactly
@@ -264,11 +276,22 @@ def _pad_for_cursor(text: str) -> tuple[str, int]:
     return padded, len(kept) + 1
 
 
-class EditScreen(Screen[None]):
-    # TextArea itself binds ctrl+o is unbound but ctrl+s/ctrl+x are (cut); `priority=True`
-    # means these are checked app-down-to-focused-widget, before TextArea's own
+class EditorPane(Vertical):
+    """Everything an edit session needs: the `EditorTextArea`, the save/discard
+    path, the mirror baseline, and the `/ai` request machinery (research R1).
+    Mounted by `EditScreen` (full-screen) or by `ListScreen` inline in
+    `#preview-pane` -- one implementation, two hosts, so "identical capability
+    inline and full-screen" (FR-019) holds by construction rather than by
+    vigilance.
+
+    Closing is host-specific, so this widget never pops a screen or unmounts
+    itself -- it posts `Closed` and lets whichever host mounted it decide.
+    """
+
+    # TextArea itself binds ctrl+s/ctrl+x (cut); `priority=True` means these are
+    # checked from the app down to the focused widget, before TextArea's own
     # bindings, so they aren't shadowed by the focused editor (e.g. TextArea's
-    # built-in ctrl+x -> cut).
+    # built-in ctrl+x -> cut). research R3.
     BINDINGS = [
         Binding("ctrl+o", "save", "Save", show=True, priority=True),
         Binding("ctrl+s", "save", "Save", show=False, priority=True),
@@ -278,7 +301,17 @@ class EditScreen(Screen[None]):
         # (plan Complexity Tracking): active only while a request is in flight, and
         # the cancel hint is on screen for the whole wait via in_flight_status().
         Binding("ctrl+c", "cancel_request", "Cancel", show=False, priority=True),
+        # Neither key is bound by TextArea (`tab_behavior="focus"` deliberately
+        # lets both through) -- without a no-op here, tab would switch the
+        # collection (inline) or move focus off the editor (research R2,
+        # FR-006/FR-007).
+        Binding("tab", "noop", show=False),
+        Binding("shift+tab", "noop", show=False),
     ]
+
+    class Closed(Message):
+        """Posted instead of popping a screen or unmounting -- the host
+        decides how the pane disappears (research R1)."""
 
     def __init__(self, target: EditTarget) -> None:
         super().__init__()
@@ -293,9 +326,9 @@ class EditScreen(Screen[None]):
         self._request: AssistantRequest | None = None
         self._breadcrumb: str | None = None
         # What each mirror in `target.text` read at open (or last reconciled) --
-        # "since they last agreed", held for the life of this screen and never
+        # "since they last agreed", held for the life of this pane and never
         # persisted (research R4). Seeded from the already-reconciled text the
-        # screen was constructed with, so a correction applied at open is never
+        # pane was constructed with, so a correction applied at open is never
         # mistaken at save time for an edit the user made (US5/US6).
         self._mirror_baseline: dict[str, bool] = {
             m.task_id: m.done for m in find_mirrors(target.text, source=target.display_path)
@@ -307,8 +340,6 @@ class EditScreen(Screen[None]):
 
     def compose(self) -> ComposeResult:
         yield EditorTextArea(self._padded_text, show_line_numbers=True, id="editor")
-        with Vertical(id="bottom-bar"):
-            yield StatusBar(EDIT_HELP, id="status-bar")
 
     def on_mount(self) -> None:
         editor = self.query_one("#editor", TextArea)
@@ -324,8 +355,12 @@ class EditScreen(Screen[None]):
             return self._request is not None
         return True
 
+    def action_noop(self) -> None:
+        """Absorbs `tab`/`shift+tab` (research R2) -- bubbles no further, so
+        neither key reaches a host screen's own binding."""
+
     def _render_status(self, note: str | None = None, *, warn: bool = True) -> None:
-        status = self.query_one(StatusBar)
+        status = self.screen.query_one(StatusBar)
         if note is None:
             status.update(EDIT_HELP)
             return
@@ -335,7 +370,7 @@ class EditScreen(Screen[None]):
     def _render_in_flight_status(self) -> None:
         if self._breadcrumb is None:
             return
-        status = self.query_one(StatusBar)
+        status = self.screen.query_one(StatusBar)
         status.update(in_flight_status(self._breadcrumb, status.size.width))
 
     def _save(self) -> bool:
@@ -393,16 +428,16 @@ class EditScreen(Screen[None]):
 
     def action_save_and_close(self) -> None:
         if self._save():
-            self.app.pop_screen()
+            self.post_message(self.Closed())
 
     def action_close(self) -> None:
         if not self.is_dirty:
-            self.app.pop_screen()
+            self.post_message(self.Closed())
             return
 
         def _handle_dismiss(discard: bool | None) -> None:
             if discard:
-                self.app.pop_screen()
+                self.post_message(self.Closed())
             else:
                 self.query_one("#editor", TextArea).focus()
 
@@ -620,3 +655,23 @@ class EditScreen(Screen[None]):
     def action_cancel_request(self) -> None:
         if self._request is not None:
             self._request.cancel()
+
+
+class EditScreen(Screen[None]):
+    """A full-screen host for `EditorPane` -- used whenever an editor opens
+    from a screen other than `ListScreen` (research R1, contract C1's last
+    row). Composes the pane plus its own `StatusBar` and pops itself when the
+    pane posts `Closed`; everything else is the pane's."""
+
+    def __init__(self, target: EditTarget) -> None:
+        super().__init__()
+        self.pane = EditorPane(target)
+
+    def compose(self) -> ComposeResult:
+        yield self.pane
+        with Vertical(id="bottom-bar"):
+            yield StatusBar(EDIT_HELP, id="status-bar")
+
+    @on(EditorPane.Closed)
+    def _on_editor_pane_closed(self, message: EditorPane.Closed) -> None:
+        self.app.pop_screen()
