@@ -144,7 +144,24 @@ BLOCKED:  <"none", or the constitution principle number and what conflicts>
 
 ## Step 6 -- The feature lane, per issue
 
-Spawn **one Opus agent** for the whole spec/plan/tasks arc and continue it with
+**First, check whether the arc has already been walked.** An issue may already have a
+`specs/<feature>/` directory and an open spec-only PR from an earlier session. Look before
+you spawn anything:
+
+```
+gh pr list --state open --search "<issue number>" --json number,title,url,headRefName
+ls specs/ | grep -i <feature keyword>
+```
+
+Resume at the first stage that is actually missing -- never re-run `/speckit-specify` over
+an existing `spec.md`, which produces a second spec competing with the one already in
+review. If `spec.md`, `plan.md`, and `tasks.md` all exist, **skip straight to implement**
+(step 4 below) in that PR's existing worktree and branch; you still review the three
+artifacts first, since you did not see them written. If the artifacts exist but the code has
+partly landed, run `/speckit-converge` to append the unbuilt remainder to `tasks.md` before
+implementing, rather than guessing what is left.
+
+Otherwise, spawn **one Opus agent** for the whole spec/plan/tasks arc and continue it with
 `SendMessage` between stages. Same agent, same context, three of your reviews in between.
 
 1. **Specify.** Prompt the agent to read the constitution, then run `/speckit-specify` for
