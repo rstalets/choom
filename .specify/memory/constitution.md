@@ -1,6 +1,86 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Version change: 2.0.0 → 2.1.0
+Bump rationale: MINOR. Principle III's configuration bullet split into two rules that had
+drifted apart: "configuration beyond workspace paths is out of scope" is the original
+bootstrap-era rule, and the project is increasingly finding it needs to layer additional
+configuration into a workspace — issue #81's proposed `/config view vertical|horizontal`
+TUI-orientation setting is the case that surfaced the conflict. That blanket clause is
+removed. "A setting that could be a sensible default MUST be a sensible default" is
+unchanged in substance and stays, now standing on its own. Per Governance, MAJOR applies
+when a principle is removed or redefined in a backward-incompatible way — one that makes
+previously-compliant designs non-compliant. This does the opposite: it removes a
+prohibition, so nothing that satisfied 2.0.0 stops satisfying 2.1.0; new designs are
+merely no longer blocked from adding a workspace-level setting. That matches this file's
+own precedent for relaxations bumping MINOR rather than MAJOR (1.1.0's wall-clock rule
+alongside the AGENTS.md cap raise; 1.2.0's AGENTS.md cap raise; 1.3.0's changelog-mandate
+removal) — a principle's title is untouched and it is not renamed, only one of its
+clauses is loosened.
+
+Trigger: GitHub issue #81 ("Vertical TUI Mode"), during a product-owner refinement
+session. The repo owner's ruling, verbatim: "This is a legacy rule, and one line has two
+rules. 'configuration beyond workspace paths is out of scope' is from the original
+bootstrap, we are increasingly needing to layer additional configuration into a
+workspace. The latter regarding sensible defaults is still valid, and in this feature the
+default should be horizontal view."
+
+Modified principles:
+  - III. Simplicity Is the Default (NON-NEGOTIABLE) — the bullet "Configuration beyond
+    workspace paths is out of scope. A setting that could be a sensible default MUST be a
+    sensible default." is replaced by "A setting that could be a sensible default MUST be
+    a sensible default." The out-of-scope clause is deleted outright; the sensible-default
+    clause is kept verbatim and now reads as its own rule rather than a qualifier on the
+    deleted one. It continues to govern any setting a feature adds, including #81's view
+    orientation, which per the ruling above defaults to horizontal.
+
+Added sections: none
+Removed sections: none
+
+Templates requiring updates:
+  ✅ .specify/templates/plan-template.md — Constitution Check gate III row reworded. It
+     read "No new configuration knob that could be a default", phrasing that enforced the
+     now-deleted out-of-scope clause (a knob was disallowed outright if a default could
+     cover it). Replaced with "Any new setting has a sensible default", which checks only
+     the surviving rule and no longer blocks adding a setting at all.
+  ✅ .specify/templates/spec-template.md — reviewed; left unchanged. Its "out of scope"
+     mention is the generic scope-boundary placeholder example, unrelated to this
+     principle.
+  ✅ .specify/templates/tasks-template.md — reviewed; left unchanged. Carries no
+     configuration-scope guidance to contradict.
+  ✅ .specify/templates/checklist-template.md — reviewed; left unchanged.
+  ✅ .claude/skills/speckit-*/SKILL.md — reviewed; none reference the deleted clause or
+     the plan-template gate wording.
+  ✅ README.md — reviewed; no mention of the deleted clause or of workspace configuration
+     scope.
+  ✅ docs/REQUIREMENTS.md — reviewed; its own "out of scope" statement (semantic search)
+     is unrelated to workspace configuration and is left unchanged.
+  ⚠ specs/006-ai-assistant-invocation/plan.md — its Complexity Tracking table cites the
+     old clause verbatim ("Configuration beyond workspace paths is out of scope") to
+     justify the `[assistant]` setting against the constitution as it stood when that plan
+     was written. Deliberately left as a point-in-time record, per this file's own
+     precedent for specs/ citations (see the 2.0.0 and 1.3.0 reports above) — the citation
+     was accurate when written and reconciling it is not this amendment's scope.
+
+Non-template files:
+  ✅ tests/ — reviewed; no test asserts the deleted "out of scope" clause or depends on
+     configuration beyond workspace paths staying unsupported. The one "out of scope"
+     match (tests/contract/test_exit_codes.py) is an unrelated code comment about a
+     not-yet-built `find`/`read` surface.
+
+Follow-up TODOs: none.
+
+Migration path:
+  - None required. This is a relaxation: nothing that satisfied 2.0.0 becomes
+    non-compliant under 2.1.0. Designs that previously had to justify a new workspace
+    setting as a Complexity Tracking violation (as spec 006 did) no longer need to; the
+    sensible-default rule still applies to whatever they add. Issue #81's implementation
+    work is unblocked by this amendment but is not itself part of it.
+-->
+
+<!--
+SYNC IMPACT REPORT
+==================
 Version change: 1.3.0 → 2.0.0
 Bump rationale: MAJOR. Principle V's reserved-keys rule is redefined in a way that is not
 backward-compatible: the prior text forbade binding `ctrl+q` to any action, full stop, and
@@ -324,8 +404,7 @@ Complexity Tracking table, naming the simpler alternative and why it fails.
   the target machine is locked down and cannot be assumed to have them.
 - Prefer the standard library. Every third-party dependency MUST be justified by what it
   would cost to do without.
-- Configuration beyond workspace paths is out of scope. A setting that could be a
-  sensible default MUST be a sensible default.
+- A setting that could be a sensible default MUST be a sensible default.
 - Date is the only axis the directory tree encodes. `type` MUST be carried in frontmatter
   and in the filename, never as a directory — types are free-form and user-invented, so a
   directory per type would fragment the vault into a long tail of one-file folders. Date
@@ -477,4 +556,4 @@ the exit code registry, and the target terminals — and is expected to change a
 ship. `AGENTS.md` in a workspace holds runtime guidance for AI assistants. Neither
 overrides this document.
 
-**Version**: 2.0.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-08-01
+**Version**: 2.1.0 | **Ratified**: 2026-07-28 | **Last Amended**: 2026-08-01
