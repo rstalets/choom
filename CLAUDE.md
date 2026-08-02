@@ -51,3 +51,13 @@ does not keep.
 - **Never insert a Claude session URL (or similar self-referential link) into a PR title or
   description.** This is a public repository. Omit any `Claude-Session:` line and
   `claude.ai/code/...` link that a default PR template might otherwise include.
+- **Link the issue at PR creation time.** When a PR addresses a tracked issue (a feature,
+  bug, or maintenance item), link that issue in the PR description as part of the same
+  `gh pr create` call — don't open the PR first and add the link in a follow-up edit.
+  - Use a closing keyword (e.g. `Closes #123`) only when the PR, as opened, fully resolves
+    the issue and merging it should close that issue. A spec-only or partial PR (e.g. a
+    plan/spec PR that precedes implementation) should reference the issue without a closing
+    keyword (e.g. `Relates to #123`), since merging it isn't meant to close the issue yet.
+  - If a PR that started as spec-only is later expanded in place to carry the full
+    implementation (e.g. its title changes from a `spec:` PR to a `feat:` PR), upgrade the
+    reference to a closing keyword at that point.
