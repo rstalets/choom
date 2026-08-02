@@ -16,8 +16,11 @@ The widget is mounted with `display = False` and stays mounted for the life of t
 finds it with `self.screen.query_one(LinkPicker)` — the same idiom as `_render_status`'s
 `self.screen.query_one(StatusBar)` — so one code path serves both hosts (FR-004).
 
-Opening the picker changes no other widget's size or position (FR-005): `#bottom-bar` is
-`height: auto` and docked, and `#link-picker` carries `max-height: 8`.
+Opening the picker introduces no pane, overlay, or screen change, and moves nothing sideways (FR-005):
+every pane keeps its width, its horizontal position, and its visibility. `#bottom-bar` is docked with
+`height: auto`, so its siblings share the remaining `1fr` and give back the rows a visible occupant
+takes — the same trade `#list-pane` already makes for the one-row `CommandBar` when `/` is pressed.
+`#link-picker` carries `max-height: 8`, which bounds that give-back.
 
 ---
 

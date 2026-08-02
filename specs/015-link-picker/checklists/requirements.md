@@ -47,3 +47,12 @@
   FR-018 and an edge case for resize while a choice is pending, US3 scenarios 6-7, SC-007, and two
   dependency notes. FRs renumbered accordingly; no requirement was removed or weakened. All 16 items
   still pass.
+- Revised again during implementation, where FR-005 turned out to be stricter than the interface it
+  describes. It required that opening the list not resize the list and scope panes; but the status-bar
+  region is docked with automatic height and its siblings share the remaining space, so *any* occupant
+  becoming visible costs them rows — the command bar has always done exactly this when `/` is pressed.
+  No bottom-bar picker could satisfy the requirement as written. FR-005 now states what is actually
+  guaranteed (no overlay, no pane introduced or removed, width, horizontal position, and visibility
+  all held) and names the vertical give-back as the existing behaviour it is. US3 scenario 6 and
+  contract C1 were reworded to match. This is a correction to a requirement that was wrong about the
+  system, not a relaxation to fit an implementation.

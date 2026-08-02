@@ -29,8 +29,8 @@ class LinkCandidate:
 
 | Source | `collection` | `date` |
 |--------|--------------|--------|
-| Meeting (`Document`) | `"meeting"` | `document.created` verbatim (already ISO) |
-| Note (`Document`) | `"note"` | `document.created` verbatim |
+| Meeting (`Document`) | `"meeting"` | `document.created[:10]` — the field is a full ISO timestamp; the date half is what every other surface shows |
+| Note (`Document`) | `"note"` | `document.created[:10]` |
 | Task (`Task`) | `"task"` | `task.created.isoformat()`, or `None` when `task.created is None` |
 
 **Validation rules**

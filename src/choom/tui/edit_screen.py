@@ -24,7 +24,7 @@ from choom.core.documents import _read_document
 from choom.core.editing import load_for_edit, save_buffer
 from choom.core.editor_commands import parse_line, parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
-from choom.core.links import find_link_targets, format_link
+from choom.core.links import format_link, link_candidates, resolve_id
 from choom.core.mirrors import (
     capture_reply_tasks,
     capture_task,
@@ -35,6 +35,8 @@ from choom.core.mirrors import (
 )
 from choom.core.models import (
     AssistantReply,
+    LinkCandidate,
+    LinkTarget,
     ParsedCommand,
     ReplyCapture,
     ResolvedAssistant,
@@ -43,8 +45,10 @@ from choom.core.models import (
 )
 from choom.core.tasks import parse_tasks, set_task_body
 from choom.tui.confirm_dialog import ConfirmDialog
+from choom.tui.link_picker import LinkPicker
 from choom.tui.status_bar import (
     EDIT_HELP,
+    LINK_PICKER_HELP,
     StatusBar,
     in_flight_status,
     link_ambiguous_status,
@@ -53,6 +57,12 @@ from choom.tui.status_bar import (
 )
 
 _PLACEHOLDER = "⋯"
+
+#: The picker needs a screen at least this tall to be a usable list rather than
+#: the modal experience in all but name (research R7, FR-017): an eight-row
+#: picker plus the status line leaves the editor a genuinely usable buffer
+#: above it. Below this, `/link` falls back to `link_ambiguous_status()`.
+MIN_PICKER_SCREEN_HEIGHT = 12
 
 
 @dataclass(frozen=True, slots=True)
@@ -350,6 +360,10 @@ class EditorPane(Vertical):
         self._mirror_baseline: dict[str, bool] = {
             m.task_id: m.done for m in find_mirrors(target.text, source=target.display_path)
         }
+        #: The line a pending `/link` picker choice would replace, or None
+        #: when no choice is pending -- the one field every guard around the
+        #: picker tests (data-model.md "Selection list").
+        self._link_picker_line: int | None = None
 
     @property
     def is_dirty(self) -> bool:
@@ -368,6 +382,19 @@ class EditorPane(Vertical):
             self._render_in_flight_status()
 
     def check_action(self, action: str, parameters: tuple[object, ...]) -> bool | None:
+        if self._link_picker_line is not None and action in (
+            "save",
+            "save_and_close",
+            "close",
+            "cancel_request",
+        ):
+            # research R2: these bindings are `priority=True`, checked from the
+            # app down regardless of focus, so they would otherwise fire
+            # underneath the picker while a choice is pending. `escape` is not
+            # priority and so would never reach here anyway (LinkPicker's own
+            # binding claims it first), but the gate covers it too rather than
+            # leaning on that as an implicit guarantee.
+            return False
         if action == "cancel_request":
             return self._request is not None
         return True
@@ -378,11 +405,12 @@ class EditorPane(Vertical):
 
     def _render_status(self, note: str | None = None, *, warn: bool = True) -> None:
         status = self.screen.query_one(StatusBar)
+        help_text = LINK_PICKER_HELP if self._link_picker_line is not None else EDIT_HELP
         if note is None:
-            status.update(EDIT_HELP)
+            status.update(help_text)
             return
         prefix = "⚠ " if warn else ""
-        status.update(f"{prefix}{note}   {EDIT_HELP}")
+        status.update(f"{prefix}{note}   {help_text}")
 
     def _render_in_flight_status(self) -> None:
         if self._breadcrumb is None:
@@ -535,16 +563,28 @@ class EditorPane(Vertical):
             return  # save error already reported
 
         workspace = self.app.workspace  # type: ignore[attr-defined]
-        matches = find_link_targets(workspace, parsed.argument)
+        candidates = link_candidates(workspace, parsed.argument)
 
-        if not matches:
+        if not candidates:
             self._render_status(link_no_match_status(parsed.argument))
             return
-        if len(matches) > 1:
-            self._render_status(link_ambiguous_status([m.title for m in matches]))
+        if len(candidates) == 1:
+            self._replace_link_line(line_index, candidates[0].target)
+            self._render_status(None)
             return
 
-        target = matches[0]
+        if self.screen.size.height < MIN_PICKER_SCREEN_HEIGHT:
+            # research R7, FR-017: too little room for a usable list -- the
+            # honest fallback that predates the picker, not a degraded one.
+            self._render_status(link_ambiguous_status([c.target.title for c in candidates]))
+            return
+
+        self._open_link_picker(line_index, candidates)
+
+    def _replace_link_line(self, line_index: int, target: LinkTarget) -> None:
+        """Replace `line_index` with a markdown link to `target`, using the
+        same call the single-match fast path and the picker's `enter` both
+        make, so the two can never format a link differently."""
         editor = self.query_one("#editor", EditorTextArea)
         original_line = editor.get_line(line_index).plain
         link_text = format_link(self.target.display_path, target, target.title)
@@ -554,7 +594,52 @@ class EditorPane(Vertical):
             (line_index, len(original_line)),
             maintain_selection_offset=False,
         )
+
+    def _open_link_picker(self, line_index: int, candidates: tuple[LinkCandidate, ...]) -> None:
+        """Raise the picker for an ambiguous `/link` (research R1, R2,
+        FR-001): candidates set, first row highlighted, focus moved to the
+        list, footer swapped to `LINK_PICKER_HELP`. `EditorPane` reaches the
+        picker through `self.screen`, the same idiom `_render_status` already
+        uses for `StatusBar` -- one code path serves both hosts (FR-004)."""
+        picker = self.screen.query_one(LinkPicker)
+        self._link_picker_line = line_index
+        picker.open(candidates)
+        picker.focus()
         self._render_status(None)
+
+    def _close_link_picker(self) -> None:
+        """Hide the picker, drop the remembered line, and return focus to the
+        editor -- the common tail of every transition out of `open` (data-
+        model.md "Selection list")."""
+        self.screen.query_one(LinkPicker).close()
+        self._link_picker_line = None
+        self.query_one("#editor", TextArea).focus()
+
+    def handle_link_chosen(self, candidate: LinkCandidate) -> None:
+        """`LinkPicker.Chosen` (contract C5, research R8): re-resolve the
+        candidate's id -- the workspace is a folder another program can
+        change between listing and choosing -- and insert from the freshly
+        resolved target when it still resolves. If it does not, report and
+        leave the line as typed rather than write a link to nothing (FR-015).
+        Called by whichever host screen caught the bubbled message."""
+        line_index = self._link_picker_line
+        assert line_index is not None, "Chosen fired with no picker open"
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        target, _warnings = resolve_id(workspace, candidate.target.id)
+        self._close_link_picker()
+        if target is None:
+            self._render_status(f"{candidate.target.title!r} no longer exists; nothing inserted")
+            return
+        self._replace_link_line(line_index, target)
+        self._render_status(None)
+
+    def handle_link_cancelled(self, message: str | None) -> None:
+        """`LinkPicker.Cancelled` (FR-008, research R9): close and leave the
+        typed line exactly as it was. `message` carries the fallback status
+        text when a resize closed the picker (contract C6); `None` for an
+        ordinary `esc`, which restores the plain edit footer with no note."""
+        self._close_link_picker()
+        self._render_status(message)
 
     def _start_ai_request(self, parsed: ParsedCommand, line_index: int) -> None:
         if parsed.command.requires_argument and not parsed.argument:
@@ -687,8 +772,24 @@ class EditScreen(Screen[None]):
     def compose(self) -> ComposeResult:
         yield self.pane
         with Vertical(id="bottom-bar"):
+            yield LinkPicker(id="link-picker")
             yield StatusBar(EDIT_HELP, id="status-bar")
 
     @on(EditorPane.Closed)
     def _on_editor_pane_closed(self, message: EditorPane.Closed) -> None:
         self.app.pop_screen()
+
+    # `LinkPicker` is composed into this screen's `#bottom-bar`, a sibling of
+    # `self.pane` rather than its descendant, so its messages bubble here --
+    # to the screen -- not to the pane. This mirrors `EditorPane.Closed` above
+    # in reverse: there the pane is the ancestor-facing widget and the screen
+    # reacts; here the screen is what the picker's messages actually reach,
+    # and it delegates to the pane, which holds the state to act on them.
+
+    @on(LinkPicker.Chosen)
+    def _on_link_chosen(self, message: LinkPicker.Chosen) -> None:
+        self.pane.handle_link_chosen(message.candidate)
+
+    @on(LinkPicker.Cancelled)
+    def _on_link_cancelled(self, message: LinkPicker.Cancelled) -> None:
+        self.pane.handle_link_cancelled(message.message)

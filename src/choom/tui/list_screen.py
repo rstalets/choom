@@ -30,6 +30,7 @@ from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditorPane, EditTarget
 from choom.tui.help_screen import HelpScreen
+from choom.tui.link_picker import LinkPicker
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
 from choom.tui.scope_pane import CategoryRow, MonthRow, ScopePane, UnfiledRow
@@ -212,6 +213,7 @@ class ListScreen(Screen[None]):
                 with Vertical(id="preview-links-section"):
                     yield ListView(id="preview-links-list")
         with Vertical(id="bottom-bar"):
+            yield LinkPicker(id="link-picker")
             yield CommandBar(id="command-bar")
             yield StatusBar(LIST_HELP, id="status-bar")
 
@@ -266,6 +268,22 @@ class ListScreen(Screen[None]):
         await self.refresh_rows(select_id=self._pending_select_id)
         self._pending_select_id = None
         self.query_one("#meeting-list", ListView).focus()
+
+    # `LinkPicker` is composed into this screen's `#bottom-bar`, a sibling of
+    # `#preview-pane` (where the inline `EditorPane` lives) rather than its
+    # ancestor, so its messages bubble here -- to the screen -- and are
+    # delegated to whichever pane is open, on the same terms as `EditScreen`'s
+    # own handlers (FR-004 host parity).
+
+    @on(LinkPicker.Chosen)
+    def _on_link_chosen(self, message: LinkPicker.Chosen) -> None:
+        if self._editor_pane is not None:
+            self._editor_pane.handle_link_chosen(message.candidate)
+
+    @on(LinkPicker.Cancelled)
+    def _on_link_cancelled(self, message: LinkPicker.Cancelled) -> None:
+        if self._editor_pane is not None:
+            self._editor_pane.handle_link_cancelled(message.message)
 
     def on_resize(self, event: events.Resize) -> None:
         # Column widths are a pure function of the pane's width (research

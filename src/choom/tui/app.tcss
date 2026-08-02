@@ -70,6 +70,12 @@ CollectionBar {
     max-height: 10;
 }
 
+#link-picker {
+    height: auto;
+    max-height: 8;
+    border-top: solid $accent;
+}
+
 CommandBar {
     height: 1;
     display: none;

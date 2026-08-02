@@ -36,6 +36,7 @@ def link_candidates(workspace: Workspace, query: str) -> tuple[LinkCandidate, ..
 | C5 | Never raises. A malformed record is skipped by the underlying scan, exactly as today; a malformed `created:` value is carried through as a string rather than raising (Principle IV). |
 | C6 | Callable without a terminal, a TTY, or an event loop (Principle I). |
 | C7 | Deterministic: the same workspace and query produce the same tuple in the same order. |
+| C8 | `date` is a bare `YYYY-MM-DD` string or `None` — never a full timestamp. `Document.created` holds a timestamp and is sliced to its date half, matching every other surface that shows it. |
 
 **Parameters**
 

@@ -111,8 +111,14 @@ two-pass idiom the collection listings use, not a new one.
 ## R5 — Normalising two different date types
 
 **Decision**: `LinkCandidate.date` is `str | None`, holding an ISO `YYYY-MM-DD` date. Documents supply
-`Document.created` (already an ISO string) verbatim; tasks supply `Task.created.isoformat()` when set
-and `None` when not.
+`Document.created[:10]`; tasks supply `Task.created.isoformat()` when set and `None` when not.
+
+**Corrected during implementation**: this decision originally said documents supply `Document.created`
+*verbatim*, on the assumption it was already a bare date. It is not — it is a full ISO timestamp, so
+rows rendered `2026-08-01T23:37:18`. The `[:10]` slice is what the rest of the TUI already does with
+that field (`DocumentRow._row_text`, `render_preview_markdown`, `filter_documents`), so the fix is to
+follow the existing convention rather than to invent one. Caught by running the real app, not by the
+test suite — the tests asserted the field was carried through, which it was.
 
 **Rationale**: The two record types genuinely differ — `Document.created: str`, `Task.created: date | None`
 — and the picker needs one comparable, displayable value. ISO strings sort lexicographically in date

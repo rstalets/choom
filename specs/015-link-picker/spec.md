@@ -155,8 +155,8 @@ position, and the screen itself are unchanged apart from the edited line.
    the editing state it was in — not a preview, not a list screen — with the cursor available for
    typing immediately.
 6. **Given** the editor is open inline in the preview pane, **When** the list opens, **Then** the list
-   and scope panes stay visible and unmoved, the editor keeps the pane it had, and the same keys
-   produce the same outcomes as they do in the full-screen editor.
+   and scope panes stay visible and keep their width and horizontal position, the editor keeps the
+   pane it had, and the same keys produce the same outcomes as they do in the full-screen editor.
 7. **Given** the list is open, **When** the terminal is resized, **Then** the candidates and the
    highlight survive the resize and the typed line is unchanged.
 
@@ -200,9 +200,11 @@ position, and the screen itself are unchanged apart from the edited line.
   list opens, while it is open, or when it closes.
 - **FR-004**: The picker MUST behave identically whether the editor is inline in the preview pane or
   full-screen — the same trigger, the same keys, the same rows, the same outcomes.
-- **FR-005**: Opening the list MUST NOT resize, displace, or overlay the editor or, in the inline
-  host, the list and scope panes. Everything on screen before the list opened stays where it was and
-  stays visible.
+- **FR-005**: Opening the list MUST NOT overlay, hide, or horizontally displace the editor or, in the
+  inline host, the list and scope panes: each keeps its width, its horizontal position, and its
+  visibility, and the editor keeps the pane it had. The status-bar region is docked and sized to its
+  contents, so the panes above it give back the rows the list occupies — the same trade they already
+  make when the command bar opens. No pane is introduced, removed, or moved sideways.
 - **FR-006**: `↑` and `↓` MUST move the highlight between rows, wrapping at both ends.
 - **FR-007**: `enter` MUST replace the `/link` line with a markdown link to the highlighted record,
   using the same link format and the same relative-path computation as a single-match insertion, and

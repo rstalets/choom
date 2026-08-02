@@ -18,7 +18,7 @@ EDITOR_COMMANDS: tuple[EditorCommand, ...] = (
     EditorCommand(
         name="link",
         argument="<search terms>",
-        description="Insert a link to the matching record",
+        description="Insert a link to the matching record, or choose one when several match",
         requires_argument=True,
     ),
     EditorCommand(

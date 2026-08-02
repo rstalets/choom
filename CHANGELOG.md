@@ -4,6 +4,34 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### A picker for ambiguous `/link`
+
+**TUI, user-visible**
+
+`/link <terms>` used to fail closed the moment a search matched more than one record: the status
+bar named the candidates and the writer had to retype a narrower query. Now, when more than one
+record matches, a short list rises from the bottom of the editor -- the same status-bar region the
+Links section already uses -- with the newest record highlighted first. `↑`/`↓` move the highlight
+and wrap at both ends, `enter` inserts a link to the highlighted record and closes the list, and
+`esc` closes it and leaves the typed line exactly as written, ready to be edited and resubmitted.
+Each row shows the record's title, its collection (meeting, note, or task), and its date, so two
+records sharing a title are distinguishable without leaving the document. The document itself never
+moves: no screen changes, the cursor and scroll position hold steady, and the behaviour is identical
+whether the editor is inline in the list screen's preview pane or full-screen. Exactly one match
+still inserts directly with no list, and no match still reports as before -- neither fast path grew
+a keystroke. On a terminal too short to show a usable list, `/link` falls back to the original
+report-and-stop message rather than rendering a cramped one.
+
+**Public API**
+
+- `choom.core.links.link_candidates(workspace, query)` (new): every `/link` match as a
+  `LinkCandidate`, newest first, ties broken by title, undated records last. `find_link_targets()`
+  is now a thin projection of it -- same matches, same tuple type, but newest-first order rather
+  than scan order (the only caller reads `matches[0]` only when there is exactly one, so nothing
+  depended on the old order).
+- `choom.core.models.LinkCandidate` (new): `target: LinkTarget`, `collection: str`,
+  `date: str | None`.
+
 ### Project renamed: endpaper → choom
 
 **CLI and TUI, user-visible**

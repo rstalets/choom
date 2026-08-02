@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import date, datetime, timedelta
+
 from textual.widgets import Label, ListView, TextArea
 
 from choom.core.links import (
@@ -17,10 +19,21 @@ from choom.core.models import Workspace
 from choom.core.notes import create_note
 from choom.core.tasks import add_task
 from choom.tui.app import ChoomApp
+from choom.tui.edit_screen import MIN_PICKER_SCREEN_HEIGHT
+from choom.tui.link_picker import LinkPicker
 from choom.tui.links_pane import LinkRow
 from choom.tui.list_screen import DocumentRow
 from choom.tui.status_bar import StatusBar
-from tests.helpers import open_edit, submit_editor_line, to_collection
+from tests.helpers import editor_pane, open_edit, submit_editor_line, to_collection
+
+_TODAY = date.today()
+
+
+def _at(days_ago: int) -> datetime:
+    """A `now` for `create_meeting`/`create_note`, offset from today rather
+    than a literal date (Principle VI -- no test depends on the wall clock)."""
+    day = _TODAY - timedelta(days=days_ago)
+    return datetime(day.year, day.month, day.day, 9, 0, 0)
 
 
 def test_inbound_and_outbound_end_to_end(tmp_workspace: Workspace) -> None:
@@ -134,6 +147,8 @@ async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Wor
 
         status = app.screen.query_one(StatusBar)
         assert "⚠" not in str(status.content)
+        # US3, FR-013: exactly one match is the unchanged fast path -- no list.
+        assert app.screen.query_one(LinkPicker).display is False
 
 
 async def test_link_zero_matches_leaves_the_line_and_reports(tmp_workspace: Workspace) -> None:
@@ -149,11 +164,145 @@ async def test_link_zero_matches_leaves_the_line_and_reports(tmp_workspace: Work
         assert editor.get_line(line_index).plain == "/link nothing matches this at all"
         status = app.screen.query_one(StatusBar)
         assert "no record matches" in str(status.content)
+        # US3, FR-014: zero matches is the unchanged fast path -- no list.
+        assert app.screen.query_one(LinkPicker).display is False
 
 
-async def test_link_several_matches_leaves_the_line_and_names_candidates(
+async def test_link_with_no_terms_still_says_it_needs_search_terms(
     tmp_workspace: Workspace,
 ) -> None:
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link")
+
+        assert editor.get_line(line_index).plain == "/link"
+        status = app.screen.query_one(StatusBar)
+        assert "needs search terms" in str(status.content)
+        assert app.screen.query_one(LinkPicker).display is False
+
+
+async def test_link_several_matches_on_a_short_terminal_leaves_the_line_and_names_candidates(
+    tmp_workspace: Workspace,
+) -> None:
+    """The picker needs a screen at least `MIN_PICKER_SCREEN_HEIGHT` rows tall
+    (FR-017, research R7); below that, `/link` falls back to the report-and-
+    stop behaviour this test used to cover unconditionally. This is that
+    behaviour's remaining coverage, not new coverage -- T024/research R10."""
+    create_meeting(tmp_workspace, "Q3 planning alpha")
+    create_meeting(tmp_workspace, "Q3 planning beta")
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, MIN_PICKER_SCREEN_HEIGHT - 1)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.display is False
+        status = app.screen.query_one(StatusBar)
+        text = str(status.content)
+        assert "Q3 planning alpha" in text
+        assert "Q3 planning beta" in text
+
+
+# --- US1: the link picker (015) --------------------------------------------------
+
+
+async def test_link_several_matches_opens_a_picker_with_the_first_row_highlighted(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.display is True
+        assert picker.index == 0
+        assert len(picker.candidates) == 2
+        # The document is unchanged -- the picker opening does not touch it.
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+
+        status = app.screen.query_one(StatusBar)
+        text = str(status.content)
+        assert "enter insert" in text
+        assert "esc cancel" in text
+
+
+async def test_down_then_enter_inserts_a_link_to_the_second_row(
+    tmp_workspace: Workspace,
+) -> None:
+    older = create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))  # newer -- row 0
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        await pilot.press("down")
+        await pilot.pause()
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.index == 1
+        assert picker.candidates[1].target.id == older.id
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        expected_dest = relative_destination(screen.target.display_path, older.path)
+        expected = f"[Q3 planning alpha]({expected_dest}#{older.id})"
+        assert editor.get_line(line_index).plain == expected
+
+        # The picker closed, focus returned to the editor, and the footer is
+        # back to the plain edit help.
+        assert picker.display is False
+        assert editor.has_focus
+        status = app.screen.query_one(StatusBar)
+        assert "ctrl+o save" in str(status.content)
+
+
+async def test_up_from_the_first_row_wraps_to_the_last(tmp_workspace: Workspace) -> None:
+    create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.index == 0
+
+        await pilot.press("up")
+        await pilot.pause()
+        assert picker.index == len(picker.candidates) - 1
+
+        await pilot.press("down")
+        await pilot.pause()
+        assert picker.index == 0
+
+
+async def test_escape_leaves_the_line_byte_identical(tmp_workspace: Workspace) -> None:
     create_meeting(tmp_workspace, "Q3 planning alpha")
     create_meeting(tmp_workspace, "Q3 planning beta")
     create_note(tmp_workspace, "vendor landscape")
@@ -165,11 +314,224 @@ async def test_link_several_matches_leaves_the_line_and_names_candidates(
 
         line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
 
+        await pilot.press("down")
+        await pilot.pause()
+
+        await pilot.press("escape")
+        await pilot.pause()
+
         assert editor.get_line(line_index).plain == "/link q3 planning"
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.display is False
+        assert editor.has_focus
         status = app.screen.query_one(StatusBar)
-        text = str(status.content)
-        assert "Q3 planning alpha" in text
-        assert "Q3 planning beta" in text
+        assert "ctrl+o save" in str(status.content)
+
+
+async def test_shared_title_rows_are_distinguishable_and_newest_first(
+    tmp_workspace: Workspace,
+) -> None:
+    """US2: a bare-title list cannot be chosen from when two candidates share a
+    title. Each row must carry its collection and date too, newest first."""
+    older = create_meeting(tmp_workspace, "Q3 planning", now=_at(30))
+    newer = create_note(tmp_workspace, "Q3 planning", now=_at(1))
+    create_note(tmp_workspace, "vendor landscape")  # a note to open and edit, today's scope
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+
+        await submit_editor_line(pilot, editor, "/link q3 planning")
+        await pilot.pause()
+
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.candidates[0].target.id == newer.id
+        assert picker.candidates[1].target.id == older.id
+
+        rows = "\n".join(str(label.content) for label in picker.query(Label))
+        assert "note" in rows
+        assert "meeting" in rows
+        assert newer.created[:10] in rows
+        assert older.created[:10] in rows
+        # The two rows must actually differ -- collection or date makes it so.
+        row_texts = [str(label.content) for label in picker.query(Label)]
+        assert len(set(row_texts)) == len(row_texts)
+
+
+async def test_picker_works_the_same_in_the_inline_editor(tmp_workspace: Workspace) -> None:
+    """FR-004: the same trigger, keys, rows, and outcomes in both hosts. The
+    inline host is the list screen's preview pane, distinct from the
+    full-screen `EditScreen` every other picker test drives."""
+    older = create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "notes")
+        # "e" straight from the list view routes inline (research R1, contract
+        # C1) -- unlike `open_edit`, which goes through the preview screen
+        # first and lands full-screen.
+        await pilot.press("e")
+        await pilot.pause()
+        from choom.tui.list_screen import ListScreen
+
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        editor = pane.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        picker = app.screen.query_one(LinkPicker)
+        assert picker.display is True
+        assert picker.index == 0
+
+        await pilot.press("down")
+        await pilot.press("enter")
+        await pilot.pause()
+
+        expected_dest = relative_destination(pane.target.display_path, older.path)
+        expected = f"[Q3 planning alpha]({expected_dest}#{older.id})"
+        assert editor.get_line(line_index).plain == expected
+        assert picker.display is False
+
+        # Inline-specific parity: the list and scope panes are untouched.
+        assert app.screen.query_one("#list-pane").display is not False
+        assert app.screen.query_one("#scope-pane").display is not False
+
+
+async def test_cancel_works_the_same_in_the_inline_editor(tmp_workspace: Workspace) -> None:
+    """FR-004/FR-008, the cancel half of host parity: `esc` closes the picker
+    and leaves the line byte-identical in the inline host too, matching
+    `test_escape_leaves_the_line_byte_identical`'s full-screen coverage."""
+    create_meeting(tmp_workspace, "Q3 planning alpha")
+    create_meeting(tmp_workspace, "Q3 planning beta")
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "notes")
+        await pilot.press("e")
+        await pilot.pause()
+        pane = editor_pane(app)
+        editor = pane.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        await pilot.press("down")
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+        assert app.screen.query_one(LinkPicker).display is False
+        assert editor.has_focus
+        assert app.screen.query_one("#list-pane").display is not False
+        assert app.screen.query_one("#scope-pane").display is not False
+
+
+# --- US3: nothing else moves (015-link-picker) -----------------------------------
+
+
+async def test_cursor_and_scroll_are_unchanged_across_open_insert_and_cancel(
+    tmp_workspace: Workspace,
+) -> None:
+    create_meeting(tmp_workspace, "Q3 planning alpha", now=_at(5))
+    newest = create_meeting(tmp_workspace, "Q3 planning beta", now=_at(1))
+    note = create_note(tmp_workspace, "vendor landscape")
+    # A long document, scrolled mid-way, so a scroll change would be visible.
+    padding = "\n".join(f"line {n}" for n in range(200))
+    note.path.write_text(
+        note.path.read_text(encoding="utf-8") + "\n" + padding + "\n", encoding="utf-8"
+    )
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot, collection="notes")
+        editor = screen.query_one("#editor", TextArea)
+        editor.cursor_location = (100, 0)
+        editor.scroll_to(y=90, animate=False)
+        await pilot.pause()
+        cursor_before = editor.cursor_location
+
+        line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+        # `submit_editor_line` moves the cursor to the new line to type it --
+        # re-capture the position the picker itself must not additionally move.
+        cursor_at_open = editor.cursor_location
+        scroll_at_open = editor.scroll_offset
+
+        assert editor.cursor_location == cursor_at_open
+        assert editor.scroll_offset == scroll_at_open
+
+        # A key outside the four the footer names does not touch the buffer.
+        before_text = editor.text
+        await pilot.press("x")
+        await pilot.pause()
+        assert editor.text == before_text
+        assert editor.cursor_location == cursor_at_open
+
+        await pilot.press("escape")
+        await pilot.pause()
+        assert editor.cursor_location == cursor_at_open
+        assert editor.scroll_offset == scroll_at_open
+        assert editor.get_line(line_index).plain == "/link q3 planning"
+
+        # Re-open (on a fresh line -- the cancelled line above is still there
+        # unconsumed) and this time insert the first (newest) row directly.
+        second_line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
+        await pilot.press("enter")
+        await pilot.pause()
+        expected_dest = relative_destination(screen.target.display_path, newest.path)
+        expected = f"[Q3 planning beta]({expected_dest}#{newest.id})"
+        assert editor.get_line(second_line_index).plain == expected
+        # Sanity: the cursor really was set mid-document, not trivially at line 0.
+        assert cursor_before == (100, 0)
+        assert editor.document.line_count > 150
+
+
+async def test_inline_list_and_scope_panes_keep_their_size_and_position(
+    tmp_workspace: Workspace,
+) -> None:
+    """FR-005: opening the picker introduces no new pane, overlay, or screen
+    change -- the list and scope panes keep their horizontal split and stay
+    visible, exactly as they already do while the command bar (`/`) is open,
+    which occupies the same `#bottom-bar`. `#bottom-bar` is `height: auto`
+    and docked (contract C1); its siblings share the remaining `1fr` of the
+    screen, so an occupant becoming visible costs `#body` the rows it adds --
+    the same trade `#list-pane` already makes for the one-row `CommandBar`.
+    That vertical give-back is this layout's existing behaviour, not a
+    regression the picker introduces, so this checks what FR-005 is actually
+    guarding against: width, x-position, and visibility, not the exact row
+    count -- picker or command bar do not change either."""
+    create_meeting(tmp_workspace, "Q3 planning alpha")
+    create_meeting(tmp_workspace, "Q3 planning beta")
+    create_note(tmp_workspace, "vendor landscape")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "notes")
+        list_region_before = app.screen.query_one("#list-pane").region
+        scope_region_before = app.screen.query_one("#scope-pane").region
+
+        await pilot.press("e")
+        await pilot.pause()
+        editor = editor_pane(app).query_one("#editor", TextArea)
+        await submit_editor_line(pilot, editor, "/link q3 planning")
+
+        list_region_after = app.screen.query_one("#list-pane").region
+        scope_region_after = app.screen.query_one("#scope-pane").region
+
+        assert app.screen.query_one(LinkPicker).display is True
+        assert app.screen.query_one("#list-pane").display is not False
+        assert app.screen.query_one("#scope-pane").display is not False
+        assert (list_region_after.x, list_region_after.width) == (
+            list_region_before.x,
+            list_region_before.width,
+        )
+        assert (scope_region_after.x, scope_region_after.width) == (
+            scope_region_before.x,
+            scope_region_before.width,
+        )
 
 
 async def test_link_partial_line_is_ordinary_text_not_a_command(
