@@ -212,4 +212,54 @@ problem the constitution is written against.
 
 | Violation | Why Needed | Simpler Alternative Rejected Because |
 |-----------|------------|-------------------------------------|
-| A stat fingerprint — `(path, mtime_ns, size)` per day file — held in memory by `ListScreen` between refresh ticks, to skip re-parsing an unchanged done store (research R10) | `ListScreen._refresh_tick` runs every 2.0 s **on Textual's main thread** (`list_screen.py:225, 478`), so the Done view's read is frame budget, not background CPU — `tests/performance/test_refresh_tick.py` puts the frame-drop crossover near 15 ms. A whole-store parse at the SC-005 ceiling would drop frames every two seconds for as long as the Done view is displayed, degrading the entire UI rather than one list. The fingerprint reduces the steady-state tick to an `os.scandir` walk that opens no file. It holds no task data, answers no question about content, is never written to disk, and dies with the screen; a wrong answer yields a list that is two seconds stale, which is the tick's existing failure mode, not a wrong one. It is also the pattern the tick already uses one layer up — `_refresh_tick_apply` compares a `key` against `_last_render_key` and skips the re-render (`list_screen.py:499`) — applied one layer earlier, where the cost now sits | **Parse on every tick**: rejected, that is the frame-drop above. **Drop the tick for the Done view**: rejected, it would make Done the one collection that does not notice an external edit, an inconsistency the user would have to learn. **Move the tick's read to a worker thread**: a real option and the one `_refresh_tick_read`'s own docstring anticipates, but it is a concurrency change to a shared code path affecting all three collections, which is a larger and riskier edit than this feature should carry. **Month-scope the Done view**: the correct long-term answer and the named first remedy if SC-005 is breached (research R10, spec §"On SC-005"), but tasks have no month scope today, so it is a TUI feature in its own right and out of scope here. **An on-disk index or cache**: forbidden by Principle III without a justification this feature does not have, and explicitly not the answer — recorded here so it cannot become the default remedy later |
+| A stat fingerprint — `(path, mtime_ns, size)` per day file — held in memory by `ListScreen` between refresh ticks, to skip re-parsing an unchanged done store, **bounded by a forced full re-parse every 30 s of displayed Done view** (research R10) | `ListScreen._refresh_tick` runs every 2.0 s **on Textual's main thread** (`list_screen.py:225, 478`), so the Done view's read is frame budget, not background CPU — `tests/performance/test_refresh_tick.py` puts the frame-drop crossover near 15 ms. A whole-store parse at the SC-005 ceiling would drop frames every two seconds for as long as the Done view is displayed, degrading the entire UI rather than one list. The fingerprint reduces the steady-state tick to an `os.scandir` walk that opens no file. It holds no task data, answers no question about content, is never written to disk, and dies with the screen. It is also the pattern the tick already uses one layer up — `_refresh_tick_apply` compares a `key` against `_last_render_key` and skips the re-render (`list_screen.py:499`) — applied one layer earlier, where the cost now sits. **The failure mode is a missed change that persists, and that is why the bound exists** (see the row below this table) | **Parse on every tick**: rejected, that is the frame-drop above. **Drop the tick for the Done view**: rejected, it would make Done the one collection that does not notice an external edit, an inconsistency the user would have to learn. **Move the tick's read to a worker thread**: a real option and the one `_refresh_tick_read`'s own docstring anticipates, but it is a concurrency change to a shared code path affecting all three collections, which is a larger and riskier edit than this feature should carry. **Month-scope the Done view**: the correct long-term answer and the named first remedy if SC-005 is breached (research R10, spec §"On SC-005"), but tasks have no month scope today, so it is a TUI feature in its own right and out of scope here. **An on-disk index or cache**: forbidden by Principle III without a justification this feature does not have, and explicitly not the answer — recorded here so it cannot become the default remedy later |
+
+### The fingerprint's failure mode, stated correctly
+
+An earlier draft of the row above claimed a missed change "yields a list that is two seconds stale,
+which is the tick's existing failure mode". **That was wrong, and the justification cannot rest on
+it.** If the fingerprint misses a change, the next tick computes the *same* fingerprint and misses it
+again. The list stays stale until something else moves that file's `(mtime_ns, size)` — indefinitely,
+not for one tick. The tick's existing failure mode always recovers on the next tick; this one does
+not. "Unlikely and permanent" is a worse shape than "certain and transient".
+
+**How a miss is actually reached.** The comparison is tuple *inequality*, not "is newer", so a
+sync-propagated timestamp that goes backwards is still detected. A miss needs the new `mtime_ns` to
+be **exactly equal** to the sampled one *and* the size unchanged. Two things make that reachable:
+
+1. **Filesystem timestamp granularity** — the sharp mechanism. `st_mtime_ns` is quantised by the
+   filesystem, not by Python: 1 s on HFS+ and ext3, 2 s on FAT/exFAT, 100 ns on NTFS. Two writes
+   inside one quantum are indistinguishable.
+2. **A size-preserving edit** — toggling `- [x]` to `- [ ]` changes no byte count, so size
+   contributes nothing and the fingerprint rests entirely on the timestamp. This is the single most
+   likely external edit to a done file.
+
+Sequence: the tick samples a file at `mtime=10.000`; an external write toggles a checkbox 0.3 s later
+on a 1-second-granularity filesystem, so the timestamp truncates to the same `10.000` and the size is
+unchanged; every subsequent tick sees an identical tuple. The constitution's OneDrive-shared-workspace
+assumption widens the exposure — the writer may be another machine, or an assistant, or the CLI in a
+second terminal.
+
+**Resolution taken: bound the staleness.** A full re-parse is forced when more than 30 s of displayed
+Done view has elapsed since the last one, so a missed change self-heals within a known bound instead
+of persisting. The bound is wall-clock, not tick-count, because the tick is paused while filtering,
+editing, or suspended (`on_screen_suspend`/`on_screen_resume`), and a tick-count bound would stretch
+arbitrarily in wall time. The clock is injected, per Principle VI.
+
+**The arithmetic, since the forced parse is the cost the fingerprint exists to avoid.**
+`tests/performance/test_refresh_tick.py` records the reference machine at ~0.14 ms/document, so the
+Meetings and Notes ticks already spend ~7 ms (50-document month) to ~28 ms (200 documents) of
+main-thread time **every 2.0 s** — an amortised 3.6–14 ms/s that ships today and is considered
+acceptable. A forced store parse measured at 100 ms every 30 s is 3.3 ms/s amortised: *below* what
+the other two collections already cost. At the SC-005 ceiling of 500 ms it is 16.7 ms/s — comparable
+on average, but the 500 ms single-frame stall is not, and that is the real limit.
+
+**So the bound is paired with an escalation trigger, not left to absorb growth.** If a measured full
+store parse exceeds ~100 ms (≈6 frames at 60 fps), the answer is to month-scope the Done view — not
+to lengthen the interval. Lengthening it would make the stall rarer instead of smaller, which hides
+the problem rather than fixing it, and would widen the staleness window the bound exists to close.
+
+**Residual, accepted and stated**: a Done view can be up to 30 s stale after an external edit that
+the fingerprint misses. That is tolerable because the Done view is a record of finished work rather
+than a live surface, because any subsequent completion, filter, collection switch, or restart
+refreshes it immediately, and because the window is now bounded and testable rather than open-ended.

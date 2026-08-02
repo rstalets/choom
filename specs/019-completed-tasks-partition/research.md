@@ -298,11 +298,42 @@ matches the previous tick's, skip the read entirely and return the previous key.
 over 1,000 small files costs single-digit milliseconds and opens nothing.
 
 **Why this is not a cache or a second source of truth (Principle III).** It stores no task data and
-answers no question about content. It decides only *whether to re-read*, and a wrong answer produces
-a stale list for two seconds, not a wrong one — the same failure mode the tick already has by
-existing at all. It is also the pattern the tick already uses one level up: `_refresh_tick_apply`
-compares a `key` against `_last_render_key` and skips the re-render when they match
-(`list_screen.py:499-514`). This adds the same idea one layer earlier, where the cost now is.
+answers no question about content. It decides only *whether to re-read*, is never written to disk,
+and dies with the screen. It is also the pattern the tick already uses one level up:
+`_refresh_tick_apply` compares a `key` against `_last_render_key` and skips the re-render when they
+match (`list_screen.py:499-514`). This adds the same idea one layer earlier, where the cost now is.
+
+**The failure mode is a missed change that persists — corrected.** An earlier draft claimed a miss
+costs "a stale list for two seconds, the same failure mode the tick already has". That was wrong. A
+missed change is missed again by every subsequent tick, because the fingerprint recomputes to the
+same value; the list stays stale until something else moves that file's `(mtime_ns, size)`. The
+tick's existing failure mode recovers on the next tick. This one does not.
+
+A miss requires the new `mtime_ns` to be **exactly equal** to the sampled one and the size unchanged
+— the comparison is tuple inequality, not "is newer", so a backwards-skewed synced timestamp is still
+detected. Two things make equality reachable: **filesystem timestamp granularity** (1 s on HFS+ and
+ext3, 2 s on FAT/exFAT, 100 ns on NTFS — two writes inside one quantum are indistinguishable), and
+**size-preserving edits**, of which toggling `- [x]` to `- [ ]` is the most likely external edit a
+done file will ever see. The OneDrive-shared-workspace assumption widens who the writer might be.
+
+**Resolution: bound the staleness** rather than accept an open-ended window. A full re-parse is
+forced when more than 30 s of *displayed* Done view has elapsed since the last one. Wall-clock, not
+tick-count, because the tick is paused while filtering, editing, or suspended, so a tick-count bound
+would stretch arbitrarily in wall time. The clock is injected (Principle VI).
+
+**Arithmetic**, since the forced parse is exactly the cost the fingerprint exists to avoid: this
+file's sibling `test_refresh_tick.py` records ~0.14 ms/document, so the Meetings and Notes ticks
+already spend ~7–28 ms of main-thread time **every 2.0 s** — 3.6–14 ms/s amortised, shipping today. A
+100 ms store parse every 30 s is 3.3 ms/s, *below* that. At the SC-005 ceiling of 500 ms it is
+16.7 ms/s — comparable on average, but a 500 ms single-frame stall is not acceptable, and that is the
+real limit. **The bound is therefore paired with an escalation trigger**: a measured full parse above
+~100 ms means month-scope the Done view, never lengthen the interval — a longer interval makes the
+stall rarer instead of smaller and widens the very window the bound exists to close.
+
+**Residual, accepted**: up to 30 s of staleness after a missed external edit. Tolerable because the
+Done view is a record of finished work rather than a live surface, because any completion, filter,
+collection switch, or restart refreshes it immediately, and because the window is now bounded and
+testable rather than open-ended.
 
 **The named first remedy if SC-005 is still breached**: month-scope the Done view using the
 `month_scope` / `scope_selection` machinery the Meetings and Notes panes already have

@@ -75,7 +75,7 @@ blocks, opens an editor, or decorates a non-TTY stream.
 | `ctrl+d` (list delete) | Deletes a completed record from the store. Same confirmation, same wording |
 | `ctrl+t` (editor task delete) | Now reaches a completed record instead of silently taking the `line_only` branch — **bug 1's fix**, inside an existing confirmation, not a new one |
 | Reconcile on open | A mirror of a completed task is ticked instead of warned dead — **bug 2's fix** |
-| Done view refresh | A stat-fingerprint precheck skips the parse when nothing changed (plan.md, Complexity Tracking) |
+| Done view refresh | A stat-fingerprint precheck skips the parse when nothing changed, **bounded by a forced full re-parse every 30 s of displayed Done view** so a missed change self-heals rather than persisting (plan.md, Complexity Tracking) |
 | Screens, dialogs | **None added** |
 
 ## 5. Error messages

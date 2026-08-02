@@ -68,6 +68,19 @@ updated.
 Never raises — an unreadable entry is omitted. Held in memory by the caller only (plan.md,
 Complexity Tracking).
 
+**A matching fingerprint is not proof the store is unchanged.** Equality can occur across a real edit
+when the filesystem's timestamp granularity (1 s on HFS+/ext3, 2 s on FAT/exFAT) swallows the write
+and the edit is size-preserving — a `- [x]` → `- [ ]` toggle changes no byte count. A miss is
+therefore **permanent**, not transient: every later tick recomputes the same tuple. Callers MUST
+bound it:
+
+> `ListScreen` skips the Done-view parse when the fingerprint matches **and** fewer than 30 s of
+> displayed Done view have elapsed since the last full parse. The 30 s clock is injected, never read
+> from the wall clock in a test (Principle VI).
+
+If a measured full store parse exceeds ~100 ms, the response is to month-scope the Done view, **not**
+to lengthen the interval — see plan.md's Complexity Tracking for the arithmetic.
+
 ### C7 — `tidy_completed(workspace, *, now=None) -> TidySummary` *(P3, droppable)*
 
 Moves every parseable completed record out of `tasks.md` into the store, one at a time under C5's
