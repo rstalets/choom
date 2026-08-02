@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import secrets
+import sys
 from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -19,7 +20,7 @@ from choom.core.workspace import init_workspace
 STUB_REPLY_TEXT = "line one\nline two\nline three"
 
 _STUB_SOURCE = """\
-#!/usr/bin/env python3
+#!{python}
 import os
 import sys
 import time
@@ -67,18 +68,23 @@ else:
 
 @pytest.fixture
 def stub_assistant(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Callable[[str], None]:
-    """Install a fake `claude` on PATH. Returns a setter for its mode.
+    """Install a fake `claude` on PATH, isolated from the host's real assistant CLIs.
 
     A small Python script written to `tmp_path`, made executable, and named as the
     `claude` profile's binary, so `shutil.which` finds it for real -- detection and
-    invocation are exercised for real rather than mocked.
+    invocation are exercised for real rather than mocked. `PATH` is replaced entirely
+    (not prepended) so a host machine with other assistant CLIs installed -- e.g. a
+    real `copilot` alongside the stub `claude` -- can't make `available_assistants()`
+    return more than this one stub. The shebang points at the running interpreter
+    directly rather than through `env python3`, so the stub still starts once `PATH`
+    no longer has a `python3` on it.
     """
     bindir = tmp_path / "bin"
     bindir.mkdir()
     script = bindir / ("claude.cmd" if os.name == "nt" else "claude")
-    script.write_text(_STUB_SOURCE, encoding="utf-8")
+    script.write_text(_STUB_SOURCE.format(python=sys.executable), encoding="utf-8")
     script.chmod(0o755)
-    monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ["PATH"])
+    monkeypatch.setenv("PATH", str(bindir))
     monkeypatch.setenv("CHOOM_STUB_MODE", "echo")
 
     def _set_mode(mode: str) -> None:
