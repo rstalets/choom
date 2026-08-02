@@ -18,6 +18,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from choom.core.assistants import PROFILES
+from choom.core.atomic_write import write_text_atomic
 from choom.core.models import AssistantProfile, Workspace
 
 #: The fixed, greppable string every discovery file carries (FR-005), naming choom and
@@ -92,3 +94,91 @@ def render_discovery_file(workspace: Workspace, profile: AssistantProfile) -> st
         frontmatter = f"---\nname: choom\ndescription: {_WHAT_CHOOM_IS}\n---\n\n"
         return f"{frontmatter}# choom\n\n{body}"
     return f"# choom\n\n{body}"
+
+
+def installed_discovery_path() -> Path | None:
+    """The one choom-owned discovery file currently on disk, across every supported
+    assistant's location, or None when none is installed (FR-016).
+
+    "choom-owned" means the marker is present (R11): a same-named file without it is
+    not ours to report, so it is skipped rather than returned.
+    """
+    for profile in PROFILES:
+        path = discovery_path(profile)
+        if path is None or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if MARKER in text:
+            return path
+    return None
+
+
+def remove_discovery_files(*, keep: AssistantProfile | None = None) -> tuple[list[Path], list[str]]:
+    """Remove every choom-owned discovery file except `keep`'s, if given (FR-008,
+    FR-009).
+
+    A file is removed only when it exists *and* carries the generated-by marker
+    (FR-010, research R11) -- a file at one of our paths without it is somebody else's
+    and is left alone, its path returned as a warning rather than deleted on the
+    strength of its filename alone.
+
+    Never raises: an unremovable file (e.g. a permissions error) is reported as a
+    warning too, so a locked-down profile directory does not turn a `none` set into a
+    hard failure -- FR-009 requires it to succeed regardless.
+
+    Returns:
+        The paths actually removed, and a warning message for every path that was
+        left alone (no marker) or could not be read or removed.
+    """
+    removed: list[Path] = []
+    warnings: list[str] = []
+    for profile in PROFILES:
+        if keep is not None and profile.name == keep.name:
+            continue
+        path = discovery_path(profile)
+        if path is None or not path.is_file():
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except OSError as exc:
+            warnings.append(f"could not check {path}: {exc}")
+            continue
+        if MARKER not in text:
+            warnings.append(f"left alone (not choom's): {path}")
+            continue
+        try:
+            path.unlink()
+        except OSError as exc:
+            warnings.append(f"could not remove {path}: {exc}")
+            continue
+        removed.append(path)
+    return removed, warnings
+
+
+def install_discovery_file(workspace: Workspace, profile: AssistantProfile) -> Path | None:
+    """Install the discovery file for `profile`, pointing at `workspace`, rewriting it
+    in full every time (FR-006).
+
+    Writes before removing any choom-owned file a previously configured assistant left
+    behind (FR-008, research R11): if the write itself fails, the previous assistant's
+    still-working pointer is left in place rather than being deleted ahead of a new one
+    that never landed.
+
+    Returns the path written, or None when `profile` has no user-scope location
+    (FR-017) -- the caller reports this; the setting itself is unaffected either way
+    (FR-013).
+
+    Raises:
+        WorkspaceError: the file could not be written -- the profile directory is
+            unwritable, or the path is otherwise unusable. The caller is expected to
+            catch this and report it without failing the setting write (FR-013,
+            FR-014).
+    """
+    path = discovery_path(profile)
+    if path is not None:
+        write_text_atomic(path, render_discovery_file(workspace, profile))
+    remove_discovery_files(keep=profile)
+    return path

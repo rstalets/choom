@@ -66,12 +66,12 @@ depends on these; no story is deliverable until they are done.
 **Independent test**: configure an assistant from inside a workspace, start that assistant with an
 unrelated working directory, and confirm it can name the workspace and its `AGENTS.md` unaided.
 
-- [ ] T012 [US1] Implement `install_discovery_file(workspace: Workspace, profile: AssistantProfile) -> Path | None` in `src/choom/core/discovery.py`, writing through `write_text_atomic` (which already creates parent directories, satisfying FR-011) and returning `None` for a profile with no location
-- [ ] T013 [US1] Implement `installed_discovery_path() -> Path | None` in `src/choom/core/discovery.py`, returning the path of the one choom-owned file currently on disk, or `None`
-- [ ] T014 [US1] Call `install_discovery_file` from the set branch of `_cmd_config_assistant` in `src/choom/cli/main.py`, after the setting write succeeds, catching `WorkspaceError` so the command cannot fail on it (FR-013)
-- [ ] T015 [US1] Call the same core function from `handle_config_command` in `src/choom/tui/app.py`, so the two interfaces install through one path and neither assembles content of its own
-- [ ] T016 [P] [US1] Add unit tests in `tests/unit/test_discovery_install.py`: a file appears at the expected path with the expected content; missing parent directories are created; an existing file at that path is overwritten in full rather than merged; a profile with no location writes nothing and does not raise
-- [ ] T017 [US1] Add an integration test in `tests/integration/test_discovery_install.py` parametrized across the CLI and TUI adapters, asserting that setting the assistant through either one leaves the same file on disk
+- [X] T012 [US1] Implement `install_discovery_file(workspace: Workspace, profile: AssistantProfile) -> Path | None` in `src/choom/core/discovery.py`, writing through `write_text_atomic` (which already creates parent directories, satisfying FR-011) and returning `None` for a profile with no location
+- [X] T013 [US1] Implement `installed_discovery_path() -> Path | None` in `src/choom/core/discovery.py`, returning the path of the one choom-owned file currently on disk, or `None`
+- [X] T014 [US1] Call `install_discovery_file` from the set branch of `_cmd_config_assistant` in `src/choom/cli/main.py`, after the setting write succeeds, catching `WorkspaceError` so the command cannot fail on it (FR-013)
+- [X] T015 [US1] Call the same core function from `handle_config_command` in `src/choom/tui/app.py`, so the two interfaces install through one path and neither assembles content of its own
+- [X] T016 [P] [US1] Add unit tests in `tests/unit/test_discovery_install.py`: a file appears at the expected path with the expected content; missing parent directories are created; an existing file at that path is overwritten in full rather than merged; a profile with no location writes nothing and does not raise
+- [X] T017 [US1] Add an integration test in `tests/integration/test_discovery_install.py` parametrized across the CLI and TUI adapters, asserting that setting the assistant through either one leaves the same file on disk
 
 **Checkpoint**: US1 is complete and shippable on its own. Everything below is reachable through a different door or is a refinement.
 

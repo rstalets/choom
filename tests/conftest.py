@@ -31,9 +31,22 @@ def _isolated_profile_root(
     fake profile root nested inside it would show up as an extra, unexpected entry.
     `tmp_path_factory.mktemp` allocates an unrelated directory instead, so this fixture
     cannot perturb any test that never touches a discovery path.
+
+    Sets `HOME`/`USERPROFILE` in the environment *as well as* patching the function
+    directly. The `monkeypatch.setattr` alone only reaches this process: several
+    `tests/contract/` tests run choom as a real child process
+    (`subprocess.run([sys.executable, "-m", "choom", ...])`, e.g.
+    `test_non_blocking.py`), which gets a fresh interpreter that never sees the patched
+    symbol and would otherwise resolve `Path.home()` for real. `monkeypatch.setenv`
+    mutates `os.environ`, which every child process inherits, and `Path.home()` reads
+    `$HOME` on POSIX and `%USERPROFILE%` on Windows -- so this closes that hole too.
+    The `setattr` stays as well: belt and braces, and it is what a purely in-process
+    test actually exercises.
     """
     root = tmp_path_factory.mktemp("profile_root")
     monkeypatch.setattr(discovery, "profile_root", lambda: root)
+    monkeypatch.setenv("HOME", str(root))
+    monkeypatch.setenv("USERPROFILE", str(root))
     return root
 
 

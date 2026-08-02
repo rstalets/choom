@@ -9,6 +9,7 @@ from textual.binding import Binding
 
 from choom.core.assistants import resolve_assistant
 from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
+from choom.core.discovery import install_discovery_file
 from choom.core.documents import (
     list_months,
     match_document,
@@ -16,7 +17,7 @@ from choom.core.documents import (
     scan_month,
     scan_unfiled,
 )
-from choom.core.errors import ChoomError, UsageError
+from choom.core.errors import ChoomError, UsageError, WorkspaceError
 from choom.core.meetings import MEETINGS, create_meeting
 from choom.core.mirrors import propagate_to_documents
 from choom.core.models import (
@@ -299,6 +300,13 @@ class ChoomApp(App[None]):
             return f"assistant must be one of {accepted}; got {value!r}"
 
         set_assistant(self.workspace, value)
+        if value != "none":
+            profile = resolve_assistant(value).profile
+            assert profile is not None  # value is claude or copilot here
+            try:
+                install_discovery_file(self.workspace, profile)
+            except WorkspaceError:
+                pass
         return None
 
     def toggle_task_and_track(self, task_id: str) -> None:

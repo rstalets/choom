@@ -25,6 +25,7 @@ from choom.cli.output import (
 from choom.core.assistants import resolve_assistant
 from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
 from choom.core.deletion import delete_by_id
+from choom.core.discovery import install_discovery_file
 from choom.core.documents import filter_documents
 from choom.core.errors import ChoomError, NotFoundError, UsageError, WorkspaceError
 from choom.core.links import check_links, heal_links, links_for_id, resolve_id
@@ -465,6 +466,13 @@ def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
 
     if namespace.value is not None:
         set_assistant(workspace, namespace.value)
+        if namespace.value != "none":
+            profile = resolve_assistant(namespace.value).profile
+            assert profile is not None  # namespace.value is claude or copilot here
+            try:
+                install_discovery_file(workspace, profile)
+            except WorkspaceError:
+                pass
         return 0
 
     configured = get_assistant(workspace)
