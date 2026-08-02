@@ -1,12 +1,28 @@
 from __future__ import annotations
 
 import json
+from datetime import date
 from pathlib import Path
 
 from choom.cli.main import main
 
 EXPECTED_KEYS = {"id", "path", "title", "type", "tags", "created", "updated"}
-EXPECTED_TASK_KEYS = {"id", "text", "done", "type", "tags", "links", "created", "line", "body"}
+#: 019-completed-tasks-partition adds `completed` and `file`, additive only
+#: (constitution Principle II) -- kept as an exact-set assertion on purpose,
+#: so a key that is renamed or removed still fails loudly here.
+EXPECTED_TASK_KEYS = {
+    "id",
+    "text",
+    "done",
+    "type",
+    "tags",
+    "links",
+    "created",
+    "line",
+    "body",
+    "completed",
+    "file",
+}
 
 
 def test_json_schema_has_exactly_seven_keys_and_no_nulls(
@@ -85,10 +101,42 @@ def test_task_list_json_has_exactly_seven_keys_id_and_created_nullable(
     assert typed["tags"] == []
     assert typed["id"] is not None
     assert typed["created"] is not None
+    # 019-completed-tasks-partition: an open task carries no completion date
+    # and lives in tasks.md.
+    assert typed["completed"] is None
+    assert typed["file"] == "tasks.md"
 
     bare = next(r for r in records if r["text"] == "bare task")
     assert bare["id"] is not None  # backfilled by load_tasks
     assert bare["created"] is None
+    assert bare["completed"] is None
+    assert bare["file"] == "tasks.md"
+
+
+def test_task_list_json_completed_is_an_iso_date_and_file_names_the_done_store(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    """019-completed-tasks-partition: `completed` and `file` are additive
+    keys on the task record; this pins their actual values for a record
+    that has moved, not just their presence in the key set above."""
+    monkeypatch.chdir(tmp_path)
+    main(["init"])
+    capsys.readouterr()
+    main(["task", "add", "buy milk"])
+    task_id = capsys.readouterr().out.strip()
+
+    main(["task", "done", task_id])
+    capsys.readouterr()
+
+    main(["task", "list", "--json", "--done"])
+    records = json.loads(capsys.readouterr().out)
+
+    assert len(records) == 1
+    record = records[0]
+    assert record["completed"] == date.today().isoformat()
+    assert record["file"].startswith("tasks/done/")
+    assert record["file"].endswith("-done.md")
+    assert "tasks.md" not in record["file"]
 
 
 def test_task_list_json_carries_body_for_every_entry(tmp_path: Path, monkeypatch, capsys) -> None:

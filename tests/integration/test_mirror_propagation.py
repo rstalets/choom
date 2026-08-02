@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import stat
+from datetime import date
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,8 @@ from choom.cli.main import main
 from choom.core.meetings import create_meeting
 from choom.core.mirrors import capture_task, propagate_to_documents
 from choom.core.models import Workspace
-from choom.core.tasks import add_task, load_tasks
+from choom.core.task_store import done_file_for, load_task_store
+from choom.core.tasks import add_task
 from choom.core.workspace import find_workspace
 from choom.tui.app import ChoomApp
 from tests.helpers import to_collection
@@ -57,9 +59,11 @@ def test_cli_task_done_splices_the_mirror_and_leaves_updated_unchanged(
     assert after_updated is not None
     assert after_updated.group(1) == before_updated.group(1)
 
-    # tasks.md was written first, and holds the new state.
-    tasks_text = workspace.tasks_file.read_text(encoding="utf-8")
-    assert f"- [x] call Terry <!-- id:{task_id}" in tasks_text
+    # 019-completed-tasks-partition: the done-store file was written first,
+    # and holds the new state; tasks.md no longer mentions the id.
+    assert task_id not in workspace.tasks_file.read_text(encoding="utf-8")
+    done_text = done_file_for(workspace, date.today()).read_text(encoding="utf-8")
+    assert f"- [x] call Terry <!-- id:{task_id}" in done_text
 
 
 async def test_tui_space_splices_the_mirror_and_leaves_updated_unchanged(
@@ -81,7 +85,7 @@ async def test_tui_space_splices_the_mirror_and_leaves_updated_unchanged(
         assert after_updated is not None
         assert after_updated.group(1) == before_updated.group(1)
 
-        tasks, _warnings = load_tasks(tmp_workspace)
+        tasks, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks if t.id == task_id).done is True
 
 
@@ -102,7 +106,7 @@ def test_a_reworded_and_reindented_mirror_is_still_found_by_id(
 
     set_task_state(tmp_workspace, task_id, done=True)
     written, _warnings = propagate_to_documents(
-        tmp_workspace, next(t for t in load_tasks(tmp_workspace)[0] if t.id == task_id)
+        tmp_workspace, next(t for t in load_task_store(tmp_workspace)[0] if t.id == task_id)
     )
     assert meeting_path in written
 
@@ -128,7 +132,7 @@ def test_missing_document_produces_a_warning_but_tasks_md_still_updates(
     assert len(warnings) == 1
     assert task.done is True
 
-    tasks, _warnings = load_tasks(tmp_workspace)
+    tasks, _warnings = load_task_store(tmp_workspace)
     assert next(t for t in tasks if t.id == task_id).done is True
 
 
@@ -149,7 +153,7 @@ def test_unwritable_document_warns_and_does_not_reverse_the_toggle(
         _written, warnings = propagate_to_documents(tmp_workspace, task)
         assert len(warnings) == 1
 
-        tasks, _warnings = load_tasks(tmp_workspace)
+        tasks, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks if t.id == task_id).done is True
     finally:
         directory.chmod(original_mode)
@@ -201,7 +205,7 @@ async def test_toggling_reflects_in_the_spliced_document_on_the_next_read(
         await pilot.press("space")
         await pilot.pause()
 
-        tasks, _warnings = load_tasks(tmp_workspace)
+        tasks, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks if t.id == task_id).done is True
 
         await to_collection(app, pilot, "meetings")

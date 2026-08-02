@@ -34,6 +34,7 @@ from choom.core.models import (
     Workspace,
 )
 from choom.core.notes import scan_notes
+from choom.core.task_store import iter_done_files, load_done_tasks, load_task_store
 from choom.core.tasks import load_tasks, match_task, parse_tasks
 from choom.core.text import _split_terminator
 
@@ -632,19 +633,32 @@ def resolve_id(
                 )
 
     if "task" in pools:
+        # tasks.md first, and the done store only on a miss
+        # (019-completed-tasks-partition, research R4/R9) -- resolving an
+        # open task's id, the common case, costs exactly what it always
+        # did. `LinkTarget.path` is *always* `workspace.tasks_file`,
+        # whichever file actually holds the record right now (FR-024): this
+        # is the canonical-address rule that is the whole reason completing
+        # or reopening a task rewrites no mirror anywhere in the vault. Do
+        # not "fix" this to the record's real path -- that would be the bug.
         tasks, task_warnings = load_tasks(workspace)
         warnings.extend(task_warnings)
-        for task in tasks:
-            if task.id == target_id:
-                candidates.append(
-                    LinkTarget(
-                        id=task.id,
-                        path=workspace.tasks_file,
-                        title=task.text,
-                        kind="task",
-                        line=task.line,
-                    )
+        task_matches = [t for t in tasks if t.id == target_id]
+        if not task_matches:
+            done_tasks, done_warnings = load_done_tasks(workspace)
+            warnings.extend(done_warnings)
+            task_matches = [t for t in done_tasks if t.id == target_id]
+        for task in task_matches:
+            assert task.id is not None  # every match here matched t.id == target_id above
+            candidates.append(
+                LinkTarget(
+                    id=task.id,
+                    path=workspace.tasks_file,
+                    title=task.text,
+                    kind="task",
+                    line=task.line,
                 )
+            )
 
     if not candidates:
         return None, tuple(warnings)
@@ -829,6 +843,10 @@ def _iter_target_paths(workspace: Workspace, paths: tuple[Path, ...]) -> list[Pa
             result.extend(sorted(directory.rglob("*.md")))
     if workspace.tasks_file.is_file():
         result.append(workspace.tasks_file)
+    # 019-completed-tasks-partition (FR-028): ordinary markdown links in a
+    # completed task's text or body are still links and must not stop being
+    # checked/healed because the task moved into the done store.
+    result.extend(iter_done_files(workspace))
     return result
 
 
@@ -842,7 +860,11 @@ def _task_links(task: Task, tasks_path: Path) -> tuple[Link, ...]:
 
 
 def _task_field_reports(workspace: Workspace, tasks_path: Path) -> list[LinkReport]:
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): a completed task's own `links:`
+    # field ids are still links. Every report is attributed to `tasks_path`
+    # (always tasks.md, the canonical address, FR-024) regardless of which
+    # file the record currently sits in.
+    tasks, _warnings = load_task_store(workspace)
     reports: list[LinkReport] = []
     for task in tasks:
         for link in _task_links(task, tasks_path):
@@ -968,7 +990,9 @@ def outbound_links(workspace: Workspace, source: Path) -> tuple[tuple[Link, Link
 
 
 def _all_task_field_links(workspace: Workspace, tasks_path: Path) -> list[Link]:
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): covers the whole store, not
+    # just tasks.md, so a completed task's `links:` field is still found.
+    tasks, _warnings = load_task_store(workspace)
     links: list[Link] = []
     for task in tasks:
         links.extend(_task_links(task, tasks_path))
@@ -1018,16 +1042,20 @@ def outbound_for_target(
     if target.kind != "task":
         return outbound_links(workspace, target.path)
 
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): a completed task is found by
+    # searching the whole store, and its ordinary markdown links are read
+    # from wherever its record actually sits (`task.source`) -- that is
+    # where the bytes are -- while its `links:` field is still attributed
+    # to tasks.md, the canonical address (FR-024).
+    tasks, _warnings = load_task_store(workspace)
     task = next((t for t in tasks if t.id == target.id), None)
     if task is None:
         return ()
 
+    source_path = task.source or workspace.tasks_file
     links = list(_task_links(task, workspace.tasks_file))
     links.extend(
-        link
-        for owner_line, link in _tasks_file_links(workspace.tasks_file)
-        if owner_line == task.line
+        link for owner_line, link in _tasks_file_links(source_path) if owner_line == task.line
     )
     return tuple((link, resolve_link(workspace, link)[1]) for link in links)
 
@@ -1071,6 +1099,21 @@ def inbound_links(workspace: Workspace, target_id: str) -> tuple[Link, ...]:
         # ...and markdown links written in tasks.md itself, which are ordinary
         # links that happen to live in a task's text or body (007).
         for _owner_line, link in _tasks_file_links(tasks_path):
+            if link.target_id == target_id:
+                results.append(link)
+
+    # 019-completed-tasks-partition (FR-028): a completed task's own
+    # markdown links move with it into the done store; they are still
+    # links and must still be found. `links:` field ids are already covered
+    # above via `_all_task_field_links`'s store-wide read.
+    for done_path in iter_done_files(workspace):
+        try:
+            data = done_path.read_bytes()
+        except OSError:
+            continue
+        if needle not in data:
+            continue
+        for _owner_line, link in _tasks_file_links(done_path):
             if link.target_id == target_id:
                 results.append(link)
 

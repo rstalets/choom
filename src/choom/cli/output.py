@@ -77,7 +77,12 @@ def print_tasks_table(tasks: Iterable[Task]) -> None:
         print_task_line(task)
 
 
-def _task_record(task: Task) -> dict[str, object]:
+def _task_record(workspace: Workspace, task: Task) -> dict[str, object]:
+    """019-completed-tasks-partition: `completed` and `file` are additive --
+    every pre-existing key keeps its name, type, and meaning (Principle II).
+    `file` is required because `line` is a line number within a file, and
+    that is now ambiguous without naming which one."""
+    source = task.source or workspace.tasks_file
     return {
         "id": task.id,
         "text": task.text,
@@ -88,11 +93,13 @@ def _task_record(task: Task) -> dict[str, object]:
         "created": task.created.isoformat() if task.created else None,
         "line": task.line,
         "body": task.body,
+        "completed": task.completed.isoformat() if task.completed else None,
+        "file": source.relative_to(workspace.root).as_posix(),
     }
 
 
-def print_tasks_json(tasks: Iterable[Task]) -> None:
-    print(json.dumps([_task_record(task) for task in tasks], ensure_ascii=False))
+def print_tasks_json(workspace: Workspace, tasks: Iterable[Task]) -> None:
+    print(json.dumps([_task_record(workspace, task) for task in tasks], ensure_ascii=False))
 
 
 def print_task_show(task: Task) -> None:
@@ -105,10 +112,10 @@ def print_task_show(task: Task) -> None:
         print(task.body)
 
 
-def print_task_show_json(task: Task) -> None:
+def print_task_show_json(workspace: Workspace, task: Task) -> None:
     """JSON form of `task show`: one object, identical in shape to an entry of
     `task list --json`."""
-    print(json.dumps(_task_record(task), ensure_ascii=False))
+    print(json.dumps(_task_record(workspace, task), ensure_ascii=False))
 
 
 def _link_report_line(workspace: Workspace, report: LinkReport) -> str:

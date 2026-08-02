@@ -42,6 +42,7 @@ from choom.core.models import (
     YearMonth,
 )
 from choom.core.notes import NOTES, create_note, open_daily_note
+from choom.core.task_store import load_task_store
 from choom.core.tasks import (
     add_task,
     filter_tasks,
@@ -286,8 +287,17 @@ class ChoomApp(App[None]):
 
     def visible_tasks(self) -> list[Task]:
         """Every task the active category (and filter, if any) shows, read
-        fresh from `tasks.md` on every call (010-read-on-load, contract C1)."""
-        tasks, self._last_warnings = load_tasks(self.workspace)
+        fresh on every call (010-read-on-load, contract C1).
+
+        The Todo category reads `load_tasks` -- `tasks.md` only, whatever
+        the size of the done store (019-completed-tasks-partition, FR-018)
+        -- and this is also what the 2-second refresh tick reads, so it must
+        never escalate. The Done category reads `load_task_store`, the union
+        of the done store and any `[x]` still in `tasks.md` (FR-019)."""
+        if self.task_category == "done":
+            tasks, self._last_warnings = load_task_store(self.workspace)
+        else:
+            tasks, self._last_warnings = load_tasks(self.workspace)
         task_filter = TaskFilter(only_done=self.task_category == "done")
         tasks = filter_tasks(tasks, task_filter)
         if self.filter_query:

@@ -5,6 +5,7 @@ from textual.widgets import TextArea
 from choom.core.meetings import create_meeting
 from choom.core.mirrors import capture_task
 from choom.core.models import Workspace
+from choom.core.task_store import load_task_store
 from choom.core.tasks import load_tasks
 from choom.tui.app import ChoomApp
 from tests.helpers import open_edit
@@ -43,7 +44,9 @@ async def test_ticking_a_mirror_and_saving_marks_the_task_done(tmp_workspace: Wo
         await pilot.press("ctrl+o")
         await pilot.pause()
 
-        tasks, _warnings = load_tasks(tmp_workspace)
+        # 019-completed-tasks-partition: the record moves into the done
+        # store on completion.
+        tasks, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks if t.id == task_id).done is True
 
 
@@ -90,7 +93,7 @@ async def test_a_tasks_md_write_does_not_cascade_back_into_the_document(
         mtime_after_save = meeting_path.stat().st_mtime_ns
         assert mtime_after_save != mtime_before_save
 
-        tasks, _warnings = load_tasks(tmp_workspace)
+        tasks, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks if t.id == task_id).done is True
 
         mtime_settled = meeting_path.stat().st_mtime_ns
