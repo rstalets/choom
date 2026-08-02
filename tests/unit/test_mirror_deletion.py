@@ -5,11 +5,13 @@ decidable against a string with no terminal involved (plan.md gate VI).
 
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from choom.core.errors import UsageError
 from choom.core.mirrors import commit_mirror_deletion, plan_mirror_deletion
 from choom.core.models import Workspace
+from choom.core.task_store import done_file_for
 from tests.conftest import tasks_file, write_tasks
 
 _SOURCE = Path("/ws/meetings/2026/08/q3-planning.md")
@@ -359,3 +361,88 @@ def test_the_two_new_functions_and_the_result_type_import_from_core() -> None:
     assert plan_mirror_deletion is not None
     assert commit_mirror_deletion is not None
     assert MirrorDeletion is not None
+
+
+# --- 019-completed-tasks-partition: resolving across the whole store -------
+# Bug 1's fix (FR-033), the widened ambiguous_id (FR-034), and the
+# unreadable_tasks re-scoping in both directions (FR-035, research R6).
+
+
+def test_a_completed_record_in_the_done_store_plans_deletable(tmp_workspace: Workspace) -> None:
+    day = done_file_for(tmp_workspace, date(2026, 8, 2))
+    day.parent.mkdir(parents=True, exist_ok=True)
+    day.write_text(
+        "- [x] call Terry <!-- id:task_a1b2 completed:2026-08-02 -->\n", encoding="utf-8"
+    )
+
+    plan = plan_mirror_deletion(tmp_workspace, _bare_line("task_a1b2"), 1, source=_SOURCE)
+    assert plan is not None
+    assert plan.outcome == "deletable"
+
+
+def test_ambiguous_id_across_tasks_md_and_a_day_file_names_both_files(
+    tmp_workspace: Workspace,
+) -> None:
+    write_tasks(tmp_workspace, "- [ ] call Terry <!-- id:task_dupe -->\n")
+    day = done_file_for(tmp_workspace, date(2026, 8, 2))
+    day.parent.mkdir(parents=True, exist_ok=True)
+    day.write_text("- [x] call Terry <!-- id:task_dupe -->\n", encoding="utf-8")
+
+    plan = plan_mirror_deletion(tmp_workspace, _bare_line("task_dupe"), 1, source=_SOURCE)
+    assert plan is not None
+    assert plan.outcome == "ambiguous_id"
+    assert "tasks.md:1" in plan.message
+    assert "2026-08-02-done.md:1" in plan.message
+
+
+def test_a_broken_line_in_an_unrelated_day_file_does_not_block_a_resolvable_deletion(
+    tmp_workspace: Workspace,
+) -> None:
+    """The id resolves uniquely in tasks.md, so `deletable` is decided
+    before `unreadable_location` (set from the broken day file scanned
+    alongside it) is ever consulted -- a file with a broken line that has
+    nothing to do with this id can never block deleting a different,
+    resolvable one (research R6, FR-035's negative half)."""
+    write_tasks(tmp_workspace, "- [ ] call Terry <!-- id:task_a1b2 -->\n")
+    broken = done_file_for(tmp_workspace, date(2026, 3, 14))
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text("- [ ] broken <!-- id:task_broken\n", encoding="utf-8")
+
+    plan = plan_mirror_deletion(tmp_workspace, _bare_line("task_a1b2"), 1, source=_SOURCE)
+    assert plan is not None
+    assert plan.outcome == "deletable"
+
+
+def test_a_broken_line_in_a_day_file_still_refuses_naming_that_file_when_the_id_resolves_nowhere(
+    tmp_workspace: Workspace,
+) -> None:
+    """The id resolves nowhere at all -- in tasks.md or any day file -- so
+    the broken line found while scanning the store now refuses, naming the
+    actual file it lives in (not always "tasks.md", the positive half of
+    FR-035)."""
+    write_tasks(tmp_workspace, "- [ ] someone else <!-- id:task_other -->\n")
+    broken = done_file_for(tmp_workspace, date(2026, 3, 14))
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text("- [ ] broken <!-- id:task_broken\n", encoding="utf-8")
+
+    plan = plan_mirror_deletion(tmp_workspace, _bare_line("task_gone"), 1, source=_SOURCE)
+    assert plan is not None
+    assert plan.outcome == "unreadable_tasks"
+    assert "2026-03-14-done.md:1" in plan.message
+    assert "tasks.md" not in plan.message
+
+
+def test_a_resolvable_id_in_the_done_store_still_deletes_despite_a_broken_line_elsewhere(
+    tmp_workspace: Workspace,
+) -> None:
+    day = done_file_for(tmp_workspace, date(2026, 8, 2))
+    day.parent.mkdir(parents=True, exist_ok=True)
+    day.write_text("- [x] call Terry <!-- id:task_a1b2 -->\n", encoding="utf-8")
+
+    broken = done_file_for(tmp_workspace, date(2026, 3, 14))
+    broken.parent.mkdir(parents=True, exist_ok=True)
+    broken.write_text("- [ ] broken <!-- id:task_broken\n", encoding="utf-8")
+
+    plan = plan_mirror_deletion(tmp_workspace, _bare_line("task_a1b2"), 1, source=_SOURCE)
+    assert plan is not None
+    assert plan.outcome == "deletable"

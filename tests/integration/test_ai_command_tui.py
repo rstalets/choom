@@ -11,6 +11,7 @@ from choom.core.assistants import PROFILES, AssistantRequest
 from choom.core.config import set_assistant, set_launch_offer_made
 from choom.core.meetings import create_meeting
 from choom.core.models import AssistantReply, Workspace
+from choom.core.task_store import load_task_store
 from choom.core.tasks import load_tasks
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import _PLACEHOLDER, EditScreen
@@ -266,7 +267,9 @@ async def test_reply_captured_tasks_reconcile_like_any_other_task(
         await pilot.press("ctrl+o")
         await pilot.pause()
 
-        tasks_after, _warnings = load_tasks(tmp_workspace)
+        # 019-completed-tasks-partition: both records have moved into the
+        # done store by now.
+        tasks_after, _warnings = load_task_store(tmp_workspace)
         assert next(t for t in tasks_after if t.id == second_id).done is True
         assert next(t for t in tasks_after if t.id == first_id).done is True
 

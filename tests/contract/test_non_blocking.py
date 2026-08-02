@@ -38,6 +38,9 @@ def test_every_command_terminates_promptly_with_stdin_closed(tmp_path: Path) -> 
     assert _run(["task", "show", "nope_1234"], tmp_path).returncode == 1
     assert _run(["task", "done", task_id], tmp_path).returncode == 0
     assert _run(["task", "undone", task_id], tmp_path).returncode == 0
+    # 019-completed-tasks-partition (P3): the sweep never prompts either.
+    assert _run(["task", "tidy"], tmp_path).returncode == 0
+    assert _run(["task", "tidy", "--json"], tmp_path).returncode == 0
     assert _run(["--version"], tmp_path).returncode == 0
     assert _run(["--help"], tmp_path).returncode == 0
 

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from datetime import date
+
 from textual.widgets import Markdown, TextArea
 
 from choom.core.models import Workspace
-from choom.core.tasks import add_task, load_tasks
+from choom.core.task_store import done_file_for, load_task_store
+from choom.core.tasks import add_task
 from choom.tui.app import ChoomApp
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.list_screen import ListScreen
@@ -220,10 +223,15 @@ async def test_toggling_done_preserves_the_body(tmp_workspace: Workspace) -> Non
         await pilot.press("space")
         await pilot.pause()
 
+    # 019-completed-tasks-partition: the record and its whole body move into
+    # today's done-store file; tasks.md no longer mentions it.
     text = tasks_file(tmp_workspace).read_text(encoding="utf-8")
-    assert "- [x] call the vendor <!-- id:t_a1b2 -->" in text
-    assert "Need the Q3 comparison." in text
+    assert "t_a1b2" not in text
 
-    tasks, _warnings = load_tasks(tmp_workspace)
+    done_text = done_file_for(tmp_workspace, date.today()).read_text(encoding="utf-8")
+    assert "- [x] call the vendor <!-- id:t_a1b2" in done_text
+    assert "Need the Q3 comparison." in done_text
+
+    tasks, _warnings = load_task_store(tmp_workspace)
     assert tasks[0].done is True
     assert tasks[0].body == "Need the Q3 comparison."

@@ -11,7 +11,11 @@ from choom.core.documents import _read_document
 from choom.core.mirrors import capture_task
 from choom.core.workspace import find_workspace
 
-EXPECTED_KEYS = {"id", "done", "links", "documents_updated", "warnings"}
+#: 019-completed-tasks-partition adds `file` (where the record now lives),
+#: additive only (constitution Principle II) -- kept as an exact-set
+#: assertion on purpose, so a key that is renamed or removed still fails
+#: loudly here.
+EXPECTED_KEYS = {"id", "done", "links", "documents_updated", "warnings", "file"}
 
 
 @pytest.fixture
@@ -52,6 +56,10 @@ def test_task_done_json_schema(cli_root: Path, capsys: pytest.CaptureFixture[str
     assert isinstance(payload["links"], list)
     assert len(payload["links"]) == 1
     assert payload["warnings"] == []
+    # 019-completed-tasks-partition: the record now lives in today's
+    # done-store file, not tasks.md.
+    assert payload["file"].startswith("tasks/done/")
+    assert payload["file"].endswith("-done.md")
 
 
 def test_documents_updated_lists_only_documents_actually_written(

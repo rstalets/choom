@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
@@ -18,6 +20,7 @@ from choom.core.documents import _read_document, scan_documents
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
+from choom.core.task_store import store_fingerprint
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
 from choom.tui.columns import (
     TASK_LEAD,
@@ -57,6 +60,17 @@ _CREATE_VERB = {"meetings": "meeting", "notes": "note"}
 #: the full frame-budget argument and the trigger to move this read to a
 #: worker thread instead of shortening the interval.
 REFRESH_SECONDS = 2.0
+
+#: 019-completed-tasks-partition (T037, plan.md Complexity Tracking): the
+#: Done view's stat-fingerprint precheck forces a full re-parse after this
+#: many seconds of *displayed* Done view, even when the fingerprint still
+#: matches -- because a miss here is permanent (every later tick recomputes
+#: the same tuple), not transient like the tick's ordinary staleness. Wall-
+#: clock, not tick-count, since the tick pauses while filtering, editing, or
+#: suspended. If a measured full parse ever exceeds ~100 ms, month-scope the
+#: Done view -- do not raise this number; a longer interval only makes the
+#: stall rarer, not smaller, and widens the window this bound exists to close.
+_DONE_FINGERPRINT_MAX_STALE_SECONDS = 30.0
 
 
 def _document_key(documents: list[Document]) -> tuple[tuple[object, ...], ...]:
@@ -245,6 +259,19 @@ class ListScreen(Screen[None]):
         #: lifetime is exactly one bar session (contract C5, plan Complexity
         #: Tracking) -- never consulted once the bar is closed.
         self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
+        #: 019-completed-tasks-partition (T036/T037, plan.md Complexity
+        #: Tracking): the Done view's stat-fingerprint precheck. Holds no
+        #: task data -- only the last sampled `store_fingerprint` tuple, the
+        #: items/key it produced, and the wall-clock time of the last *real*
+        #: parse, so a tick that finds an unchanged fingerprint can skip
+        #: re-parsing the whole store and still hand back the same items.
+        self._done_fingerprint: tuple[tuple[str, int, int], ...] | None = None
+        self._done_fingerprint_items: list[Task] = []
+        self._done_fingerprint_key: tuple[tuple[object, ...], ...] = ()
+        self._done_fingerprint_at: float | None = None
+        #: Wall-clock seconds, injected so no test reads the real clock
+        #: (Principle VI). `time.monotonic` by default.
+        self._clock: Callable[[], float] = time.monotonic
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(
@@ -591,9 +618,18 @@ class ListScreen(Screen[None]):
         read. Touches no widget -- returns the rows, whether they are tasks,
         and the comparison key built from them, which is what a worker thread
         would eventually hand back via `call_from_thread` instead of this
-        being called directly on the main thread."""
+        being called directly on the main thread.
+
+        The Done category's read goes through `_done_view_read`'s stat-
+        fingerprint precheck instead of calling `visible_tasks()` directly
+        (019-completed-tasks-partition, T036) -- the Todo category never
+        does, since `visible_tasks()` already costs exactly one file read
+        there (FR-018) and needs no gating."""
         app = self.app
         is_tasks = app.active == "tasks"  # type: ignore[attr-defined]
+        if is_tasks and app.task_category == "done":  # type: ignore[attr-defined]
+            items_t, key = self._done_view_read()
+            return cast("list[Document | Task]", items_t), True, key
         items = cast(
             "list[Document | Task]",
             app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
@@ -604,6 +640,44 @@ class ListScreen(Screen[None]):
             else _document_key(cast("list[Document]", items))
         )
         return items, is_tasks, key
+
+    def _done_view_read(self) -> tuple[list[Task], tuple[tuple[object, ...], ...]]:
+        """The Done view's tick read, gated by a stat fingerprint (T036,
+        plan.md Complexity Tracking): `_refresh_tick` runs every
+        `REFRESH_SECONDS` on Textual's main thread, so a whole-store parse at
+        the SC-005 ceiling would drop frames for as long as the Done view is
+        displayed. `store_fingerprint` costs a directory walk, not a parse;
+        when it matches the last sample, the parse is skipped and the
+        previous items/key are returned unchanged.
+
+        Bounded by a forced full re-parse once more than 30 s of *displayed*
+        Done view has elapsed since the last real one (T037): a missed
+        change is not like the tick's ordinary staleness, which the next
+        tick always corrects -- `store_fingerprint`'s own docstring explains
+        why a miss here is permanent, not transient, so the bound exists to
+        put a ceiling on it rather than leave it open-ended. If a measured
+        full parse ever exceeds ~100 ms, the fix is to month-scope the Done
+        view, never to lengthen this bound -- a longer interval only makes
+        the stall rarer, not smaller, and widens the very window this bound
+        exists to close.
+        """
+        app = self.app
+        now = self._clock()
+        fingerprint = store_fingerprint(app.workspace)  # type: ignore[attr-defined]
+        stale = (
+            self._done_fingerprint_at is None
+            or now - self._done_fingerprint_at >= _DONE_FINGERPRINT_MAX_STALE_SECONDS
+        )
+        if not stale and fingerprint == self._done_fingerprint:
+            return self._done_fingerprint_items, self._done_fingerprint_key
+
+        items = cast("list[Task]", app.visible_tasks())  # type: ignore[attr-defined]
+        key = _task_key(items)
+        self._done_fingerprint = fingerprint
+        self._done_fingerprint_items = items
+        self._done_fingerprint_key = key
+        self._done_fingerprint_at = now
+        return items, key
 
     async def _refresh_tick_apply(self, key: tuple[tuple[object, ...], ...]) -> None:
         """The apply step: re-renders via `refresh_rows` -- the same path

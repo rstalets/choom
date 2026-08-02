@@ -27,6 +27,13 @@ class Workspace:
     def tasks_file(self) -> Path:
         return self.root / "tasks.md"
 
+    @property
+    def done_dir(self) -> Path:
+        """The done-store collection root, `tasks/done/` (019-completed-tasks-
+        partition). Partitioned `YYYY/MM/` beneath it, same as every other
+        dated collection; see `choom.core.task_store.done_file_for`."""
+        return self.root / "tasks" / "done"
+
 
 @dataclass(frozen=True, slots=True)
 class Document:
@@ -84,6 +91,7 @@ ScanWarningReason = Literal[
     "task_unterminated_comment",
     "task_malformed_comment",
     "task_invalid_value",
+    "task_unreadable_file",
     "link_dead",
     "link_ambiguous",
     "mirror_conflict",
@@ -158,6 +166,28 @@ class Task:
     line: int
     links: tuple[str, ...] = ()
     body: str = ""
+    #: The record's own completion date, from its `completed:` field
+    #: (019-completed-tasks-partition). `None` for every open record and for
+    #: a completed record that predates this feature. Never derived from
+    #: `source` -- a record's location is never authoritative (FR-005).
+    completed: date | None = None
+    #: The file this record was read from. Populated by every loader
+    #: (`load_tasks`, `load_done_tasks`, `load_task_store`); `None` only for a
+    #: `Task` built by a caller that never read one. Exists because `line` is
+    #: a line number and stopped being self-describing the moment a record
+    #: could live in either of two files.
+    source: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TidySummary:
+    """What `task_store.tidy_completed` (P3, droppable) did to `tasks.md`
+    (019-completed-tasks-partition). Lives for the length of one command;
+    never persisted."""
+
+    moved: int
+    left: int
+    warnings: tuple[ScanWarning, ...]
 
 
 @dataclass(frozen=True, slots=True)
