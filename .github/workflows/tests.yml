@@ -44,4 +44,31 @@ jobs:
         # Oversubscribing to ~2x the runner's vCPU count beats `-n auto` (1x): each
         # worker is mostly idle, so more workers keep landing time savings until
         # spawn overhead outweighs it -- measured at ~2x for this runner size.
-        run: uv run --extra dev pytest -q -n $(( $(getconf _NPROCESSORS_ONLN) * 2 )) --durations=10
+        #
+        # tests/performance/ is excluded here and runs in its own job (`performance`
+        # below): its assertions are wall-clock budgets, which flake on a shared
+        # runner for reasons that have nothing to do with the PR under test (issue
+        # #84). Keeping it out of this job keeps this job -- the gate on ordinary
+        # PRs -- free of that flake.
+        run: uv run --extra dev pytest -q -n $(( $(getconf _NPROCESSORS_ONLN) * 2 )) --durations=10 -m "not performance"
+
+  performance:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+
+      - name: Test (performance)
+        # Isolated from the `test` matrix job so a flaky wall-clock budget (issue
+        # #84) can be re-run on its own without re-running, or blocking, the rest
+        # of the suite. This does NOT make the budgets themselves robust to a slow
+        # runner -- see issue #84 for that open question. No continue-on-error: a
+        # real regression here is a real signal and must fail the job.
+        run: uv run --extra dev pytest -q -m performance --durations=10
