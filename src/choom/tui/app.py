@@ -175,6 +175,35 @@ class ChoomApp(App[None]):
         if self._list_screen is not None:
             self._list_screen.set_pending_status(message)
 
+    async def action_quit(self) -> None:
+        """`ctrl+q` (bug #64): quit immediately when nothing would be lost, exactly
+        as before -- but if a dirty `EditScreen` is on the stack, raise the same
+        confirmation `EditScreen.action_close` raises rather than silently
+        discarding the edit (constitution Principle V, amended 2.0.0)."""
+        from choom.tui.confirm_dialog import ConfirmDialog
+        from choom.tui.edit_screen import EditScreen
+
+        if isinstance(self.screen, ConfirmDialog):
+            return  # already confirming a quit or a close; don't stack a second dialog
+
+        dirty = any(
+            isinstance(screen, EditScreen) and screen.is_dirty for screen in self.screen_stack
+        )
+        if not dirty:
+            self.exit()
+            return
+
+        def _handle_dismiss(discard: bool | None) -> None:
+            if discard:
+                self.exit()
+
+        dialog = ConfirmDialog(
+            "You have unsaved changes. Are you sure you want to exit?",
+            cancel_label="Continue Editing",
+            confirm_label="Exit Without Saving",
+        )
+        self.push_screen(dialog, _handle_dismiss)
+
     # --- scope (month / unfiled / category) -----------------------------------
 
     def _reset_scope(self, collection: str) -> None:

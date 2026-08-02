@@ -28,14 +28,25 @@ def test_refresh_tick_read_stays_inside_one_frame_on_a_representative_month(
     reference machine's ~15 ms (one 60 fps frame) to absorb slower CI
     hardware while staying well under the SC-003 200 ms list-load budget --
     is the stated trigger to move the tick's read to a worker thread
-    (research R5), not a reason to shorten REFRESH_SECONDS or skip reads."""
+    (research R5), not a reason to shorten REFRESH_SECONDS or skip reads.
+
+    Best-of-5: a single `perf_counter()` read is exposed to one bad scheduler
+    tick on a shared/oversubscribed CI runner (this flaked at 50.1 ms against
+    the 50 ms ceiling once CI started running xdist workers at ~2x core count
+    instead of 1x). A real regression -- e.g. losing the month scoping and
+    falling back to a full-collection scan -- slows every sample; a transient
+    scheduling hiccup slows one. Taking the minimum removes the latter without
+    hiding the former.
+    """
     now = datetime.now()
     workspace = generate(tmp_path, 50, spread_months=2, now=now, current_month_count=50)
 
-    start = time.perf_counter()
-    documents, warnings = scan_month(workspace, MEETINGS, YearMonth(now.year, now.month))
-    elapsed = time.perf_counter() - start
+    samples = []
+    for _ in range(5):
+        start = time.perf_counter()
+        documents, warnings = scan_month(workspace, MEETINGS, YearMonth(now.year, now.month))
+        samples.append(time.perf_counter() - start)
 
     assert len(documents) == 50
     assert warnings == []
-    assert elapsed < 0.05
+    assert min(samples) < 0.05, f"scan_month samples: {[f'{s * 1000:.1f}ms' for s in samples]}"

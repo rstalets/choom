@@ -5,6 +5,7 @@ from choom.core.documents import (
     scan_documents,
 )
 from choom.core.editing import load_for_edit, save_buffer, stamp_updated
+from choom.core.editor_commands import parse_reply_lines
 from choom.core.errors import ChoomError, NotFoundError, UsageError, WorkspaceError
 from choom.core.frontmatter import read_frontmatter, render_frontmatter
 from choom.core.links import (
@@ -26,6 +27,7 @@ from choom.core.links import (
 )
 from choom.core.meetings import create_meeting, filter_meetings, match_meeting, scan_meetings
 from choom.core.mirrors import (
+    capture_reply_tasks,
     capture_task,
     find_mirrors,
     mirror_line,
@@ -53,6 +55,8 @@ from choom.core.models import (
     MirrorResolution,
     Note,
     ParsedTasks,
+    ReplyCapture,
+    ReplyLine,
     SaveResult,
     ScanWarning,
     Task,
@@ -99,6 +103,8 @@ __all__ = [
     "Note",
     "NotFoundError",
     "ParsedTasks",
+    "ReplyCapture",
+    "ReplyLine",
     "SaveResult",
     "ScanWarning",
     "Task",
@@ -107,6 +113,7 @@ __all__ = [
     "Workspace",
     "WorkspaceError",
     "add_task",
+    "capture_reply_tasks",
     "capture_task",
     "check_links",
     "create_document",
@@ -138,6 +145,7 @@ __all__ = [
     "open_daily_note",
     "outbound_for_target",
     "outbound_links",
+    "parse_reply_lines",
     "parse_tags",
     "parse_tasks",
     "propagate_to_documents",

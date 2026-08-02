@@ -15,7 +15,9 @@ def test_echo_mode_proves_the_composed_prompt_reached_argv(
     tmp_path: Path, stub_assistant: Callable[[str], None]
 ) -> None:
     stub_assistant("echo")
-    prompt = compose_prompt("summarise the bullets above", tmp_path / "note.md", 7)
+    prompt = compose_prompt(
+        "summarise the bullets above", tmp_path / "note.md", 7, task_capture=True
+    )
 
     request = start_request(_CLAUDE, prompt, cwd=tmp_path)
     reply = request.wait()

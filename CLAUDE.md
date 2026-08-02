@@ -2,6 +2,15 @@
 
 Repo-specific instructions for Claude Code sessions working on choom.
 
+## Read the constitution first
+
+Before doing any work in this repo — not just spec-driven work via speckit — read
+`.specify/memory/constitution.md`. It defines choom's non-negotiable principles (core vs.
+interface boundaries, the CLI's AI-facing contract, the plain-markdown-only rule, data-loss
+avoidance, and more) and is the authority whenever a convention or a habit conflicts with
+it. This applies to bugfixes, small edits, and any other task, not only work that goes
+through a `speckit-*` skill.
+
 ## Testing
 
 - **Run tests via `scripts/dev-tests.sh`**, not a hand-rolled `pytest` invocation — it
