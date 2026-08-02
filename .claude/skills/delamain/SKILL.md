@@ -1,7 +1,7 @@
 ---
 name: "delamain"
 description: "Autonomously deliver a set of issues or a whole milestone -- routing enhancements through speckit on Opus subagents and bugfix/maintenance work through Sonnet subagents, scheduling what can run in parallel, reviewing every gate, smoke-testing the TUI, and merging green PRs."
-argument-hint: "milestone:<name-or-number> | <issue numbers, e.g. 39 43 60> (omit to be asked)"
+argument-hint: "milestone:<name-or-number> | <issue numbers> [--into <branch>] (omit to be asked)"
 metadata:
   author: "choom"
 user-invocable: true
@@ -52,7 +52,10 @@ construct mid-run.
   Every other kind of problem (a flaky test, a merge conflict, an ambiguous requirement, a
   missing edge case, a lint failure, a CI misconfiguration) you are empowered to resolve
   or direct a subagent to resolve.
-- **Never commit to `main`, never force-push, never merge a PR whose checks are not green.**
+- **Never commit to `main`, never force-push `main`, never merge a PR whose checks are not
+  green.** When running `--into` an integration branch, you never touch `main` at all --
+  merging `<TARGET>` into `main` is the user's decision, not yours, and you stop at handing
+  the branch back.
 - **Never merge a PR that contains only spec/plan/tasks artifacts.** That PR stays open
   until the implement agent has pushed the code onto the same branch.
 - **Every job runs in its own worktree.** You stay in the repo root and coordinate.
@@ -77,6 +80,64 @@ construct mid-run.
 
 Pull each issue's full body. You need it to write subagent prompts and to judge whether the
 issue is ready to build.
+
+### Resolve the target branch
+
+`--into <branch>` sets the **integration branch** every job merges into. Without it, the
+target is `main` and each merge is permanent as it lands.
+
+This repo is trunk-based and should stay that way for ordinary work. An integration branch is
+for one case only: an unattended run long enough that cleaning up `main` afterwards would be
+worse than reviewing everything at once. It lives one night, not one release cycle.
+
+Create it from `main` before scheduling anything, and record the target as `<TARGET>` for the
+rest of the run:
+
+```bash
+git fetch origin
+git push origin origin/main:refs/heads/<branch>   # branch off current main, no local checkout
+```
+
+What changes when `<TARGET>` is not `main`:
+
+- **Every job branches from `origin/<TARGET>`, not `origin/main`.** This is the one that will
+  silently ruin the run if you get it wrong. `worktree.baseRef` is `fresh` in this user's
+  settings, so `EnterWorktree` bases new worktrees on `origin/main` regardless of what you
+  intended. Each agent must therefore re-base explicitly as its first action inside the
+  worktree:
+  ```bash
+  git fetch origin && git checkout -B <job-branch> origin/<TARGET>
+  ```
+  Skip this and feature 2 never sees feature 1's merged work. Nothing fails loudly -- each
+  PR's tests pass in isolation and each merge is clean -- and the semantic conflicts surface
+  the next morning. Put this command in every subagent prompt verbatim, and verify it ran by
+  checking `git merge-base --is-ancestor origin/<TARGET> HEAD` before you merge.
+- **PRs target it**: `gh pr create --base <TARGET>`.
+- **Issues do not auto-close.** GitHub only honours a `Closes #N` in a PR description when the
+  PR merges into the *default* branch. `Closes #N` stays in the body (it is the record of
+  intent, and it fires when `<TARGET>` reaches `main`), but do not verify auto-closure at
+  Step 9 and do not close issues by hand -- they should close when the work actually reaches
+  `main`.
+- **Check what protects `<TARGET>`** with `gh api repos/:owner/:repo/rules/branches/<TARGET>`,
+  and say so in the run plan. The existing `Protect Default` ruleset covers
+  `~DEFAULT_BRANCH` only, so a fresh release branch starts unprotected -- but it can be
+  covered by a ruleset targeting `refs/heads/release/*`, and the rules chosen there change
+  what you are allowed to do:
+  - `required_status_checks` present → the platform enforces Step 9's green-CI gate instead
+    of your discipline alone. This is the rule worth having.
+  - `pull_request` present → merges must go through PRs, which you do anyway.
+  - `deletion` present → `git push origin --delete <TARGET>` is blocked, so the one-command
+    backout is gone. Flag this to the user rather than working around it.
+  - `non_fast_forward` present → you cannot reset `<TARGET>` to a known-good commit, so a
+    tangle of bad merges has to be unwound by revert, as on `main`.
+
+  If you find `deletion` or `non_fast_forward` on `<TARGET>`, the integration branch has the
+  same recovery cost as `main` and most of its point is gone. Say so in the run plan before
+  the go-ahead, rather than discovering it at 3am.
+- **CodeQL may not run** on PRs to a non-default branch (it is default-setup, not a workflow
+  in `.github/workflows/`). `tests.yml` uses an unfiltered `on: pull_request`, so the test
+  matrix does run. Treat the eventual `<TARGET>` → `main` PR as where the full CodeQL sweep
+  happens, and say so when you hand the branch back.
 
 ## Step 2 -- Classify each issue into a lane
 
@@ -108,8 +169,8 @@ running them one after the other.
 - **A direct job may run alongside the in-flight feature** when their scopes are disjoint --
   a `.github/workflows/` change or a docs edit alongside a TUI feature is the normal case.
   Anything touching `src/choom/` while a feature is open gets serialized behind it.
-- Every job branches from current `origin/main`. After each merge, later jobs rebase onto
-  the new `main` before their PR goes green.
+- Every job branches from current `origin/<TARGET>`. After each merge, later jobs rebase onto
+  the new `<TARGET>` before their PR goes green.
 
 ## Step 4 -- Present the run plan, then go
 
@@ -281,8 +342,9 @@ Then merge with a merge commit, matching this repo's history:
 gh pr merge <n> --merge --delete-branch
 ```
 
-Confirm the issue closed. Move to the next wave, and rebase in-flight jobs onto the new
-`main`.
+When `<TARGET>` is `main`, confirm the issue closed. When it is an integration branch, confirm
+it did **not** -- issues close when the work reaches `main`, not before. Either way, move to
+the next wave and rebase in-flight jobs onto the new `<TARGET>`.
 
 You may merge feature PRs, bugfix PRs, and maintenance PRs on these terms. You may not
 merge anything you parked or escalated.
@@ -309,7 +371,7 @@ The ruleset on `main` blocks direct pushes and force-pushes, so the revert goes 
 like anything else:
 
 ```bash
-git checkout -b revert-<feature> origin/main
+git checkout -b revert-<feature> origin/<TARGET>
 git revert -m 1 --no-edit <merge-sha>          # -m 1 keeps main's side of the merge
 git checkout <merge-sha> -- specs/<feature>/   # keep the design; only the code goes back
 git commit -q --amend --no-edit
@@ -321,8 +383,14 @@ editor by default, and an editor in an unattended agent is a hang, not an error.
 
 Keeping `specs/<feature>/` matters: the spec, plan, and tasks passed three review gates and
 are what a re-run builds from. Only the implementation is in question. Verify before opening
-the PR that `git diff origin/main HEAD` shows deletions under `src/`/`tests/` and **nothing**
-under `specs/`.
+the PR that `git diff origin/<TARGET> HEAD` shows deletions under `src/`/`tests/` and
+**nothing** under `specs/`.
+
+When `<TARGET>` is an integration branch the calculus is softer -- nothing has reached `main`,
+so a bad merge is not an incident. Reverting still beats fixing forward for the same reason,
+but if several merges have tangled on top of each other, resetting the whole integration
+branch back to a known-good commit and re-running the affected jobs is legitimate here in a
+way it never is on `main`.
 
 Then:
 
@@ -368,4 +436,17 @@ At the end, give the user:
   to know and the reason they will want the ledger.
 - **Parked**: issue, the reason, and the specific next action (usually `/product-owner <n>`
   or a constitution decision only they can make).
+
+When the run targeted an integration branch, close by handing it back explicitly -- the user
+is deciding whether a night of unattended work reaches `main`, and they should not have to
+reconstruct the state to decide:
+
+- How many merges are on `<TARGET>`, and `git log --oneline --merges origin/main..origin/<TARGET>`.
+- That the issues are still open **by design**, and will close when `<TARGET>` merges.
+- That CodeQL has not swept these changes yet; the `<TARGET>` → `main` PR is where it runs.
+- The two commands, so the decision is one line either way:
+  ```bash
+  gh pr create --base main --head <TARGET> --title "..." --body "Closes #A, Closes #B, ..."
+  git push origin --delete <TARGET>    # or: throw the night away, main never moved
+  ```
 - Whether the milestone is now empty and ready for `/release`.
