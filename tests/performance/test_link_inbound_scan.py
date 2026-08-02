@@ -83,17 +83,37 @@ def test_inbound_links_under_500ms_on_6000_document_workspace(
 
     monkeypatch.setattr(links_module, "find_links", _counting_find_links)
 
-    start = time.perf_counter()
     results = inbound_links(workspace, _TARGET_ID)
-    elapsed = time.perf_counter() - start
 
     assert len(results) == 1
     assert results[0].source == linking_note
     # Deterministic form of the same claim the timing budget below protects: the
     # candidate substring filter runs before parsing, so only the one file whose
     # bytes actually contain the id gets parsed -- not all 6000 (see docstring
-    # on inbound_links). Immune to CI noise, unlike the timing assertion.
+    # on inbound_links). Immune to CI noise, unlike the timing assertion, and is
+    # the assertion that actually catches the regression this test exists for
+    # (see def25fb) -- the elapsed budget below is a secondary backstop.
     assert corpus_parses == 1, (
         f"find_links parsed {corpus_parses} corpus files, want 1 (candidate filter skipped)"
     )
-    assert elapsed < 0.5, f"inbound_links took {elapsed:.3f}s, budget is 0.5s (SC-006)"
+
+    # Best-of-5, same technique as
+    # test_refresh_tick.py::test_refresh_tick_read_stays_inside_one_frame_on_a_representative_month
+    # (established in 016656e), applied here preventively (issue #84): this
+    # test has the same single-sample, bare-absolute-budget, thousands-of-files
+    # shape that flaked on test_scan.py in PR #83, at a comparable corpus size
+    # (6000 files here vs. 2000 there). The deterministic corpus_parses
+    # assertion above already proves the specific regression this test
+    # exists to catch (over-parsing past the candidate filter); this loop
+    # times the monkeypatch-free, unaccounted call so the counting wrapper's
+    # per-call bookkeeping doesn't inflate the measured cost.
+    monkeypatch.undo()
+    samples = []
+    for _ in range(5):
+        start = time.perf_counter()
+        inbound_links(workspace, _TARGET_ID)
+        samples.append(time.perf_counter() - start)
+
+    assert min(samples) < 0.5, (
+        f"inbound_links samples: {[f'{s * 1000:.1f}ms' for s in samples]} (SC-006)"
+    )
