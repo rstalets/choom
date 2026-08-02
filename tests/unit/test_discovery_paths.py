@@ -69,10 +69,7 @@ def test_discovery_path_joins_profile_root_with_the_profiles_relpath() -> None:
 
     root = discovery.profile_root()
     assert discovery.discovery_path(claude) == root / ".claude" / "skills" / "choom" / "SKILL.md"
-    assert (
-        discovery.discovery_path(copilot)
-        == root / ".copilot" / "instructions" / "choom.instructions.md"
-    )
+    assert discovery.discovery_path(copilot) == root / ".copilot" / "skills" / "choom" / "SKILL.md"
 
 
 def test_discovery_path_is_none_for_a_profile_with_no_location() -> None:

@@ -30,21 +30,38 @@ mechanism itself, not decoration.
 
 ## R2 — Where GitHub Copilot CLI reads from, regardless of working directory
 
-**Decision**: `~/.copilot/instructions/choom.instructions.md`.
+**Decision**: `~/.copilot/skills/choom/SKILL.md` — the same artifact, filename, and frontmatter as
+R1's Claude skill.
 
-**Rationale**: Copilot CLI's changelog documents `~/.copilot/instructions/*.instructions.md` as
-"user-level instructions across all repositories", and lists that glob under `/help` alongside the
-other instruction locations. That is the same guarantee the Claude skill gives: read on every
-session, independent of the working directory. Confirmed against Copilot CLI documentation rather
-than assumed, because the spec's FR-017 branch turns on whether such a location exists at all.
+**Rationale**: Copilot CLI reads personal skills from `~/.copilot/skills` (or `~/.agents/skills`),
+as `SKILL.md` files with required `name` and `description` frontmatter, discovered without
+registration — `/skills reload` is needed only to pick one up mid-session. Its documentation defines
+`description` as "what the skill does, **and when Copilot should use it**", which is the same
+matched-against-a-request mechanism Claude skills use, and the same reason the description is
+written as a trigger rather than a label (R10).
+
+Because both products converge on the same shape, the renderer has nothing left to vary between
+them: one rendering serves both.
+
+**Corrected during implementation.** This first read `~/.copilot/instructions/choom.instructions.md`,
+inferred from a changelog line about user-level instructions, and the absence of a `skills/`
+directory under a real `~/.copilot` was taken as corroboration. Both were wrong: the directory is
+simply created on first use, and Copilot's published skills documentation was never consulted. The
+mistake had a real cost beyond the wrong path — an instructions file is always in context, so it
+would have spent tokens in every Copilot session regardless of relevance, while a skill loads only
+when its description matches.
 
 **Alternatives considered**:
 
+- `~/.copilot/instructions/*.instructions.md` (user-level instructions). Rejected once skills were
+  found: always-loaded context for a pointer that is relevant only when the user is working with
+  their notes, and asymmetric with the Claude side for no reason.
+- Plugin-packaged skills (`manifest.json` plus `skills/*.json` under `installed-plugins/`). Rejected:
+  a heavier artifact requiring packaging, where a personal `SKILL.md` needs none.
 - `~/.copilot/agents/*.json` (custom agents). Rejected: an agent is invoked deliberately with
-  `/agent`; it is not ambient context, so it would not be read unless the user already knew to ask
-  for it — which defeats discovery.
-- `~/.copilot/settings.json`. Rejected: settings, not instructions; nothing there reaches the model
-  as context.
+  `/agent`; it is not ambient, so it would not be read unless the user already knew to ask for it —
+  which defeats discovery.
+- `~/.copilot/settings.json`. Rejected: settings, not context; nothing there reaches the model.
 
 **Consequence for FR-017**: both supported assistants have a location, so the "no location that
 fits" branch is unreachable today. It is still implemented, because `AssistantProfile` is the

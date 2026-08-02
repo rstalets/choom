@@ -33,12 +33,39 @@ MARKER = (
     "Rewritten on every run; edits are lost. -->"
 )
 
-#: What choom is, in one line -- reused for both the rendered body and, for the Claude
-#: skill, the frontmatter `description` an assistant matches against to decide whether
-#: the skill is relevant (research R1), so it has to carry the same fact either way.
+#: What choom is, in one line, for the rendered body.
 _WHAT_CHOOM_IS = (
     "choom is a plain-Markdown notes and meeting tool; this workspace holds the "
     "user's notes and meetings."
+)
+
+#: The skill's frontmatter `description` -- what an assistant matches a request
+#: against to decide whether to open the skill at all (research R1), which makes it the
+#: one string in this file that has to describe *when* choom is relevant rather than
+#: what it is. A description that only names the tool gives a request like "write this
+#: up" nothing to match on, so the skill is only ever used when the user names it --
+#: which is the manual instruction this whole feature exists to remove.
+#:
+#: Deliberately not `_WHAT_CHOOM_IS`: the body is read once the pointer is already being
+#: followed and can be declarative, while this is read cold, against a request, and has
+#: to earn the open. Deliberately possessive throughout ("the user's own", "notes of
+#: their own") to keep it to personal notes -- "notes" is a common word, and a skill
+#: that fires on release notes or notes in a code review is noise the user learns to
+#: resent.
+#:
+#: Restating `AGENTS.md` is still forbidden (FR-003), and this does not: when to reach
+#: for choom is not in `AGENTS.md` and cannot be inferred by following the pointer.
+#:
+#: Kept to a single line: it sits inside the file's 20-line budget (FR-004), and a
+#: folded YAML block would spend three or four lines of it on wrapping alone. Contains
+#: no ": " or " #" sequence, either of which would end a plain YAML scalar early.
+_WHEN_TO_USE_CHOOM = (
+    "The user's own meeting notes, daily notes, and task list live in a choom "
+    "workspace on this machine. Use it whenever they ask to write up or find a "
+    "meeting, capture a note or a thought, add or tick off a task, or refer to notes "
+    "of their own -- including implicit requests like write this up, add a follow-up "
+    "for that, or what did I decide about the renewal. Says where the workspace is "
+    "and where its instructions are."
 )
 
 
@@ -72,11 +99,14 @@ def render_discovery_file(workspace: Workspace, profile: AssistantProfile) -> st
     cannot be inferred by following the pointer is only that choom exists, where the
     workspace is, and that `AGENTS.md` holds the rest -- so that is all this carries.
 
-    Differs only in the wrapper each assistant expects (research R10): YAML frontmatter
-    naming the Claude Code skill, or a plain heading for the Copilot CLI instructions
-    file. The body is otherwise identical, and the workspace's absolute path sits alone
-    on its own line, unquoted, so spaces and non-ASCII characters need no escaping
-    rules the reader has to know (FR-018).
+    Identical for every supported assistant, because both read the same artifact: a
+    `SKILL.md` with `name` and `description` frontmatter, dropped into a user-scope
+    skills directory, discovered without registration and loaded only when its
+    `description` matches a request (research R1, R2). `profile` is still taken so a
+    future assistant wanting a different wrapper has somewhere to put it.
+
+    The workspace's absolute path sits alone on its own line, unquoted, so spaces and
+    non-ASCII characters need no escaping rules the reader has to know (FR-018).
     """
     body = (
         f"{_WHAT_CHOOM_IS}\n"
@@ -91,10 +121,8 @@ def render_discovery_file(workspace: Workspace, profile: AssistantProfile) -> st
         "\n"
         f"{MARKER}\n"
     )
-    if profile.name == "claude":
-        frontmatter = f"---\nname: choom\ndescription: {_WHAT_CHOOM_IS}\n---\n\n"
-        return f"{frontmatter}# choom\n\n{body}"
-    return f"# choom\n\n{body}"
+    frontmatter = f"---\nname: choom\ndescription: {_WHEN_TO_USE_CHOOM}\n---\n\n"
+    return f"{frontmatter}# choom\n\n{body}"
 
 
 def installed_discovery_path() -> Path | None:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import yaml
+
 from choom.core.assistants import PROFILES
 from choom.core.discovery import MARKER, render_discovery_file
 from choom.core.models import Workspace
@@ -71,19 +73,53 @@ def test_no_agents_md_content_is_restated() -> None:
             assert needle not in text, f"{profile.name}'s discovery file restates {needle!r}"
 
 
-def test_claude_wrapper_carries_frontmatter_and_copilot_does_not() -> None:
+def test_every_profile_gets_the_same_skill_file() -> None:
+    """Both supported assistants read the same artifact -- a `SKILL.md` carrying `name`
+    and `description` frontmatter, dropped into a user-scope skills directory and
+    discovered without registration -- so there is nothing left for the renderer to
+    vary between them (research R1, R2). Asserted rather than assumed: a divergence
+    here would mean one assistant silently receives a file it cannot parse.
+    """
     workspace = _workspace(Path("/tmp/choom-example"))
-    claude = next(p for p in PROFILES if p.name == "claude")
-    copilot = next(p for p in PROFILES if p.name == "copilot")
+    rendered = {p.name: render_discovery_file(workspace, p) for p in PROFILES}
 
-    claude_text = render_discovery_file(workspace, claude)
-    assert claude_text.startswith("---\n")
-    assert "name: choom" in claude_text
-    assert "description:" in claude_text
+    for name, text in rendered.items():
+        assert text.startswith("---\n"), f"{name} lost its frontmatter"
+        assert "name: choom" in text
+        assert "description:" in text
 
-    copilot_text = render_discovery_file(workspace, copilot)
-    assert not copilot_text.startswith("---\n")
-    assert copilot_text.startswith("# choom\n")
+    assert len(set(rendered.values())) == 1
+
+
+def test_frontmatter_parses_as_yaml_and_says_when_to_use_the_skill() -> None:
+    """The frontmatter is the skill's whole discovery mechanism: an assistant matches
+    a request against `description` to decide whether to open the skill at all, so it
+    has to parse, and it has to describe *when* choom is relevant rather than only what
+    it is. A description naming the tool alone gives a request like "write this up"
+    nothing to match, leaving the skill usable only when the user names it -- the manual
+    instruction this feature exists to remove.
+
+    Parsing is not a formality. The description is a plain YAML scalar, so a stray
+    ": " or " #" inside it would silently truncate the value or end the document, and
+    the failure would show up as a skill that never triggers rather than as an error.
+    """
+    workspace = _workspace(Path("/tmp/choom-example"))
+    for profile in PROFILES:
+        text = render_discovery_file(workspace, profile)
+
+        _, _, rest = text.partition("---\n")
+        block, _, _ = rest.partition("\n---\n")
+        parsed = yaml.safe_load(block)
+
+        # Both products require `name` to be a lowercase identifier.
+        assert parsed["name"] == "choom"
+        description = parsed["description"]
+        # The whole sentence survived the scalar, not just its first clause.
+        assert description.endswith("where its instructions are.")
+        # It names the situations to use it in, not only the tool.
+        assert "Use it whenever" in description
+        for trigger in ("meeting", "note", "task"):
+            assert trigger in description.lower()
 
 
 def test_points_at_agents_md_and_names_what_choom_is() -> None:

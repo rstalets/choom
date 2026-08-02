@@ -103,7 +103,7 @@ PROFILES: tuple[AssistantProfile, ...] = (
         parse_reply=_copilot_parse_reply,
         # Copilot CLI's documented "user-level instructions across all repositories"
         # location (research R2).
-        discovery_relpath=PurePosixPath(".copilot/instructions/choom.instructions.md"),
+        discovery_relpath=PurePosixPath(".copilot/skills/choom/SKILL.md"),
     ),
 )
 

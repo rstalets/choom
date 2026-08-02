@@ -92,7 +92,7 @@ grep -c choom-qs /tmp/choom-qs2/../../root/.claude/skills/choom/SKILL.md 2>/dev/
 
 ```bash
 choom config assistant copilot
-ls ~/.claude/skills/choom/SKILL.md ~/.copilot/instructions/choom.instructions.md
+ls ~/.claude/skills/choom/SKILL.md ~/.copilot/skills/choom/SKILL.md
 ```
 
 **Expect**: exactly one exists — the Copilot one. The Claude file was removed because it carried
@@ -134,7 +134,7 @@ command. `choom init` with no `--assistant` in a fourth directory installs nothi
 
 ```bash
 rm -rf /tmp/choom-qs /tmp/choom-qs2 /tmp/choom-qs3
-rm -f ~/.claude/skills/choom/SKILL.md ~/.copilot/instructions/choom.instructions.md
+rm -f ~/.claude/skills/choom/SKILL.md ~/.copilot/skills/choom/SKILL.md
 ```
 
 Restore any file you backed up in Prerequisites.

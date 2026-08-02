@@ -12,7 +12,7 @@ facing artifact, and the only file choom writes outside the workspace.
 | Assistant | Path | Read by that tool when |
 |---|---|---|
 | `claude` | `<profile>/.claude/skills/choom/SKILL.md` | every session, any working directory |
-| `copilot` | `<profile>/.copilot/instructions/choom.instructions.md` | every session, all repositories |
+| `copilot` | `<profile>/.copilot/skills/choom/SKILL.md` | matched against a request, any working directory |
 
 `<profile>` is `Path.home()` — `%USERPROFILE%` on Windows. Missing directories are created
 (FR-011). Both relative paths are short enough to be irrelevant to the Windows 260-character limit.
@@ -22,7 +22,7 @@ facing artifact, and the only file choom writes outside the workspace.
 ```markdown
 ---
 name: choom
-description: <one line: what choom is, and that this workspace holds the user's notes>
+description: <one line: when to reach for choom -- the situations and requests it serves>
 ---
 
 # choom
@@ -41,8 +41,33 @@ the commands, the layout, and the file format this tool expects.
 
 ## Shape — `copilot`
 
-The same body under a plain `# choom` heading, without the frontmatter. Content is identical; only
-the wrapper each tool expects differs.
+Byte-identical to the above. Both products read a `SKILL.md` with required `name` and `description`
+frontmatter from a user-scope skills directory, discovered without registration, so there is nothing
+for the renderer to vary between them. `render_discovery_file` still takes the profile, so a future
+assistant wanting a different wrapper has somewhere to put it.
+
+## The `description` field is the trigger, not a label
+
+A skill is loaded *conditionally*: the assistant matches a request against `description` to decide
+whether to open the file at all. So this one field decides whether the feature works unprompted or
+only when the user names choom by hand — which is the manual instruction the whole feature exists to
+remove. It therefore states **when to reach for choom** (write up or find a meeting, capture a note,
+add or tick off a task, refer to notes of their own, including implicit requests like "write this
+up"), not merely what choom is.
+
+Two constraints on it:
+
+- **Possessive framing throughout** — "the user's own", "notes of their own". "Notes" is a common
+  word, and a skill that fires on release notes or notes in a code review is noise a user learns to
+  resent. Over-triggering is the opposite failure to not triggering, and just as real.
+- **A single line.** It lives inside the file's 20-line budget, and a folded YAML block would spend
+  three or four lines on wrapping alone. It must contain no `": "` or `" #"` sequence — either ends
+  a plain YAML scalar early, and the symptom would be a skill that silently never triggers rather
+  than a parse error anyone notices.
+
+This applies to both assistants equally. Copilot's own documentation defines `description` as "what
+the skill does, and when Copilot should use it" — the same matched-against-a-request mechanism, so
+the same wording serves both.
 
 ## Rules
 

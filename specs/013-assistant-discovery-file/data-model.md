@@ -25,7 +25,7 @@ persisted.
 | Assistant | `discovery_relpath` |
 |---|---|
 | `claude` | `.claude/skills/choom/SKILL.md` |
-| `copilot` | `.copilot/instructions/choom.instructions.md` |
+| `copilot` | `.copilot/skills/choom/SKILL.md` |
 
 **Rules**:
 
@@ -41,7 +41,7 @@ Not a dataclass — a rendered string written to disk. Modelled here because its
 
 | Element | Rule |
 |---|---|
-| Wrapper | Per assistant: YAML frontmatter (`name`, `description`) for the Claude skill; a plain markdown heading for the Copilot instructions file. |
+| Wrapper | YAML frontmatter carrying `name` and `description`, identical for every supported assistant — both read a `SKILL.md` from a user-scope skills directory. |
 | What choom is | One line. |
 | Workspace path | The resolved absolute path, alone on its own line, unquoted and unwrapped, so spaces and non-ASCII characters need no escaping rules (FR-018). |
 | Pointer | An instruction to read that workspace's `AGENTS.md` before creating or changing anything. |
