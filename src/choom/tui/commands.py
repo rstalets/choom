@@ -21,7 +21,12 @@ VERB_TABLE: tuple[Verb, ...] = (
     Verb("notes", None, "", "Switch to the Notes collection"),
     Verb("tasks", None, "", "Switch to the Tasks collection"),
     Verb("init", None, "", "Registered, no TUI action (reserved)"),
-    Verb("config", None, "assistant <claude|copilot|none>", "Set which AI assistant /ai calls"),
+    Verb(
+        "config",
+        None,
+        "assistant <claude|copilot|none> | view <horizontal|vertical>",
+        "Set the AI assistant, or the list/preview view orientation",
+    ),
 )
 
 _BY_TOKEN: dict[str, Verb] = {}

@@ -11,43 +11,65 @@ from pathlib import Path
 import pytest
 
 from choom.cli.main import main
-from choom.core import discovery
+from choom.core import discovery, preferences
 from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.core.workspace import init_workspace
 
 
 @pytest.fixture(autouse=True)
-def _isolated_profile_root(
+def _isolated_profile_and_preferences_roots(
     tmp_path_factory: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch
 ) -> Path:
-    """Redirect every discovery-file path into a scratch directory (013-assistant-
-    discovery-file, research R13). `choom.core.discovery.profile_root()` is the single
-    seam the whole feature is built on -- every path `discovery.py` computes starts
-    from it -- so patching it here, autouse, is what keeps a forgotten test from ever
-    writing into a developer's real `~/.claude` or `~/.copilot`.
+    """Redirect every discovery-file path (013-assistant-discovery-file, research R13)
+    *and* every preferences-file path (020-vertical-tui-mode, research R5) into a
+    scratch directory. `choom.core.discovery.profile_root()` and
+    `choom.core.preferences.preferences_root()` are each the single seam their own
+    feature is built on -- every path either module computes starts from its own
+    resolver -- so patching both here, autouse, is what keeps a forgotten test from
+    ever writing into a developer's real `~/.claude`, `~/.copilot`,
+    `~/.config/choom`, or `%LOCALAPPDATA%\\choom`.
 
     Uses `tmp_path_factory`, not the test's own `tmp_path`: several existing tests
     (e.g. `test_atomic_write.py`) assert the exact contents of their `tmp_path`, and a
     fake profile root nested inside it would show up as an extra, unexpected entry.
     `tmp_path_factory.mktemp` allocates an unrelated directory instead, so this fixture
-    cannot perturb any test that never touches a discovery path.
+    cannot perturb any test that never touches a discovery or preferences path.
 
-    Sets `HOME`/`USERPROFILE` in the environment *as well as* patching the function
-    directly. The `monkeypatch.setattr` alone only reaches this process: several
+    Isolates at **both** levels, for each resolver:
+
+    - `monkeypatch.setattr` on the resolver function itself (`discovery.profile_root`,
+      `preferences.preferences_root`), reaching every in-process call.
+    - `monkeypatch.setenv` for every environment variable either resolver reads
+      (`HOME`, `USERPROFILE`, and -- new for preferences -- `LOCALAPPDATA`,
+      `APPDATA`, `XDG_CONFIG_HOME`), reaching a real child process too.
+
+    Both are required. The `setattr` alone only reaches this process: several
     `tests/contract/` tests run choom as a real child process
     (`subprocess.run([sys.executable, "-m", "choom", ...])`, e.g.
-    `test_non_blocking.py`), which gets a fresh interpreter that never sees the patched
-    symbol and would otherwise resolve `Path.home()` for real. `monkeypatch.setenv`
-    mutates `os.environ`, which every child process inherits, and `Path.home()` reads
-    `$HOME` on POSIX and `%USERPROFILE%` on Windows -- so this closes that hole too.
-    The `setattr` stays as well: belt and braces, and it is what a purely in-process
-    test actually exercises.
+    `test_non_blocking.py`), which gets a fresh interpreter that never sees a patched
+    symbol -- it would resolve `Path.home()`/read the real environment for real.
+    `monkeypatch.setenv` mutates `os.environ`, which every child process inherits, so
+    this closes that hole. The `setattr` stays as well: belt and braces, and it is
+    what a purely in-process test actually exercises. Half a fix here looks exactly
+    like a whole one.
+
+    Note the asymmetry this leaves, deliberately: the in-process patch makes
+    `preferences.preferences_root()` return `root` itself, while an unpatched (real
+    child-process) call resolves to `root / "choom"` (via `XDG_CONFIG_HOME`, on
+    POSIX) or `root / "choom"` (via `LOCALAPPDATA`, on Windows) -- one level deeper.
+    Both stay inside the same isolated tree; a test that spawns a subprocess and
+    checks the preferences file on disk should look for it one level below what an
+    in-process `preferences_root()` call reports.
     """
     root = tmp_path_factory.mktemp("profile_root")
     monkeypatch.setattr(discovery, "profile_root", lambda: root)
+    monkeypatch.setattr(preferences, "preferences_root", lambda: root)
     monkeypatch.setenv("HOME", str(root))
     monkeypatch.setenv("USERPROFILE", str(root))
+    monkeypatch.setenv("LOCALAPPDATA", str(root))
+    monkeypatch.setenv("APPDATA", str(root))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(root))
     return root
 
 

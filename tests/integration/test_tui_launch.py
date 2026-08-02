@@ -163,3 +163,22 @@ def test_a_run_that_never_returns_yet_does_not_restore(
     assert observed["written"] == [_enter_bytes(tmp_workspace)]
     assert CLEAR not in "".join(observed["written"])
     assert POP not in "".join(observed["written"])
+
+
+# --- T008 (020-vertical-tui-mode): the stored view-orientation preference is
+# read once, at construction, alongside the rest of the session state.
+
+
+async def test_view_orientation_reads_horizontal_with_no_preferences_file(
+    tmp_workspace: Workspace,
+) -> None:
+    app = ChoomApp(tmp_workspace)
+    assert app.view_orientation == "horizontal"
+
+
+async def test_view_orientation_reads_vertical_when_stored(tmp_workspace: Workspace) -> None:
+    from choom.core.preferences import set_view_orientation
+
+    set_view_orientation("vertical")
+    app = ChoomApp(tmp_workspace)
+    assert app.view_orientation == "vertical"
