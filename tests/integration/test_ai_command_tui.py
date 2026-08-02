@@ -102,6 +102,74 @@ async def test_reply_with_task_lines_captures_real_linked_tasks(
         assert editor.has_focus
 
 
+async def test_unwritable_tasks_md_still_lands_the_whole_reply(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    """T031: a failed capture never costs the reply (US5). With tasks.md
+    unwritable, every line of the reply still reaches the buffer -- the task
+    lines exactly as the assistant wrote them, since none could be captured
+    -- and the status bar names the failure."""
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("reply_with_tasks")
+
+    root = tmp_workspace.root
+    original_mode = root.stat().st_mode
+    root.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        app = ChoomApp(tmp_workspace)
+        async with app.run_test(size=(80, 24)) as pilot:
+            screen = await open_edit(app, pilot)
+            editor = screen.query_one("#editor", TextArea)
+
+            line_index = await submit_editor_line(pilot, editor, "/ai summarise and track")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+
+            expected_lines = [
+                "Here is a summary of the discussion.",
+                "/task call Terry about the renewal",
+                "One more thing worth tracking down the line.",
+                "/task.followup review the budget numbers #finance",
+            ]
+            actual_lines = [
+                editor.get_line(line_index + offset).plain for offset in range(len(expected_lines))
+            ]
+            assert actual_lines == expected_lines  # no line lost, none captured
+
+            status = screen.query_one(StatusBar)
+            status_text = str(status.content)
+            assert "⚠" in status_text
+            assert "could not write" in status_text
+    finally:
+        root.chmod(original_mode)
+
+
+async def test_cancelled_request_with_task_lines_pending_creates_no_task(
+    tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
+) -> None:
+    """T032 (FR-019, research R5): a request cancelled before the reply is
+    used must create nothing -- the capture runs only for a reply that will
+    actually be inserted."""
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    stub_assistant("sleep")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        screen = await open_edit(app, pilot)
+        editor = screen.query_one("#editor", TextArea)
+
+        line_index = await submit_editor_line(pilot, editor, "/ai anything")
+        assert screen._request is not None
+
+        await pilot.press("ctrl+c")
+        await app.workers.wait_for_complete()
+        await pilot.pause()
+
+        assert editor.get_line(line_index).plain == "/ai anything"
+        tasks, _warnings = load_tasks(tmp_workspace)
+        assert tasks == []
+
+
 async def test_reply_containing_a_slash_ai_line_is_inserted_as_literal_text(
     tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
 ) -> None:

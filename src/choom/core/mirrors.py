@@ -179,33 +179,48 @@ def capture_reply_tasks(
 
     Returns `ReplyCapture(text, tasks, warnings)`. When `text` has no eligible line, the
     returned `text` is `text` itself -- the same object -- and no read or write happens
-    (FR-011).
+    (FR-011). No line is ever lost, under any failure: a line whose capture raises
+    `UsageError` (an empty description after `#tag` removal, or a rejected type or tag
+    token) or `WorkspaceError` (tasks.md could not be written) is left exactly as the
+    assistant wrote it, with a `ScanWarning(reason="reply_capture_failed")` recorded for
+    it, and the walk continues to the next line (FR-016, FR-017, research R10).
 
-    Raises: UsageError or WorkspaceError, propagated from `capture_task`, on the first
-    line that cannot be captured -- this is the success-path implementation; per-line
-    failure recovery lands separately.
+    Raises: nothing from the two documented failure modes above -- both are caught and
+    reported as warnings. Any other exception propagates; a bug here should be loud.
     """
     lines = parse_reply_lines(text)
     if not any(line.task is not None for line in lines):
         return ReplyCapture(text=text, tasks=(), warnings=())
 
     tasks: list[Task] = []
+    warnings: list[ScanWarning] = []
     out_lines: list[str] = []
     for line in lines:
         if line.task is None:
             out_lines.append(line.text)
             continue
-        task, mirror = capture_task(
-            workspace,
-            line.task.argument,
-            type=line.task.suffix,
-            source=source,
-            source_id=source_id,
-        )
+        try:
+            task, mirror = capture_task(
+                workspace,
+                line.task.argument,
+                type=line.task.suffix,
+                source=source,
+                source_id=source_id,
+            )
+        except (UsageError, WorkspaceError) as exc:
+            warnings.append(
+                ScanWarning(
+                    path=workspace.tasks_file,
+                    reason="reply_capture_failed",
+                    message=str(exc),
+                )
+            )
+            out_lines.append(line.text)
+            continue
         tasks.append(task)
         out_lines.append(mirror)
 
-    return ReplyCapture(text="\n".join(out_lines), tasks=tuple(tasks), warnings=())
+    return ReplyCapture(text="\n".join(out_lines), tasks=tuple(tasks), warnings=tuple(warnings))
 
 
 # --- The non-stamping write -------------------------------------------------------

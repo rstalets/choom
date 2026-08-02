@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import stat
 
 from choom.core.meetings import create_meeting
 from choom.core.mirrors import capture_reply_tasks, capture_task
@@ -112,3 +113,89 @@ def test_a_reply_captured_task_matches_a_typed_capture_of_the_same_words(
     assert len(saved_lines) == 2
     normalised = [_ID_OR_CREATED.sub(r"\1:X", line) for line in saved_lines]
     assert normalised[0] == normalised[1]
+
+
+# --- T028: partial and total failure never cost a line (US5) -------------------
+
+
+def test_one_failure_among_several_still_captures_the_rest_in_order(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    text = "/task first thing\n/task #onlytags\n/task third thing"
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
+
+    lines = capture.text.split("\n")
+    assert len(lines) == 3  # no line ever lost
+    assert lines[1] == "/task #onlytags"  # the failing line survives as text
+    assert lines[0] != "/task first thing"  # the other two were captured
+    assert lines[2] != "/task third thing"
+
+    assert [t.text for t in capture.tasks] == ["first thing", "third thing"]
+    assert len(capture.warnings) == 1
+    assert capture.warnings[0].reason == "reply_capture_failed"
+    assert capture.warnings[0].path == tmp_workspace.tasks_file
+
+
+def test_every_capture_failing_leaves_the_text_identical_and_warns_per_line(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    text = "/task #tag1\n/task #tag2"
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
+
+    assert len(capture.text.split("\n")) == 2  # no line ever lost
+    assert capture.text == text
+    assert capture.tasks == ()
+    assert len(capture.warnings) == 2
+
+
+def test_bare_task_with_no_description_lands_as_text_with_a_warning(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    text = "before\n/task\nafter"
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
+
+    lines = capture.text.split("\n")
+    assert len(lines) == 3
+    assert lines == ["before", "/task", "after"]
+    assert capture.tasks == ()
+    assert len(capture.warnings) == 1
+
+
+def test_a_description_that_is_only_tags_fails_loudly_rather_than_dropping_them(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    text = "/task #urgent #procurement"
+    capture = capture_reply_tasks(tmp_workspace, text, source=meeting.path, source_id=meeting.id)
+
+    assert capture.text == text  # the tags are not silently dropped
+    assert capture.tasks == ()
+    assert len(capture.warnings) == 1
+    assert capture.warnings[0].reason == "reply_capture_failed"
+
+
+def test_an_unwritable_tasks_md_fails_the_line_without_losing_the_reply(
+    tmp_workspace: Workspace,
+) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    text = "intro\n/task call Terry\noutro"
+
+    root = tmp_workspace.root
+    original_mode = root.stat().st_mode
+    root.chmod(stat.S_IRUSR | stat.S_IXUSR)
+    try:
+        capture = capture_reply_tasks(
+            tmp_workspace, text, source=meeting.path, source_id=meeting.id
+        )
+    finally:
+        root.chmod(original_mode)
+
+    lines = capture.text.split("\n")
+    assert len(lines) == 3  # no line ever lost
+    assert lines == ["intro", "/task call Terry", "outro"]
+    assert capture.tasks == ()
+    assert len(capture.warnings) == 1
+    assert capture.warnings[0].reason == "reply_capture_failed"
