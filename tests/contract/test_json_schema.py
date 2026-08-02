@@ -129,10 +129,21 @@ def test_task_show_json_matches_the_shape_of_a_list_entry(
     assert show_record["body"] == ""
 
 
-EXPECTED_CONFIG_ASSISTANT_KEYS = {"configured", "resolved", "source", "available"}
+#: The four keys this surface carried before 013-assistant-discovery-file. Adding a
+#: key is a minor change (constitution II); this set exists so a future change that
+#: renames or removes one of these four -- the one thing that would actually be
+#: breaking -- fails loudly here rather than passing by accident.
+PRE_EXISTING_CONFIG_ASSISTANT_KEYS = {"configured", "resolved", "source", "available"}
+
+#: The two keys 013-assistant-discovery-file adds (FR-016, FR-033): `discovery_file`
+#: (absolute path string, or null) and `launch_offer_made` (boolean).
+EXPECTED_CONFIG_ASSISTANT_KEYS = PRE_EXISTING_CONFIG_ASSISTANT_KEYS | {
+    "discovery_file",
+    "launch_offer_made",
+}
 
 
-def test_config_assistant_json_has_exactly_four_keys_and_available_is_never_null(
+def test_config_assistant_json_keys_and_available_is_never_null(
     tmp_path: Path, monkeypatch, capsys
 ) -> None:
     monkeypatch.chdir(tmp_path)
@@ -145,6 +156,8 @@ def test_config_assistant_json_has_exactly_four_keys_and_available_is_never_null
     assert record["configured"] is None
     assert record["available"] == [] or isinstance(record["available"], list)
     assert record["available"] is not None
+    assert record["discovery_file"] is None
+    assert record["launch_offer_made"] is False
 
     main(["config", "assistant", "claude"])
     capsys.readouterr()
@@ -154,3 +167,9 @@ def test_config_assistant_json_has_exactly_four_keys_and_available_is_never_null
     assert record["configured"] == "claude"
     assert record["resolved"] == "claude"
     assert record["source"] == "configured"
+    # discovery_file/launch_offer_made depend on whether a real `claude` profile
+    # location was writable in the test's isolated profile root -- covered in depth
+    # by tests/contract/test_config_assistant_cli.py; only the key set and types
+    # matter here.
+    assert record["discovery_file"] is None or isinstance(record["discovery_file"], str)
+    assert isinstance(record["launch_offer_made"], bool)

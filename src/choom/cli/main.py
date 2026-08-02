@@ -23,9 +23,19 @@ from choom.cli.output import (
     relative_path,
 )
 from choom.core.assistants import resolve_assistant
-from choom.core.config import LEGAL_ASSISTANT_VALUES, get_assistant, set_assistant
+from choom.core.config import (
+    LEGAL_ASSISTANT_VALUES,
+    get_assistant,
+    get_launch_offer_made,
+    set_assistant,
+    set_launch_offer_made,
+)
 from choom.core.deletion import delete_by_id
-from choom.core.discovery import install_discovery_file
+from choom.core.discovery import (
+    install_discovery_file,
+    installed_discovery_path,
+    remove_discovery_files,
+)
 from choom.core.documents import filter_documents
 from choom.core.errors import ChoomError, NotFoundError, UsageError, WorkspaceError
 from choom.core.links import check_links, heal_links, links_for_id, resolve_id
@@ -466,18 +476,23 @@ def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
 
     if namespace.value is not None:
         set_assistant(workspace, namespace.value)
-        if namespace.value != "none":
-            profile = resolve_assistant(namespace.value).profile
-            assert profile is not None  # namespace.value is claude or copilot here
-            try:
-                install_discovery_file(workspace, profile)
-            except WorkspaceError:
-                pass
+        # An explicit set outranks an earlier declined launch offer (FR-028): clear
+        # the record so a later launch can offer again if there is once more
+        # something to offer. Best-effort -- the setting write just above already
+        # succeeded against this same file, so a subsequent failure here is not
+        # expected, but it must not turn into a command failure either way (FR-013).
+        try:
+            set_launch_offer_made(workspace, False)
+        except WorkspaceError:
+            pass
+        _report_discovery_outcome(workspace, namespace.value)
         return 0
 
     configured = get_assistant(workspace)
     resolved = resolve_assistant(configured)
     resolved_name = resolved.profile.name if resolved.profile is not None else None
+    discovery_file = installed_discovery_path()
+    launch_offer_made = get_launch_offer_made(workspace)
 
     if namespace.json:
         print(
@@ -487,6 +502,8 @@ def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
                     "resolved": resolved_name,
                     "source": resolved.source,
                     "available": list(resolved.available),
+                    "discovery_file": str(discovery_file) if discovery_file is not None else None,
+                    "launch_offer_made": launch_offer_made,
                 },
                 ensure_ascii=False,
             )
@@ -496,7 +513,44 @@ def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
         print(f"resolved\t{resolved_name or '-'}")
         print(f"source\t{resolved.source}")
         print(f"available\t{','.join(resolved.available) or '-'}")
+        print(f"discovery\t{discovery_file or '-'}")
+        print(f"offered\t{'yes' if launch_offer_made else 'no'}")
     return 0
+
+
+def _report_discovery_outcome(workspace: Workspace, value: str) -> None:
+    """The discovery-file side effect of a successful set, reported on stderr --
+    stdout stays empty on a set, always (research R8) -- and never affects the exit
+    code (FR-013): the setting write above has already decided it.
+
+    `none` removes every choom-owned file (FR-009); any other legal value installs
+    the file for that assistant, removing what a previously configured assistant
+    left behind (FR-008, handled inside `install_discovery_file`).
+    """
+    if value == "none":
+        removed, warnings = remove_discovery_files()
+        for warning in warnings:
+            print_error(warning)
+        if removed:
+            print_error(f"removed discovery file: {removed[0]}")
+        else:
+            print_error("no discovery file was installed")
+        return
+
+    profile = resolve_assistant(value).profile
+    assert profile is not None  # value is "claude" or "copilot" here: a legal,
+    # recognised name resolves immediately (never falls through to detection), so
+    # this can only be None if LEGAL_ASSISTANT_VALUES and PROFILES disagree -- a
+    # programming error, not a runtime case to handle gracefully.
+    try:
+        path = install_discovery_file(workspace, profile)
+    except WorkspaceError as exc:
+        print_error(f"discovery file not installed: {exc}")
+        return
+    if path is None:
+        print_error(f"no discovery file for {profile.name}")
+    else:
+        print_error(f"installed discovery file at {path}")
 
 
 def _resolve_link_paths(workspace: Workspace, raw_paths: list[str]) -> tuple[Path, ...]:

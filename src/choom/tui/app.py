@@ -14,7 +14,11 @@ from choom.core.config import (
     set_assistant,
     set_launch_offer_made,
 )
-from choom.core.discovery import install_discovery_file, should_offer_discovery
+from choom.core.discovery import (
+    install_discovery_file,
+    remove_discovery_files,
+    should_offer_discovery,
+)
 from choom.core.documents import (
     list_months,
     match_document,
@@ -350,9 +354,9 @@ class ChoomApp(App[None]):
 
     def handle_config_command(self, argument: str) -> str | None:
         """Handle `/config <setting> [<value>]` from the command bar (research
-        R11). Returns a status-bar message, or None on a silent successful
-        write -- reading or a bad value always reports something, matching
-        the CLI peer's behaviour (FR-025-029)."""
+        R11). Returns a status-bar message; a set always reports the discovery-file
+        outcome (FR-015), matching the CLI peer's stderr line in substance -- the two
+        interfaces report the same result in their own idiom."""
         setting_name, _, value = argument.partition(" ")
         if setting_name != "assistant":
             return f"unknown setting: {setting_name!r}"
@@ -372,14 +376,38 @@ class ChoomApp(App[None]):
             return f"assistant must be one of {accepted}; got {value!r}"
 
         set_assistant(self.workspace, value)
-        if value != "none":
-            profile = resolve_assistant(value).profile
-            assert profile is not None  # value is claude or copilot here
-            try:
-                install_discovery_file(self.workspace, profile)
-            except WorkspaceError:
-                pass
-        return None
+        # An explicit set outranks an earlier declined launch offer (FR-028); see
+        # the CLI's _report_discovery_outcome for why this is best-effort.
+        try:
+            set_launch_offer_made(self.workspace, False)
+        except WorkspaceError:
+            pass
+        return self._describe_discovery_outcome(value)
+
+    def _describe_discovery_outcome(self, value: str) -> str:
+        """The discovery-file side effect of a successful `/config assistant <value>`,
+        worded for the status bar (FR-014, FR-015) -- the TUI's peer to the CLI's
+        `_report_discovery_outcome`. `none` removes every choom-owned file (FR-009);
+        any other legal value installs the file for that assistant."""
+        if value == "none":
+            removed, warnings = remove_discovery_files()
+            if warnings:
+                return "; ".join(warnings)
+            return (
+                "assistant set to none; discovery file removed"
+                if removed
+                else "assistant set to none"
+            )
+
+        profile = resolve_assistant(value).profile
+        assert profile is not None  # value is "claude" or "copilot" here
+        try:
+            path = install_discovery_file(self.workspace, profile)
+        except WorkspaceError as exc:
+            return f"assistant set to {value}; discovery file not installed: {exc}"
+        if path is None:
+            return f"assistant set to {value}; no discovery file for {value}"
+        return f"assistant set to {value}; discovery file installed at {path}"
 
     def toggle_task_and_track(self, task_id: str) -> None:
         """Flip one task's state and, once that write has succeeded, push it

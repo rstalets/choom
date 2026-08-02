@@ -3,9 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from choom.cli.main import main
+from choom.core.discovery import discovery_path
 from choom.core.models import Workspace
 from choom.core.workspace import init_workspace
 from choom.tui.app import ChoomApp
+from choom.tui.status_bar import StatusBar
 from tests.helpers import open_bar, type_command
 
 
@@ -62,3 +64,24 @@ async def test_config_predating_this_feature_reads_without_error(
         await pilot.pause()
         # No crash, and the workspace opened normally.
         assert app.active == "tasks"
+
+
+async def test_tui_reports_the_discovery_outcome_in_the_status_bar(
+    tmp_workspace: Workspace,
+) -> None:
+    # 013-assistant-discovery-file, US4/T033: the TUI's peer to the CLI's stderr
+    # line -- the two interfaces report the same result in their own idiom.
+    from choom.core.assistants import PROFILES
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await type_command(app, pilot, "config assistant claude")
+
+        status = app.screen.query_one(StatusBar)
+        text = str(status.content)
+        assert "claude" in text.lower()
+
+    claude = next(p for p in PROFILES if p.name == "claude")
+    path = discovery_path(claude)
+    assert path is not None
+    assert path.is_file()
