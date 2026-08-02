@@ -52,6 +52,9 @@ construct mid-run.
   Every other kind of problem (a flaky test, a merge conflict, an ambiguous requirement, a
   missing edge case, a lint failure, a CI misconfiguration) you are empowered to resolve
   or direct a subagent to resolve.
+- **Every PR you merge on your own authority carries the `delamain` label**, applied before the
+  merge. It is how the repo owner tells autonomously-merged work from human-reviewed work months
+  later, when the transcript is gone. See Step 9.
 - **Never commit to `main`, never force-push `main`, never merge a PR whose checks are not
   green.** When running `--into` an integration branch, you never touch `main` at all --
   merging `<TARGET>` into `main` is the user's decision, not yours, and you stop at handing
@@ -377,6 +380,29 @@ Merge when **all** of these hold. No exceptions, no "it's only a docs change".
   `Relates to #N` is one that was never upgraded from spec-only, so it is not ready to merge
   -- and carries no session URL.
 - The PR contains implementation, not just spec/plan/tasks artifacts.
+
+**Label every PR you merge autonomously `delamain`, before you merge it.** The repo owner needs
+to be able to tell at a glance which PRs a human reviewed and which one of your copies did, and
+that distinction has to survive in the record long after the run -- when auditing what shipped in
+a release, or when tracing a regression back to how it was approved. A merged PR's label is the
+only durable trace of that; this chat transcript is not.
+
+```
+gh pr edit <n> --add-label delamain
+gh pr merge <n> --merge --delete-branch
+```
+
+Apply it in that order, so a PR that is somehow merged out from under you is never left
+unlabelled. The label goes on **anything you merge on your own authority** -- feature PRs,
+bugfix PRs, maintenance PRs, and the housekeeping PRs you open against the skill or the repo's
+own tooling mid-run. It does **not** go on a PR a human merges, and it is not a substitute for
+any gate above: labelling a red PR does not make it mergeable.
+
+If the label does not exist in the repo, create it once rather than skipping it:
+
+```
+gh label create delamain --color ec6547 --description "This PR was merged by Delamain autonomously."
+```
 
 Then merge with a merge commit, matching this repo's history:
 
