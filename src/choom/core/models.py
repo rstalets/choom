@@ -250,13 +250,23 @@ class Mirror:
 
     `state_offset` is the load-bearing field: it is the character offset of
     the single state character in the document text, so applying a state is
-    always `text[:o] + char + text[o+1:]` -- no line is ever re-rendered."""
+    always `text[:o] + char + text[o+1:]` -- no line is ever re-rendered.
+
+    `link_start`/`link_end` are the character offsets of the mirror's own
+    link -- the same `Link` this was selected from (017-editor-task-delete).
+    They exist so a caller deciding whether a line carries text beyond its
+    checkbox and its task link (FR-011) reads the answer `find_mirrors`
+    already computed rather than re-scanning the line for it, which would be
+    a second, divergent definition of which link is the mirror (FR-005,
+    FR-007)."""
 
     task_id: str
     done: bool
     line: int
     state_offset: int
     text: str
+    link_start: int
+    link_end: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +290,38 @@ class MirrorReport:
     text: str
     resolutions: tuple[MirrorResolution, ...]
     warnings: tuple[ScanWarning, ...]
+
+
+MirrorDeletionOutcome = Literal[
+    "deletable", "line_only", "unreadable_tasks", "ambiguous_id", "self_referential"
+]
+
+
+@dataclass(frozen=True, slots=True)
+class MirrorDeletion:
+    """What deleting the task line at one cursor position would do
+    (017-editor-task-delete), decided by `mirrors.plan_mirror_deletion` and
+    carried out by `mirrors.commit_mirror_deletion`. Never persisted -- it
+    lives for the length of one keystroke.
+
+    `text` and `span` describe the same single removal:
+    `text == original[:span[0]] + original[span[1]:]`. `text` is what a
+    non-widget caller uses; `span` is what the TUI converts to widget
+    coordinates so the removal is one undoable `TextArea.delete` rather than
+    a re-render (Principle IV, FR-017, FR-018). Both are `""` / `(0, 0)` on a
+    refusing outcome, since nothing is removed.
+
+    `message` names why a refusing outcome was refused and what to do about
+    it (Principle V); it is `""` for `deletable` and `line_only`, which need
+    no explanation."""
+
+    outcome: MirrorDeletionOutcome
+    task_id: str
+    description: str
+    text: str
+    span: tuple[int, int]
+    extra_text: bool
+    message: str = ""
 
 
 @dataclass(frozen=True, slots=True)

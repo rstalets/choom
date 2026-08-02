@@ -8,7 +8,13 @@ from choom.core.config import get_assistant, set_assistant
 from choom.core.editing import load_for_edit, save_buffer
 from choom.core.links import relative_destination
 from choom.core.meetings import create_meeting, scan_meetings
-from choom.core.mirrors import capture_task, propagate_to_documents, reconcile_on_open
+from choom.core.mirrors import (
+    capture_task,
+    commit_mirror_deletion,
+    plan_mirror_deletion,
+    propagate_to_documents,
+    reconcile_on_open,
+)
 from choom.core.notes import create_note, open_daily_note, scan_notes
 from choom.core.tasks import set_task_state
 from choom.core.workspace import init_workspace
@@ -156,6 +162,47 @@ def test_capture_and_mirror_round_trip_in_a_workspace_with_spaces_and_non_ascii(
     assert warnings == ()
     assert meeting.path in written
     assert "- [x] [appeler Terry" in meeting.path.read_text(encoding="utf-8")
+
+
+# --- T024 (017-editor-task-delete): ctrl+t's core half in a non-ASCII workspace
+
+
+def test_task_deletion_survives_a_workspace_path_with_spaces_and_non_ascii(
+    tmp_path: Path,
+) -> None:
+    """The gesture's own path budget is zero -- `plan_mirror_deletion` and
+    `commit_mirror_deletion` neither construct nor open a path beyond
+    `workspace.tasks_file`, which every other core function already opens.
+    What this exercises is the character-offset splice itself: a non-ASCII
+    task description sliced out of the buffer by `str` offsets, which cannot
+    split a multi-byte character the way a byte offset could."""
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
+    task, line = capture_task(
+        workspace,
+        "appeler Terry à propos du renouvellement 笔记",
+        source=meeting.path,
+        source_id=meeting.id,
+    )
+    assert task.id is not None
+
+    text = f"above\n\n{line}\n  a nested note\n\nbelow\n"
+    plan = plan_mirror_deletion(workspace, text, 3, source=meeting.path)
+    assert plan is not None
+    assert plan.outcome == "deletable"
+    # The central invariant (data-model.md §3), asserted here specifically
+    # because the sliced text is non-ASCII: `str` offsets index characters,
+    # never bytes, so this holds even though "appeler...笔记" is not the same
+    # number of bytes as it is characters.
+    assert plan.text == text[: plan.span[0]] + text[plan.span[1] :]
+    assert plan.text == "above\n\n  a nested note\n\nbelow\n"
+
+    commit_mirror_deletion(workspace, plan)
+    tasks_text = workspace.tasks_file.read_text(encoding="utf-8")
+    assert task.text not in tasks_text
 
 
 def test_reconcile_on_open_works_in_a_workspace_with_spaces_and_non_ascii(
