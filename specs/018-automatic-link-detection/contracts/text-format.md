@@ -76,14 +76,11 @@ destination := url  |  "<" url ">"      -- angle-wrapped iff url contains one of
 | ```` ```\ncurl https://api.example.com/v1\n``` ```` | fenced code block |
 | `~~~\nhttps://example.com/a\n~~~` | tilde fence |
 | ```` ```\nunclosed fence https://example.com/a ```` | unclosed fence masks to end of file |
-| ```` ```https://example.com/a\nbody\n``` ```` | a URL in a fence info string |
 | `` `https://example.com` `` | inline code span |
 | `[the spec](https://example.com/spec)` | existing link — destination |
 | `[https://a.example](https://a.example)` | existing link — **link text**; this is the idempotency case |
 | `[a](https://x.com/Foo_(bar))` | unescaped balanced parens — the form `_LINK_RE` misses (R1) |
 | `[a](<https://x.com/Foo_(bar)>)` | angle-wrapped destination |
-| `[a](<notes/Q3 (draft).md#note_1>)` | choom's own escaped record link |
-| `[a](<https://x.com/Q3 (draft>)` | unbalanced paren in an angle destination — mask 6 backstops mask 5 |
 | `<https://example.com>` | CommonMark autolink |
 | `![screenshot](https://example.com/a.png)` | image |
 | `[spec]: https://example.com/spec` | link reference definition |
@@ -97,7 +94,32 @@ destination := url  |  "<" url ">"      -- angle-wrapped iff url contains one of
 
 ---
 
-## Corpus C — idempotency
+## Corpus C — adversarial
+
+Fifteen cases built to break the masks rather than to exercise the happy path. Each was run; the
+"result" column is what the prototype produced.
+
+| Input | Result |
+|---|---|
+| `[a](<notes/Q3 (draft).md#note_1>)` | unchanged — choom's own escaped record link |
+| `[a](<notes/Q3 (draft).md#note_1> )` | unchanged — trailing space before `)` |
+| `[a](<https://x.com/Q3 (draft>)` | unchanged — unbalanced paren defeats mask 5's depth counter; **mask 6 backstops it** |
+| ```` ```https://example.com/a\nbody\n``` ```` | unchanged — a URL in a fence info string |
+| `[[wiki]] https://example.com/a` | URL converted, `[[wiki]]` untouched |
+| `[unclosed\n\nplain https://example.com/a\n` | URL converted — an unclosed `[` must not swallow the rest of the file |
+| `see ] https://example.com/a` | URL converted — a stray `]` in prose |
+| `see ( https://example.com/a` | URL converted — a stray `(` in prose |
+| `` `[x]` then https://example.com/a `` | URL converted, code span untouched |
+| `[a](x.md#note_1) https://example.com/a [b](y.md#note_2)` | only the middle URL converted |
+| `![i](p.png) https://example.com/a` | URL converted, image untouched |
+| `text https://example.com/a <!-- id:task_a1b2 -->` | URL converted, comment untouched |
+| `    https://example.com/a` | **converted** — indented code blocks are not masked (research R8, accepted) |
+| `end https://example.com/a\nnext line` | converted; the following line untouched |
+| `a https://example.com/a\nb\n` | converted; newline count unchanged |
+
+---
+
+## Corpus D — idempotency
 
 For **every** input in Corpus A: `f(x)` == `f(f(x))` == `f(f(f(x)))`, byte for byte.
 
