@@ -287,7 +287,57 @@ Confirm the issue closed. Move to the next wave, and rebase in-flight jobs onto 
 You may merge feature PRs, bugfix PRs, and maintenance PRs on these terms. You may not
 merge anything you parked or escalated.
 
-## Step 10 -- Parking and escalation
+## Step 10 -- When a merge turns out to be broken
+
+You will sometimes discover, an hour after merging, that something you landed is wrong -- a
+later job's tests fail against it, `main` goes red, or a smoke test on the next feature walks
+into it.
+
+**First, separate a flake from a breakage.** A red check on `main` is not automatically a bad
+merge. Re-run the job once. If it passes with no code change, it was runner noise (see #84 --
+`tests/performance/` budgets flake on shared runners), and there is nothing to revert. Only a
+failure that reproduces is a breakage.
+
+**Then revert. Do not fix forward.** This is not negotiable while running unattended, and it
+overrides the instinct that a one-line fix is faster. Fixing forward at 3am with nobody
+watching turns one bad change into two, and the smoke test that would have caught the second
+one is the thing you cannot run for yourself at scale. A revert returns `main` to a known-good
+state immediately and costs a re-run tomorrow, which is cheap. A bad forward fix costs the
+morning.
+
+The ruleset on `main` blocks direct pushes and force-pushes, so the revert goes through a PR
+like anything else:
+
+```bash
+git checkout -b revert-<feature> origin/main
+git revert -m 1 --no-edit <merge-sha>          # -m 1 keeps main's side of the merge
+git checkout <merge-sha> -- specs/<feature>/   # keep the design; only the code goes back
+git commit -q --amend --no-edit
+gh pr create --title "revert: back out <feature> (#N)" --body "..."
+```
+
+`--no-edit` on both commands is not cosmetic: `git revert` and `git commit --amend` open an
+editor by default, and an editor in an unattended agent is a hang, not an error.
+
+Keeping `specs/<feature>/` matters: the spec, plan, and tasks passed three review gates and
+are what a re-run builds from. Only the implementation is in question. Verify before opening
+the PR that `git diff origin/main HEAD` shows deletions under `src/`/`tests/` and **nothing**
+under `specs/`.
+
+Then:
+
+- Reopen the issue (`gh issue reopen <n>`) -- the merge closed it.
+- **Park the feature for the night.** Do not re-run the implement agent on the same issue in
+  the same session. An implementation that just failed review-after-merge fails again more
+  often than it succeeds, and retrying unattended is how one bad merge becomes three.
+- **Report it in chat immediately**, not at the end of the run: what you merged, what broke,
+  the revert PR, and that the design survived.
+
+If you cannot construct a clean revert -- later merges have built on top of the bad one --
+stop merging entirely, leave `main` as it is, and escalate. Untangling a stack of dependent
+merges is not something to attempt without the user awake.
+
+## Step 11 -- Parking and escalation
 
 Park a job when: a constitution conflict surfaces, a subagent reports `BLOCKED`, a review
 gate fails three times on the same point, CI fails for a reason outside the job's scope, or
@@ -301,7 +351,7 @@ Escalate immediately in your chat output -- do not wait for the end of the run -
 block is a constitution conflict. State the principle by number, the artifact, and the
 conflict in two or three sentences.
 
-## Step 11 -- Ledger and final report
+## Step 12 -- Ledger and final report
 
 Keep a running ledger at `$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`: one row per issue with lane,
 agent, worktree, branch, PR, stage, and outcome. Update it as each stage lands so a resumed
@@ -312,6 +362,10 @@ At the end, give the user:
 
 - **Merged**: issue, PR, one line on what landed.
 - **Open**: PR and what it is waiting on.
+- **Reverted**: issue, the original merge, the revert PR, what broke, and confirmation that
+  `specs/<feature>/` survived so a re-run starts from the reviewed design rather than from
+  scratch. Lead with this section if it is non-empty -- it is the first thing the user needs
+  to know and the reason they will want the ledger.
 - **Parked**: issue, the reason, and the specific next action (usually `/product-owner <n>`
   or a constitution decision only they can make).
 - Whether the milestone is now empty and ready for `/release`.
