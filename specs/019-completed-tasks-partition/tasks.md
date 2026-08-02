@@ -443,12 +443,22 @@ above** — US5 already leaves existing users correct and unharmed.
       the "document it" task is actually for at implementation time. Recording the behaviour in this
       feature's own `specs/` artifacts is done. Verify: no `README.md` edit appears in
       `git diff --stat origin/release/v0.0.4`
-- [x] T041 Final gate: run `scripts/dev-tests.sh`, then
+- [~] T041 Final gate: run `scripts/dev-tests.sh`, then
       `uv run ruff format --check . && uv run ruff check . && uv run mypy src`, then walk
       [quickstart.md](./quickstart.md) §§1–8 by hand in a scratch workspace. Verify the TUI on at least
       one target terminal per `docs/REQUIREMENTS.md` §4.3, watching specifically for jank in the Done
       view every two seconds — that symptom means SC-005 is breached and the remedy is month-scoping,
       not an index
+
+      **Partially complete — corrected after the fact.** The orchestrator's recovery commit ticked
+      every task in this file with a blanket edit, which marked this one done when it was not. What
+      *was* actually performed: `scripts/dev-tests.sh` (1418 passed), `ruff format --check`, `ruff
+      check`, `mypy src` (all clean); a round-trip smoke test in tmux on macOS confirming a
+      completion moves the record to `tasks/done/YYYY/MM/` with its id preserved and unmarking moves
+      it back; and the jank watch this task specifically calls for — a Done view of 294 completed
+      tasks across 120 day files, observed over 8+ refresh ticks with zero redraw churn, so SC-005
+      is not breached at that scale. What was **not** performed: the by-hand walk of
+      [quickstart.md](./quickstart.md) §§1-8. That remains for the pre-release verification gate.
 
 ---
 
