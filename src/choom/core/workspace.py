@@ -19,6 +19,29 @@ _GUIDANCE_TEMPLATES = {
 }
 
 
+def workspace_title(workspace: Workspace) -> str:
+    """The terminal title identifying a choom session on `workspace`.
+
+    Returns `"choom — <name>"`, where `<name>` is the workspace root's final path
+    segment (falling back to the root's full path text when it has no final
+    segment, as at a filesystem or drive root). Unprintable characters are
+    dropped, whitespace runs are collapsed, and the result is bounded to 64
+    characters with a trailing `…` when the name is longer. Returns `"choom"`
+    alone when no usable name survives.
+
+    Pure: no I/O, no clock, no environment. Never raises.
+    """
+    name = workspace.root.name or str(workspace.root)
+    name = "".join(ch for ch in name if ch.isprintable() or ch == " ")
+    name = " ".join(name.split())
+    if not name:
+        return "choom"
+    prefix = "choom — "
+    if len(prefix) + len(name) > 64:
+        name = name[: 64 - len(prefix) - 1] + "…"
+    return f"{prefix}{name}"
+
+
 def find_workspace(start: Path) -> Workspace:
     current = start.resolve()
     while True:

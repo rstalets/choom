@@ -241,9 +241,12 @@ def _run_tui() -> int:
         print_error(str(exc))
         return exc.exit_code
 
+    from choom.core import workspace_title
     from choom.tui.app import ChoomApp
+    from choom.tui.terminal_title import terminal_title
 
-    ChoomApp(workspace).run()
+    with terminal_title(workspace_title(workspace)):
+        ChoomApp(workspace).run()
     return 0
 
 

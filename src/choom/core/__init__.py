@@ -82,7 +82,7 @@ from choom.core.text import (
     parse_tags,
     slugify,
 )
-from choom.core.workspace import find_workspace, init_workspace
+from choom.core.workspace import find_workspace, init_workspace, workspace_title
 
 __all__ = [
     "ChoomError",
@@ -169,5 +169,6 @@ __all__ = [
     "set_task_state",
     "slugify",
     "stamp_updated",
+    "workspace_title",
     "write_document",
 ]
