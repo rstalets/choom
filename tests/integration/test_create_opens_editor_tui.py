@@ -18,7 +18,9 @@ def _one_month_before(dt: datetime) -> datetime:
 
 async def test_creating_a_meeting_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
     # Creating from the list opens inline (contract C1, US4): the list is
-    # never left.
+    # never left, and the new record is already the highlighted row while
+    # the editor is open (FR-016, research R8) -- the list and the pane agree
+    # about what is being edited rather than catching up on close.
     app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
@@ -26,6 +28,9 @@ async def test_creating_a_meeting_opens_the_editor_directly(tmp_workspace: Works
 
         assert isinstance(app.screen, ListScreen)
         editor_pane(app)  # asserts one is mounted
+        highlighted = list_view(app).highlighted_child
+        assert highlighted is not None
+        assert highlighted.document.title == "Q3 planning"  # type: ignore[union-attr]
 
 
 async def test_creating_a_note_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
@@ -36,6 +41,9 @@ async def test_creating_a_note_opens_the_editor_directly(tmp_workspace: Workspac
 
         assert isinstance(app.screen, ListScreen)
         editor_pane(app)  # asserts one is mounted
+        highlighted = list_view(app).highlighted_child
+        assert highlighted is not None
+        assert highlighted.document.title == "vendor landscape"  # type: ignore[union-attr]
 
 
 async def test_creating_the_daily_note_opens_the_editor_directly(tmp_workspace: Workspace) -> None:
@@ -46,6 +54,8 @@ async def test_creating_the_daily_note_opens_the_editor_directly(tmp_workspace: 
 
         assert isinstance(app.screen, ListScreen)
         editor_pane(app)  # asserts one is mounted
+        highlighted = list_view(app).highlighted_child
+        assert highlighted is not None
 
 
 async def test_create_moves_scope_to_new_month(tmp_workspace: Workspace) -> None:

@@ -7,7 +7,7 @@ from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditorPane
 from choom.tui.list_screen import ListScreen
-from tests.helpers import editor_pane, type_command
+from tests.helpers import editor_pane, list_view, type_command
 
 
 def _todays_notes(app: ChoomApp) -> list:  # type: ignore[type-arg]
@@ -18,6 +18,9 @@ def _todays_notes(app: ChoomApp) -> list:  # type: ignore[type-arg]
 
 
 async def test_bare_note_creates_and_opens_todays_daily_note(tmp_workspace: Workspace) -> None:
+    # Creating the daily note from the list opens inline (contract C1, US4),
+    # and the new note is already the highlighted row while the editor is
+    # open (FR-016, research R8) -- same behaviour as any other create path.
     app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
@@ -29,6 +32,9 @@ async def test_bare_note_creates_and_opens_todays_daily_note(tmp_workspace: Work
         assert document is not None
         assert document.type == "daily"
         assert _todays_notes(app)[0].path == pane.target.display_path
+        highlighted = list_view(app).highlighted_child
+        assert highlighted is not None
+        assert highlighted.document.path == pane.target.display_path  # type: ignore[union-attr]
 
 
 async def test_bare_note_second_time_reopens_same_note_without_creating(

@@ -11,6 +11,7 @@ from choom.tui.edit_screen import EditorPane, EditScreen
 from choom.tui.list_screen import DocumentRow, ListScreen, ListView
 from choom.tui.preview_screen import PreviewScreen
 from choom.tui.status_bar import EDIT_HELP, StatusBar
+from tests.conftest import tasks_file
 from tests.helpers import create_document_out_of_process, editor_pane, list_view, to_collection
 
 # Risk-based coverage for US1 (Principle VI): these cover what the inline
@@ -177,18 +178,25 @@ async def test_out_of_process_create_freezes_the_list_while_the_pane_is_open(
 # --- User Story 2: task editing shares the same inline route -----------------
 
 
-async def test_e_on_a_highlighted_task_edits_inline(tmp_workspace: Workspace) -> None:
-    add_task(tmp_workspace, "call the vendor")
+async def test_e_on_a_highlighted_task_edits_its_body_inline(tmp_workspace: Workspace) -> None:
+    """`e` on a highlighted task edits its details in the pane (US2): the task
+    list stays visible throughout, saving writes the body, and the same task
+    is still highlighted afterwards with its new details in the preview."""
+    add_task(tmp_workspace, "buy milk")
+    task = add_task(tmp_workspace, "call the vendor")
 
     app = ChoomApp(tmp_workspace)
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         assert app.active == "tasks"
+        await pilot.press("j")  # highlight "call the vendor" (oldest-first order)
+        await pilot.pause()
 
         await pilot.press("e")
         await pilot.pause()
 
         assert isinstance(app.screen, ListScreen)
+        assert app.screen.query_one("#meeting-list", ListView).display is True
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = "Need the Q3 comparison."
 
@@ -197,8 +205,15 @@ async def test_e_on_a_highlighted_task_edits_inline(tmp_workspace: Workspace) ->
 
         assert isinstance(app.screen, ListScreen)
         assert not app.screen.query(EditorPane)
+
+        text = tasks_file(tmp_workspace).read_text(encoding="utf-8")
+        assert "call the vendor" in text
+        assert "Need the Q3 comparison." in text
+
         preview = app.screen.query_one("#preview", Markdown)
         assert "Need the Q3 comparison." in str(preview._markdown or "")  # type: ignore[attr-defined]
+        highlighted = list_view(app).highlighted_child
+        assert highlighted.record.id == task.id  # type: ignore[union-attr]
 
 
 # --- User Story 3 regression guard: full-screen reading stays full-screen ---
@@ -225,3 +240,42 @@ async def test_e_inside_preview_screen_stays_full_screen(tmp_workspace: Workspac
         await pilot.pause()
 
         assert isinstance(app.screen, PreviewScreen)
+
+
+# --- User Story 4: every route into edit mode from the list renders inline --
+
+
+async def test_following_a_task_link_from_backlinks_opens_inline(
+    tmp_workspace: Workspace,
+) -> None:
+    """A link in the preview that resolves to a task opens inline from the
+    list screen (contract C1's last route, FR-002) -- the same route as
+    `test_a_task_links_field_appears_as_an_inbound_link` in test_links.py,
+    driven through the keyboard rather than `core.links` directly."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    task = add_task(tmp_workspace, "call Terry about the renewal")
+    assert task.id is not None
+
+    text = tasks_file(tmp_workspace).read_text(encoding="utf-8")
+    updated = text.replace(f"id:{task.id}", f"id:{task.id} links:{meeting.id}")
+    tasks_file(tmp_workspace).write_text(updated, encoding="utf-8")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(100, 30)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("b")  # expand backlinks -- the task links this meeting
+        await pilot.pause()
+
+        from choom.tui.links_pane import LinkRow
+
+        links_list = app.screen.query_one("#preview-links-list", ListView)
+        row_index = next(i for i, row in enumerate(links_list.children) if isinstance(row, LinkRow))
+        links_list.index = row_index
+        await pilot.pause()
+
+        await pilot.press("enter")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        assert pane.target.display_path == tmp_workspace.tasks_file

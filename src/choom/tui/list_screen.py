@@ -898,19 +898,32 @@ class ListScreen(Screen[None]):
         if document is not None:
             from choom.tui.edit_screen import open_editor
 
-            self._pending_select_id = document.id
             self._pending_error = None
+            self._pending_select_id = document.id
+            # Select the new record before opening the editor, not after
+            # (research R8, FR-016): inline, the list is in plain view beside
+            # the editor for the whole edit, so it must already agree about
+            # what is being edited rather than catching up once the pane
+            # closes and covers the mismatch.
+            self.query_one(CollectionBar).set_active(self.app.active)  # type: ignore[attr-defined]
+            await self._refresh_scope_pane()
+            await self.refresh_rows(select_id=document.id)
             open_editor(self.app, document.path)
         else:
             self._pending_error = self.app.last_create_error  # type: ignore[attr-defined]
 
     @on(CommandBar.DailyRequested)
-    def _on_daily_requested(self, message: CommandBar.DailyRequested) -> None:
+    async def _on_daily_requested(self, message: CommandBar.DailyRequested) -> None:
         daily = self.app.open_daily_note_and_track()  # type: ignore[attr-defined]
         from choom.tui.edit_screen import open_editor
 
         self._pending_error = None
-        self._pending_select_id = daily.document.id if daily.document is not None else None
+        select_id = daily.document.id if daily.document is not None else None
+        self._pending_select_id = select_id
+        # Same ordering as _on_create_requested (research R8): select first.
+        self.query_one(CollectionBar).set_active(self.app.active)  # type: ignore[attr-defined]
+        await self._refresh_scope_pane()
+        await self.refresh_rows(select_id=select_id)
         # The editor reads raw text regardless of whether frontmatter parses, so an
         # existing-but-malformed daily note is still editable, not blocked (FR-022).
         open_editor(self.app, daily.path)

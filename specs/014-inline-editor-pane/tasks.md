@@ -171,12 +171,12 @@ list stayed visible and the same task is highlighted with its new details in the
 
 **Depends on**: Phase 3 (the mounting path is shared; task editing differs only in its `EditTarget`).
 
-- [ ] T034 [US2] Confirm `ListScreen.action_edit`'s task branch in `src/choom/tui/list_screen.py` reaches
+- [X] T034 [US2] Confirm `ListScreen.action_edit`'s task branch in `src/choom/tui/list_screen.py` reaches
       `open_task_editor` and therefore the inline route from T017, with no separate branch of its own
-- [ ] T035 [US2] Integration test in `tests/integration/test_inline_editor_tui.py`: `e` on a highlighted
+- [X] T035 [US2] Integration test in `tests/integration/test_inline_editor_tui.py`: `e` on a highlighted
       task opens the editor inline on that task's body, saving writes the details, and the same task is
       highlighted with the updated details in the preview
-- [ ] T036 [P] [US2] Update `tests/integration/test_task_body_tui.py` for the inline path, keeping every
+- [X] T036 [P] [US2] Update `tests/integration/test_task_body_tui.py` for the inline path, keeping every
       existing assertion about what is written to `tasks.md`
 
 **Checkpoint**: Both editing entry points from the list are inline.
@@ -194,10 +194,10 @@ confirm the return lands on the reading view.
 **Depends on**: Phase 2 only. This story is a regression guard and can be verified as soon as the
 routing exists; it does not need US1's mounting path.
 
-- [ ] T037 [P] [US3] Integration test in `tests/integration/test_inline_editor_tui.py`: `e` inside
+- [X] T037 [P] [US3] Integration test in `tests/integration/test_inline_editor_tui.py`: `e` inside
       `PreviewScreen` pushes a full-screen `EditScreen`, and save-and-close returns to `PreviewScreen`
       (FR-018, contract C1's last row)
-- [ ] T038 [P] [US3] Confirm `tests/integration/test_edit_presentation.py` passes unchanged in substance
+- [X] T038 [P] [US3] Confirm `tests/integration/test_edit_presentation.py` passes unchanged in substance
       — it is the full-screen editor's contract and this feature must not move it (research R10)
 
 **Checkpoint**: The scope boundary is enforced by a test, not by intention.
@@ -214,15 +214,15 @@ visible, and the new record is the highlighted row while the editor is open.
 
 **Depends on**: Phase 3.
 
-- [ ] T039 [US4] In `ListScreen._on_create_requested` in `src/choom/tui/list_screen.py`, refresh the
+- [X] T039 [US4] In `ListScreen._on_create_requested` in `src/choom/tui/list_screen.py`, refresh the
       scope pane and rows selecting the new record **before** opening the editor, so the pane and the
       list agree about what is being edited (FR-016, research R8)
-- [ ] T040 [US4] Apply the same ordering in `ListScreen._on_daily_requested` in
+- [X] T040 [US4] Apply the same ordering in `ListScreen._on_daily_requested` in
       `src/choom/tui/list_screen.py`
-- [ ] T041 [P] [US4] Update `tests/integration/test_create_opens_editor_tui.py`: the editor opens inline
+- [X] T041 [P] [US4] Update `tests/integration/test_create_opens_editor_tui.py`: the editor opens inline
       and the new record is the highlighted row while it is open
-- [ ] T042 [P] [US4] Update `tests/integration/test_daily_note_tui.py` for the same behaviour
-- [ ] T043 [P] [US4] Integration test in `tests/integration/test_inline_editor_tui.py`: following a link
+- [X] T042 [P] [US4] Update `tests/integration/test_daily_note_tui.py` for the same behaviour
+- [X] T043 [P] [US4] Integration test in `tests/integration/test_inline_editor_tui.py`: following a link
       that resolves to a task opens the editor inline from the list screen (FR-002's last route)
 
 **Checkpoint**: Every route into edit mode from the list screen renders in the pane.
