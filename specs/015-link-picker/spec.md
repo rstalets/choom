@@ -13,6 +13,12 @@ that `/link <terms>` stop failing closed when the search matches more than one r
 raise a selection list from the status bar so the writer chooses from what was found without leaving
 the document.
 
+**Builds on**: `008-document-links` (the link format, the `/link` command, and the search this
+extends) and `014-inline-editor-pane`, which made the editor a widget with two hosts — inline in the
+preview pane of the list screen, and full-screen from anywhere else. The picker is reached from that
+editor, so it inherits both hosts and 014's rule that the editor's capabilities are identical in each
+(014 FR-019). This spec assumes those changes exist and does not restate them.
+
 ---
 
 ## Overview
@@ -148,6 +154,11 @@ position, and the screen itself are unchanged apart from the edited line.
 5. **Given** the list is open, **When** the writer inserts or cancels, **Then** the editor is left in
    the editing state it was in — not a preview, not a list screen — with the cursor available for
    typing immediately.
+6. **Given** the editor is open inline in the preview pane, **When** the list opens, **Then** the list
+   and scope panes stay visible and unmoved, the editor keeps the pane it had, and the same keys
+   produce the same outcomes as they do in the full-screen editor.
+7. **Given** the list is open, **When** the terminal is resized, **Then** the candidates and the
+   highlight survive the resize and the typed line is unchanged.
 
 ---
 
@@ -159,6 +170,11 @@ position, and the screen itself are unchanged apart from the edited line.
 - **A very short terminal.** When there is not enough room to show a usable list, the interface must
   still do something honest — the existing report-and-stop behaviour is the correct fallback rather
   than a one-row list or a broken layout.
+- **The editor is inline and the preview pane is narrow.** The status-bar region spans the screen, not
+  the pane, so a narrow pane does not by itself narrow the list; what a narrow *screen* does to a row
+  is the truncation rule above.
+- **A resize while a choice is pending.** The list is a pending decision, not a rendering — it survives
+  the resize with its candidates and highlight, or falls back honestly if the new size cannot hold it.
 - **The record disappears between listing and choosing.** The workspace is a folder of files that
   another program can change. If the chosen record can no longer be resolved when `enter` is pressed,
   the writer is told so and the line is left as typed, rather than a link to nothing being written.
@@ -177,33 +193,41 @@ position, and the screen itself are unchanged apart from the edited line.
 
 - **FR-001**: When `/link <terms>` matches more than one record, the system MUST present a selection
   list of the matching records instead of reporting the candidates and stopping.
-- **FR-002**: The selection list MUST be presented within the editor's status-bar region, with the
-  document remaining visible; it MUST NOT be a separate screen and MUST NOT introduce a new state in
-  the list → preview → edit model.
+- **FR-002**: The selection list MUST be presented in the status-bar region at the bottom of the
+  screen hosting the editor, with the document remaining visible; it MUST NOT be a separate screen and
+  MUST NOT introduce a new state in the list → preview → edit model.
 - **FR-003**: The system MUST NOT move the cursor or change the document's scroll position when the
   list opens, while it is open, or when it closes.
-- **FR-004**: `↑` and `↓` MUST move the highlight between rows, wrapping at both ends.
-- **FR-005**: `enter` MUST replace the `/link` line with a markdown link to the highlighted record,
+- **FR-004**: The picker MUST behave identically whether the editor is inline in the preview pane or
+  full-screen — the same trigger, the same keys, the same rows, the same outcomes.
+- **FR-005**: Opening the list MUST NOT resize, displace, or overlay the editor or, in the inline
+  host, the list and scope panes. Everything on screen before the list opened stays where it was and
+  stays visible.
+- **FR-006**: `↑` and `↓` MUST move the highlight between rows, wrapping at both ends.
+- **FR-007**: `enter` MUST replace the `/link` line with a markdown link to the highlighted record,
   using the same link format and the same relative-path computation as a single-match insertion, and
   MUST close the list.
-- **FR-006**: `esc` MUST close the list and leave the `/link` line byte-identical to what the writer
+- **FR-008**: `esc` MUST close the list and leave the `/link` line byte-identical to what the writer
   typed.
-- **FR-007**: While the list is open, the footer MUST state every key that acts on it, and keys other
+- **FR-009**: While the list is open, the footer MUST state every key that acts on it, and keys other
   than those MUST NOT modify the document.
-- **FR-008**: Each row MUST show the record's title, its collection, and its date.
-- **FR-009**: Rows MUST be ordered newest first, with ties broken by title so repeating a search
+- **FR-010**: Each row MUST show the record's title, its collection, and its date.
+- **FR-011**: Rows MUST be ordered newest first, with ties broken by title so repeating a search
   produces the same order; records with no date MUST sort after all dated records.
-- **FR-010**: The list MUST occupy a bounded number of rows regardless of how many records match, and
+- **FR-012**: The list MUST occupy a bounded number of rows regardless of how many records match, and
   MUST scroll within itself when the match count exceeds what it shows.
-- **FR-011**: When exactly one record matches, the system MUST insert the link directly, with no list
+- **FR-013**: When exactly one record matches, the system MUST insert the link directly, with no list
   and no additional keystroke.
-- **FR-012**: When no record matches, the system MUST report as it does today and MUST NOT show a list.
-- **FR-013**: If the highlighted record cannot be resolved at the moment of insertion, the system MUST
+- **FR-014**: When no record matches, the system MUST report as it does today and MUST NOT show a list.
+- **FR-015**: If the highlighted record cannot be resolved at the moment of insertion, the system MUST
   report that and leave the line as typed rather than inserting an unresolvable link.
-- **FR-014**: The set of records the list offers MUST be exactly what the current `/link` search
+- **FR-016**: The set of records the list offers MUST be exactly what the current `/link` search
   finds — titles, ids, types, and tags — with no change to what counts as a match.
-- **FR-015**: When the available space is too small to render a usable list, the system MUST fall back
+- **FR-017**: When the available space is too small to render a usable list, the system MUST fall back
   to the existing report-and-stop behaviour rather than rendering a degraded list.
+- **FR-018**: A terminal resize while the list is open MUST NOT lose the pending choice or the typed
+  line: the list re-lays out to the new width, keeps its candidates and its highlight, and the fallback
+  in FR-017 applies if the resize leaves too little room.
 
 ### Key Entities
 
@@ -230,6 +254,8 @@ position, and the screen itself are unchanged apart from the edited line.
   change as before it.
 - **SC-006**: The list appears without a perceptible pause after the command is submitted, in a
   workspace of a thousand records.
+- **SC-007**: Every acceptance scenario in this spec holds identically with the editor inline in the
+  preview pane and with it full-screen — no capability, key, or outcome differs between the two.
 
 ## Assumptions
 
@@ -263,8 +289,14 @@ position, and the screen itself are unchanged apart from the edited line.
 
 - Builds on the shipped document-links primitive (issue #27, spec `008-document-links`), which defines
   the link format, `find_link_targets`, and the `/link` command this extends.
+- Builds on `014-inline-editor-pane` (issue #57), which made the editor one widget with two hosts —
+  inline in the preview pane and full-screen. The picker is part of the editor's capability surface, so
+  014's parity rule applies to it and is restated here as FR-004.
 - Uses the editor's existing slash-command plumbing, shared with `/ai` and `/link` today. This feature
   adds a widget and a selection handler, not a new command surface.
+- Uses the existing status-bar region at the bottom of the screen, which already hosts the status bar
+  and the command bar as stacked, auto-height widgets. The picker is another occupant of that region,
+  not a new surface.
 - The multi-word search fix has landed, so ambiguity is hit less often than when issue #46 was
   written. It does not remove ambiguity, and this feature is what handles what remains.
 - Related: inline task capture (issue #21) will want the same picker if it grows a "link this task to

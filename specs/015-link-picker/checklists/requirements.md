@@ -41,3 +41,9 @@
     recorded in Assumptions and constrained by FR-007.
 - No [NEEDS CLARIFICATION] markers were needed. Issue #46 specifies keys, ordering, row content, and
   both fast paths; everything else had a defensible default, recorded in Assumptions.
+- Revalidated after `014-inline-editor-pane` merged. That feature gave the editor two hosts (inline in
+  the preview pane, and full-screen), which the original spec did not account for. Added: a
+  "Builds on" note, FR-004 (parity across both hosts), FR-005 (nothing on screen is displaced),
+  FR-018 and an edge case for resize while a choice is pending, US3 scenarios 6-7, SC-007, and two
+  dependency notes. FRs renumbered accordingly; no requirement was removed or weakened. All 16 items
+  still pass.
