@@ -23,8 +23,26 @@ clause is absent and the prompt is byte-identical to today's.
   editing a file, because choom performs the write (research R4).
 - It states, at minimum: both forms (`/task <description>`, `/task.<type> <description>`); that `#tags`
   inside the description are lifted out and attached to the task; that the line must be its entire
-  content, unindented, and outside any code fence; that choom replaces the line with a link to the task it
-  creates; and that emitting one is optional (FR-001 – FR-005).
+  content, unindented, and outside any code fence; and that choom replaces the line with a link to the
+  task it creates (FR-001 – FR-004).
+- It is **directive, not permissive**, about which shape wins: content that is a thing to be done is
+  written as a task line rather than a bullet in a markdown list, in terms that explicitly override the
+  general "write a list" guidance earlier in the block (FR-005).
+- It **bounds capture to the request**: a summary or an explanation is answered as one, never with
+  captured tasks appended (FR-005a).
+- It requires **examples to be fenced** when the assistant is explaining the syntax rather than using it
+  (FR-005b).
+
+**Why the last three are requirements and not wording preferences.** The first version of this clause
+explained the syntax accurately, was permissive ("you may write"), and closed with "this is optional --
+most replies need none". Measured against the real Claude Code CLI on a meeting note with four
+commitments, asking for the action items returned a plain markdown list and zero task lines, every time:
+the assistant read that closing sentence together with the earlier "write markdown ... a list" bullet and
+concluded a list was wanted. Making it directive fixed that case and broke a second one — a plain
+"summarise this" request began appending captured tasks nobody asked for — and fixing *that* exposed a
+third, where "how does this work?" produced an unfenced example that would have been captured as two real
+tasks. All three wordings are load-bearing, and each is pinned by a test in
+`tests/unit/test_compose_prompt.py` naming the failure it prevents.
 
 **Callers**: `task_capture=True` for a document (`open_editor`); `False` for a task body
 (`open_task_editor`), which has no document identity to link a capture from (FR-007).

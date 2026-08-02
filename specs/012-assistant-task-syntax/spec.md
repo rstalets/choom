@@ -242,8 +242,16 @@ the failure.
   substitution has happened.
 - **FR-004**: The instruction MUST state that the command must be the line's entire content, unindented,
   and outside any code fence, and that a line failing those conditions is left as ordinary text.
-- **FR-005**: The instruction MUST present task lines as available rather than required; a reply with none
-  is a normal reply.
+- **FR-005**: The instruction MUST direct that content which is a thing to be done — action items,
+  followups, next steps, commitments — is written as a task line rather than as a bullet in a markdown
+  list, and MUST say so in terms that override the general guidance to answer with a list. A reply with
+  nothing to capture still uses no task lines.
+- **FR-005a**: The instruction MUST bound capture to what the request asked for. A request for a summary
+  or an explanation MUST NOT produce captured tasks appended to the answer — capturing something the user
+  did not ask to capture puts real records in their workspace that they then have to delete.
+- **FR-005b**: The instruction MUST tell the assistant to put every example inside a code fence when it is
+  explaining or demonstrating the syntax rather than capturing something. The classifier's fence rule
+  (FR-012) only protects the user if the assistant actually fences.
 - **FR-006**: The instruction MUST be identical for every configured assistant. No assistant-specific
   wording, and no assistant may receive a different grammar.
 - **FR-007**: The instruction MUST be omitted when the request originates somewhere with no document

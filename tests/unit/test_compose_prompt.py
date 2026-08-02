@@ -40,6 +40,35 @@ def test_task_syntax_clause_present_when_task_capture_is_true(tmp_path: Path) ->
     assert "#tags" in composed
 
 
+def test_task_syntax_clause_directs_rather_than_merely_permits(tmp_path: Path) -> None:
+    """The first wording explained the syntax and closed with "this is optional --
+    most replies need none", while an earlier instruction recommends "a list". Asked
+    for the action items, a real assistant read those together and returned a plain
+    markdown list every time -- the syntax reached it and went unused. The clause has
+    to say which shape wins for content that is a thing to be done."""
+    composed = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=True)
+    assert "not as\n  a bullet in a markdown list" in composed
+    assert "overrides the guidance above" in composed
+    assert "optional" not in composed
+
+
+def test_task_syntax_clause_bounds_capture_to_what_was_asked(tmp_path: Path) -> None:
+    """The directive wording, on its own, made a plain "summarise this" request
+    append captured tasks nobody asked for -- real records the user then has to go
+    and delete."""
+    composed = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=True)
+    assert "Answer only what was asked" in composed
+    assert "never a\n  list of captured tasks appended to it" in composed
+
+
+def test_task_syntax_clause_tells_the_assistant_to_fence_its_examples(tmp_path: Path) -> None:
+    """Asked how the syntax works, a real assistant wrote its example unfenced, which
+    the classifier would have captured as two real tasks. The classifier's fence rule
+    only helps if the assistant fences."""
+    composed = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=True)
+    assert "put every example inside a code\n  fence" in composed
+
+
 def test_task_syntax_clause_absent_when_task_capture_is_false(tmp_path: Path) -> None:
     with_clause = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=True)
     without_clause = compose_prompt("anything", tmp_path / "note.md", 1, task_capture=False)

@@ -36,13 +36,29 @@ do not see it anywhere first.
   overwrites the file on the next save, so any edit you make is discarded."""
 
 _TASK_SYNTAX = """\
-- Writing a task is not editing a file: on a line of its own, unindented and
-  outside any code fence, you may write `/task <description>` or
-  `/task.<type> <description>` -- e.g. `/task.followup call Terry about the
-  renewal`. Any `#tags` inside the description are lifted out and attached to
-  the task rather than kept in its text. choom creates the task and replaces
-  that line with a link to it, so write the surrounding prose as if the link
-  is already there. This is optional -- most replies need none."""
+- Writing a task is not editing a file. On a line of its own, unindented and
+  outside any code fence, write `/task <description>` or
+  `/task.<type> <description>` -- e.g. `/task.followup send the vendor
+  comparison #finance`. choom creates the task and replaces that line with a
+  link to it, so write the surrounding prose as if the link is already there.
+  Any `#tags` in the description are lifted out and attached to the task
+  rather than left in its text.
+- When the answer is things to be done -- action items, followups, next steps,
+  commitments, what someone owes whom -- write each one as a task line, not as
+  a bullet in a markdown list. This overrides the guidance above about writing
+  a list: a plain list of action items looks right and is useless, because it
+  leaves the user to retype every item by hand to capture it, which is the
+  whole reason this syntax exists. Prose and ordinary bullets are still right
+  for everything that is not a thing to be done, and a reply with nothing to
+  capture uses no task lines at all. Answer only what was asked: a request for
+  a summary or an explanation gets a summary or an explanation, and never a
+  list of captured tasks appended to it. Capturing something the user did not
+  ask you to capture puts real records in their workspace that they then have
+  to go and delete.
+- If you are explaining or demonstrating this syntax rather than capturing
+  something -- the user asked how it works -- put every example inside a code
+  fence. A bare example line is indistinguishable from a real one and creates
+  a real task."""
 
 
 def _claude_build_args(prompt: str) -> list[str]:

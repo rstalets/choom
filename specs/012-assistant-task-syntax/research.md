@@ -2,7 +2,9 @@
 
 **Feature**: 012-assistant-task-syntax | **Date**: 2026-08-01
 
-Twelve decisions. No `NEEDS CLARIFICATION` markers remain, and none were carried in from the spec.
+Thirteen decisions. No `NEEDS CLARIFICATION` markers remain, and none were carried in from the spec.
+R13 was added after implementation, from a bug report, and supersedes R4's account of what the
+instruction says — R4's placement reasoning still stands.
 
 ---
 
@@ -103,6 +105,11 @@ Content, in about six lines: the two forms (`/task <description>` and `/task.<ty
 `#tags` inside the description are lifted out, that the line must be the whole line and unindented and
 outside any code fence, that choom replaces it with a link to the task it creates, and that it is
 optional.
+
+> **Superseded in part by R13.** "Optional" is exactly the word that made a real assistant answer a
+> request for action items with a markdown list. The clause is now directive for content that is a thing
+> to be done, bounded to what the request asked for, and requires fenced examples. The placement decision
+> above — last, after "Do not edit any file", reconciling itself with it — is unchanged.
 
 **Rationale**: Placement matters more than it looks. "Do not edit any file" is the last and most absolute
 instruction in the block, and a permission to create tasks that arrives before it reads as contradicted by
@@ -264,3 +271,49 @@ already documents the `/task` line for that reader. This feature's instruction t
 prompt, which is self-contained by construction — an assistant invoked by `/ai` is told the grammar
 whether or not it ever reads `AGENTS.md`. Adding it to both would duplicate the one string FR-006 exists to
 keep single, and would spend the file's ~100-line budget on something its reader does not need.
+
+---
+
+## R13: The instruction has to be directive, and bounded, and fence its examples
+
+**Added after implementation**, from a bug report: asked for a list of tasks from a meeting note, the
+assistant returned a markdown list and used the syntax not at all.
+
+**Decision**: three properties, all measured against the real Claude Code CLI rather than reasoned about.
+
+1. **Directive, not permissive.** R4's wording explained the syntax, said "you may write", and closed
+   with "this is optional -- most replies need none". Read together with the earlier instruction to
+   "write markdown that belongs in working notes: prose, a list, a table", an assistant asked for action
+   items produced a list every time. The clause now says content that is a thing to be done is written as
+   a task line "not as a bullet in a markdown list", and that this "overrides the guidance above".
+2. **Bounded to the request.** Directive wording alone over-corrected: a plain "summarise the discussion
+   in two sentences" began appending three captured tasks, because the note contained commitments. The
+   clause now says to answer only what was asked, and names the cost — real records the user has to go
+   and delete.
+3. **Examples fenced.** With the syntax now prominent, "how do I capture a task from in here?" produced a
+   *bare* example line, which the classifier would have captured as a real task. The classifier's fence
+   rule (R2) is only half the protection; the assistant has to fence. The clause now says so, and names
+   why: a bare example is indistinguishable from a real one.
+
+**Rationale**: this is the part of the feature no stub can test — quickstart's US2 says as much, and T037
+called out that only a real assistant can prove the line gets emitted. The failure was not in the
+mechanism, which worked from the first commit, but in the assumption that stating a capability makes an
+assistant use it. Prompt wording is behaviour here, so each of the three is a requirement (FR-005,
+FR-005a, FR-005b) with a test naming the failure it prevents, not a phrasing that a later edit can
+casually undo.
+
+**Measurement**: four prompts against the same fixture note -- "list the action items I committed to",
+"summarise in two sentences then list what I owe", "summarise in two sentences", and "how do I capture a
+task? show me an example" -- scored by running the real classifier over each reply rather than by eye.
+Before: 0 captured on the first, which is the bug. After: 2, 2, 0, 0 -- all four as intended.
+
+**Alternatives considered**:
+
+- *Leave the wording and let users prompt around it* ("...and use the task syntax"). Rejected: it makes
+  the feature something the user has to know a password for, and #44's whole complaint is that capturing
+  by hand is what stops them asking.
+- *Drop "a list" from the general instruction block.* Rejected: it is right for every reply that is not a
+  set of commitments, and this feature does not get to degrade the ordinary case.
+- *Post-process a markdown list into task lines.* Rejected outright: choom would be inventing tasks from
+  text the assistant did not mark as tasks, which is the opposite of the explicit grammar this feature
+  exists to establish.
