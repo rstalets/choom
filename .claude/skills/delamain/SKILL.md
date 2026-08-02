@@ -17,9 +17,9 @@ driving. The core decides who goes where, inspects every arrival, and is the onl
 gets to call a job finished -- and the only one that notices when a copy has started
 drifting off its route.
 
-This sits between `/product-owner` (which refines an issue into a real problem statement)
-and `/release` (which ships what landed). It does not refine issues and it does not cut
-releases.
+This sits between `/regina` (which refines an issue into a real problem statement and the
+decisions a spec needs) and `/release` (which ships what landed). It does not refine issues
+and it does not cut releases.
 
 **You are the orchestrator, not the implementer.** You run on Opus. You do not write
 feature code yourself. Your job is routing, review, verification, and merge decisions.
@@ -227,7 +227,7 @@ What changes when `<TARGET>` is not `main`:
 | Labels | Lane | Path |
 |---|---|---|
 | `enhancement` + `ready` | **Feature** | speckit: specify → plan → tasks → implement |
-| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/product-owner <n>` and skip. |
+| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/regina <n>` and skip. |
 | `bug` | **Direct** | Single subagent: reproduce → fix → test → PR |
 | `maintenance`, `documentation`, `dependencies`, `github_actions` | **Direct** | Single subagent: change → test → PR |
 | No label, or ambiguous | **Parked** | Ask rather than guess a lane. |
@@ -553,7 +553,7 @@ At the end, give the user:
   `specs/<feature>/` survived so a re-run starts from the reviewed design rather than from
   scratch. Lead with this section if it is non-empty -- it is the first thing the user needs
   to know and the reason they will want the ledger.
-- **Parked**: issue, the reason, and the specific next action (usually `/product-owner <n>`
+- **Parked**: issue, the reason, and the specific next action (usually `/regina <n>`
   or a constitution decision only they can make).
 
 When the run targeted an integration branch, close by handing it back explicitly -- the user
