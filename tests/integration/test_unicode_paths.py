@@ -225,3 +225,65 @@ def test_reconcile_on_open_works_in_a_workspace_with_spaces_and_non_ascii(
     )
     assert "[x]" in report.text
     assert report.warnings == ()
+
+
+# --- T037 (018-automatic-link-detection): bare-URL conversion in a workspace
+# with spaces and non-ASCII, and across a CRLF document -----------------------
+
+
+def test_a_bare_url_with_non_ascii_characters_survives_a_save(tmp_path: Path) -> None:
+    """Offsets in `format_bare_urls` are character offsets into a Python
+    `str`, never byte offsets, so a multi-byte character next to a URL
+    cannot be split mid-character. This is the case that would catch it if
+    the implementation ever moved to byte offsets: a non-ASCII character
+    immediately follows the converted URL on the same line."""
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    note = create_note(workspace, "vendor landscape")
+    original = note.path.read_text(encoding="utf-8")
+    note.path.write_text(
+        original + "\nVoir https://example.com/résumé puis 笔记.\n",
+        encoding="utf-8",
+    )
+
+    file = load_for_edit(note.path)
+    result = save_buffer(note.path, file.text, file, workspace=workspace)
+    assert result.ok
+    assert len(result.conversions) == 1
+    conv = result.conversions[0]
+    assert conv.url == "https://example.com/résumé"
+    assert "[https://example.com/résumé](https://example.com/résumé)" in result.saved_text
+    assert "puis 笔记." in result.saved_text  # the trailing non-ASCII text is intact
+
+
+def test_a_bare_url_in_a_crlf_document_round_trips_the_line_ending_convention(
+    tmp_path: Path,
+) -> None:
+    """`load_for_edit` normalises CRLF to LF on read and
+    `_apply_line_ending_policy` restores the convention on write -- this
+    feature adds no line-ending handling of its own, so a CRLF file must
+    round-trip exactly as it already does. If this test ever needs new
+    production code to pass, the conversion is doing something it should
+    not (research R2: no mask or edit in this feature inserts or removes a
+    newline)."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    note = create_note(workspace, "vendor landscape")
+    original = note.path.read_bytes().decode("utf-8")
+    crlf_text = (original + "\nSee https://example.com/a for details.\n").replace("\n", "\r\n")
+    note.path.write_bytes(crlf_text.encode("utf-8"))
+
+    file = load_for_edit(note.path)
+    assert file.newline == "\r\n"
+    result = save_buffer(note.path, file.text, file, workspace=workspace)
+    assert result.ok
+    assert len(result.conversions) == 1
+
+    on_disk = note.path.read_bytes().decode("utf-8")
+    assert "\r\n" in on_disk
+    assert "\n" not in on_disk.replace("\r\n", "")  # every newline is `\r\n` -- none bare
+    assert "[https://example.com/a](https://example.com/a)" in on_disk

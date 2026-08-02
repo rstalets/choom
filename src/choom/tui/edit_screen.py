@@ -24,7 +24,13 @@ from choom.core.documents import _read_document
 from choom.core.editing import load_for_edit, save_buffer
 from choom.core.editor_commands import parse_line, parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
-from choom.core.links import format_link, link_candidates, resolve_id
+from choom.core.links import (
+    format_bare_urls,
+    format_link,
+    link_candidates,
+    map_cursor_offset,
+    resolve_id,
+)
 from choom.core.mirrors import (
     capture_reply_tasks,
     capture_task,
@@ -184,11 +190,18 @@ def open_task_editor(app: App[None], task: Task) -> None:
             body = report.text
 
     def _save(text: str) -> SaveResult:
+        # format_bare_urls runs here, before set_task_body, rather than inside
+        # it (018-automatic-link-detection, research R9): set_task_body has a
+        # second caller above -- reconcile-on-open -- and converting there
+        # would rewrite a body the user has not touched, violating FR-016.
+        converted, conversions = format_bare_urls(text)
         try:
-            set_task_body(workspace, task_id, text)
+            set_task_body(workspace, task_id, converted)
         except (NotFoundError, UsageError, WorkspaceError) as exc:
             return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
-        return SaveResult(ok=True, saved_text=text, stamped=False, message="")
+        return SaveResult(
+            ok=True, saved_text=converted, stamped=False, message="", conversions=conversions
+        )
 
     target = EditTarget(
         text=body,
@@ -508,9 +521,27 @@ class EditorPane(Vertical):
             # what actually landed on disk, or the widget would read as dirty
             # the instant it saved (whenever the new timestamp differs from
             # what's still displayed). `load_text` resets cursor/selection, so
-            # capture and restore it around the reload (FR-014).
+            # capture and restore it around the reload (FR-014). The stamp is
+            # length-neutral, so restoring `(row, col)` verbatim is correct for
+            # it; a URL conversion is not (018-automatic-link-detection,
+            # research R12), so the column is mapped through the conversions
+            # instead. The row is never affected -- no conversion inserts a
+            # newline -- so only the column needs mapping.
             cursor = editor.cursor_location
-            editor.text = result.saved_text
+            if result.conversions:
+                # `TextArea.document` is typed as the abstract `DocumentBase`,
+                # but the editor is never given a `document` override
+                # (research R4, same idiom as `_commit_delete_task` above) --
+                # it is always the concrete `Document`, which carries
+                # `get_index_from_location`/`get_location_from_index`.
+                offset = editor.document.get_index_from_location(cursor)  # type: ignore[attr-defined]
+                new_offset = map_cursor_offset(result.conversions, offset)
+                editor.text = result.saved_text
+                cursor = editor.document.get_location_from_index(  # type: ignore[attr-defined]
+                    new_offset
+                )
+            else:
+                editor.text = result.saved_text
             editor.cursor_location = cursor
 
         self.original_text = result.saved_text
@@ -521,6 +552,13 @@ class EditorPane(Vertical):
 
         messages = [w.message for w in result.warnings]
         messages.extend(w.message for w in mirror_report.warnings)
+        if result.conversions:
+            # FR-025: named when non-zero, silent otherwise -- a message on
+            # every save is a message nobody reads, composed into the same
+            # chain as a save/mirror warning so it never replaces one.
+            count = len(result.conversions)
+            noun = "link" if count == 1 else "links"
+            messages.append(f"formatted {count} {noun}")
         if self.target.stamps_frontmatter and not result.stamped:
             missing_stamp = "frontmatter's updated: field could not be found; saved as typed"
             self._render_status(f"{note}; {missing_stamp}" if note else missing_stamp)

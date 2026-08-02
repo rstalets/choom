@@ -118,12 +118,26 @@ class EditableFile:
 
 
 @dataclass(frozen=True, slots=True)
+class UrlConversion:
+    """One bare-URL-to-markdown-link edit `format_bare_urls` made, as offsets into
+    the *original* text it was given (018-automatic-link-detection). `start`/`end`
+    bound the matched URL; `replacement` is what was spliced in its place --
+    `[url](destination)`. Never persisted: recomputed from the text on every save."""
+
+    start: int
+    end: int
+    url: str
+    replacement: str
+
+
+@dataclass(frozen=True, slots=True)
 class SaveResult:
     ok: bool
     saved_text: str
     stamped: bool
     message: str
     warnings: tuple[ScanWarning, ...] = ()
+    conversions: tuple[UrlConversion, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

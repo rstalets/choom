@@ -82,6 +82,16 @@ def save_buffer(
     (never fatal -- a dead link never sets `ok=False`). When `workspace` is None,
     behaviour is exactly as before this parameter existed.
 
+    Every bare `http://`/`https://` URL in the body is also wrapped as a markdown
+    link, `[url](url)` (018-automatic-link-detection, FR-001) -- unconditionally,
+    unlike healing, since the conversion needs nothing from `workspace`. The order
+    is heal -> convert -> stamp -> line-ending policy -> one atomic write
+    (contracts/core-api.md C5): heal and convert act on provably disjoint spans (a
+    healed destination carries no scheme, a converted one always does, so
+    `_link_from_match` declines it), and convert MUST precede the stamp, or this
+    function's own `saved_text` would diverge from the bytes actually written.
+    `SaveResult.conversions` carries the edits for the caller's cursor mapping.
+
     Never raises on a write failure -- returns SaveResult(ok=False) with a
     user-facing message, leaving the target byte-identical.
     """
@@ -93,6 +103,10 @@ def save_buffer(
 
         text, _reports, warnings = heal_text(workspace, text, source=path)
 
+    from choom.core.links import format_bare_urls
+
+    text, conversions = format_bare_urls(text)
+
     when = now or datetime.now()
     timestamp = when.replace(microsecond=0).isoformat()
     stamped_text, stamped = stamp_updated(text, timestamp)
@@ -103,5 +117,10 @@ def save_buffer(
     except WorkspaceError as exc:
         return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
     return SaveResult(
-        ok=True, saved_text=stamped_text, stamped=stamped, message="", warnings=warnings
+        ok=True,
+        saved_text=stamped_text,
+        stamped=stamped,
+        message="",
+        warnings=warnings,
+        conversions=conversions,
     )
