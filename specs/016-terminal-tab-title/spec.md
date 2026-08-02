@@ -233,9 +233,9 @@ terminal, and confirm no title sequence appears in either stream.
 #### Where it must stay silent
 
 - **FR-015**: choom MUST NOT emit a title sequence when stdout is not a terminal.
-- **FR-016**: No `choom` subcommand invocation MUST ever emit a title sequence, on stdout or on stderr,
-  attached to a terminal or not. Only the interactive interface sets a title. See "Interface parity"
-  below.
+- **FR-016**: Every `choom` subcommand invocation MUST NOT emit a title sequence, on stdout or on
+  stderr, attached to a terminal or not. Only the interactive interface sets a title. See "Interface
+  parity" below.
 - **FR-017**: The behaviour MUST NOT be configurable. It adds no command-line flag, no workspace
   setting, and no environment variable. The only conditions on it are FR-015 and the platform checks in
   FR-021 through FR-023.

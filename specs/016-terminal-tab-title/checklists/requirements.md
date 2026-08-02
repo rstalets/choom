@@ -55,5 +55,15 @@
 - Two numeric choices are fixed here rather than left to implementation, per Principle V (the interface
   is specified, not improvised): the 64-character title cap (FR-005) and the exactly-once set at startup
   (FR-008, FR-009). Both are unit-testable against the core composition function without a terminal.
+- Post-review fix (spec gate PASS, planning round): FR-016 read "No `choom` subcommand invocation MUST
+  ever emit a title sequence" — a malformed MUST, since the negation attaches to the subject and the
+  sentence parses as the opposite of its intent. Reworded to "Every `choom` subcommand invocation MUST
+  NOT emit...". Meaning unchanged; ambiguity removed, because implementers read requirement text
+  literally.
+- Planning research turned up one thing worth recording against FR-011, which is left as written: inside a
+  running choom, `ctrl+c` is **not** an exit path. Textual binds it to its own `action_help_quit`, which
+  shows "Press ctrl+q to quit" and does not terminate anything. FR-011 is still satisfied — where a SIGINT
+  does end the process it raises `KeyboardInterrupt`, which the restore path catches by process teardown
+  rather than by any binding, as constitution Principle V requires. See research R4.
 - No configuration knob is proposed, so Principle III's sensible-default rule is satisfied by FR-017
   rather than justified as a complexity exception.
