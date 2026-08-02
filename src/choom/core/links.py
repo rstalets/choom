@@ -30,9 +30,11 @@ from choom.core.models import (
     LinkTarget,
     ScanWarning,
     Task,
+    UrlConversion,
     Workspace,
 )
 from choom.core.notes import scan_notes
+from choom.core.task_store import iter_done_files, load_done_tasks, load_task_store
 from choom.core.tasks import load_tasks, match_task, parse_tasks
 from choom.core.text import _split_terminator
 
@@ -257,6 +259,317 @@ def format_link(source: Path, target: LinkTarget, text: str) -> str:
     return f"[{text}]({_render_destination(dest)})"
 
 
+# --- Bare URL formatting on save (018-automatic-link-detection) ---------------
+#
+# format_bare_urls() wraps every bare http(s):// URL in a document as a real
+# CommonMark inline link, [<url>](<url>), on a save the user performed. The
+# rule that governs every mask below (T007/research R1, and it belongs here
+# in a comment, not only in the spec): a *scanner* -- _LINK_RE above -- exists
+# to find record links choom will act on, and being narrow there is safe: a
+# link it misses is simply not healed. A *mask* exists to find every span
+# that must not be touched, and being narrow there is unsafe: a link a mask
+# misses gets a second [...](...) wrapped around a destination it failed to
+# see, corrupting the file. _LINK_RE's destination alternative is
+# `[^\s()]*`, so it misses a destination with balanced parentheses
+# (`[a](https://x.com/Foo_(bar))`), an image (`(?<!!)` excludes it), a
+# reference definition, and an autolink -- four ordinary forms a Wikipedia
+# URL or an existing choom link can take. A mask MUST be a superset of the
+# grammar it guards, never a subset of it, which is why the masks below are
+# new and deliberately wider rather than a reuse of _LINK_RE.
+
+_BARE_URL_RE = re.compile(
+    r'(?<![^\s([{"\'*_~|>])(?P<u>(?P<scheme>https?://)[^\s<>\[\]]*)',
+    re.IGNORECASE,
+)
+
+#: FR-013's trailing-boundary character set: dropped one at a time, repeatedly,
+#: from the end of a candidate. `?`, `#`, `&`, `=`, `/`, and `%` are never in
+#: this set -- they are part of a URL, not punctuation trailing it.
+_TRAILING_CHARS = ".,:;!?'\"*_~"
+
+_COMMENT_START = "<!--"
+_COMMENT_END = "-->"
+
+_ANGLE_SPAN_RE = re.compile(r"<[^<>\n]*>")
+
+#: FR-012: a link reference definition, `[label]: destination`, optionally
+#: indented up to 3 spaces (CommonMark's own limit before it becomes an
+#: indented code block). Wrapping the destination would break the
+#: definition and silently kill every `[label]` reference in the file.
+_REFDEF_RE = re.compile(r"^ {0,3}\[[^\]\n]*\]:[ \t]*\S+", re.MULTILINE)
+
+
+def _mask_frontmatter(text: str) -> str:
+    r"""Blank the frontmatter block -- the leading ``---\n`` through the
+    closing ``\n---``, inclusive -- to spaces, preserving every line
+    terminator so offsets found afterward stay valid in `text` unchanged.
+    Left byte-identical when either delimiter is absent.
+
+    Stricter than `heal_text`, which never masks frontmatter, because that
+    function only ever rewrites a destination inside an *existing* link,
+    which cannot occur in frontmatter choom itself wrote -- this function's
+    exposure is immediate, not theoretical (research R3): an unquoted YAML
+    scalar that starts with ``[`` becomes a flow sequence, and wrapping a
+    bare URL in frontmatter (`title: [https://x](https://x)`) turns the
+    block into unparseable YAML. `_parse_document` then returns
+    `(None, malformed_yaml)`, and the note drops out of every list, every
+    search, and every `--json` payload choom produces -- the note is still
+    on disk and is now invisible to the tool. This mask exists so that
+    failure can never happen.
+    """
+    if not text.startswith("---\n"):
+        return text
+    terminator = text.find("\n---", 3)
+    if terminator == -1:
+        return text
+    end = terminator + len("\n---")
+    masked_block = "".join(ch if ch in ("\n", "\r") else " " for ch in text[:end])
+    return masked_block + text[end:]
+
+
+def _mask_comments(text: str) -> str:
+    """Blank HTML comments, ``<!--`` through the next ``-->``, to spaces,
+    across line boundaries, preserving every line terminator. Covers the
+    task line's own metadata comment (choom parses its contents) and any
+    comment a user wrote for themselves. An unterminated comment masks to
+    end-of-file -- the conservative direction, since it converts less."""
+    out = list(text)
+    pos = 0
+    while True:
+        start = text.find(_COMMENT_START, pos)
+        if start == -1:
+            break
+        close = text.find(_COMMENT_END, start + len(_COMMENT_START))
+        end = close + len(_COMMENT_END) if close != -1 else len(text)
+        for i in range(start, end):
+            if out[i] not in ("\n", "\r"):
+                out[i] = " "
+        pos = end
+    return "".join(out)
+
+
+def _mask_links(text: str) -> str:
+    r"""Blank every markdown inline link or image, ``[text](dest)`` /
+    ``![alt](dest)`` -- the *whole* span, link text and destination
+    together, to spaces (FR-009, research R1/R6). Masking only the
+    destination would leave the link-text copy of an already-converted URL
+    exposed on the next save and break idempotency: the second pass would
+    then produce ``[[U](U)](U)`` and the third ``[[[U](U)](U)](U)``, the
+    user's file degrading a little on every save. Masking the whole span is
+    what makes ``[U](U)`` inert on every later pass.
+
+    Does not use `_LINK_RE` (see the module comment above this section) --
+    the destination is scanned with paren-depth counting instead, so a
+    destination with balanced parentheses is fully covered. An unbalanced
+    paren inside an *angle-wrapped* destination defeats depth counting by
+    construction (there is no way to tell, by counting alone, which ``)``
+    closes the link); when that happens this function simply does not
+    recognise a link here, and `_mask_angle` (run immediately after, in the
+    mask pipeline) backstops it by blanking the `<...>` run on its own
+    terms, which need no paren balance at all.
+
+    An unclosed ``[`` never swallows the rest of the file: the text slot is
+    only ever treated as a candidate up to the next ``[`` or ``]``, exactly
+    matching `_LINK_RE`'s own ``[^\[\]]*`` text rule, and a failed match
+    advances one character rather than skipping ahead.
+    """
+    out = list(text)
+    i = 0
+    n = len(text)
+    while i < n:
+        if text[i] != "[":
+            i += 1
+            continue
+        text_end = i + 1
+        while text_end < n and text[text_end] not in ("[", "]"):
+            text_end += 1
+        if text_end >= n or text[text_end] != "]" or text_end + 1 >= n or text[text_end + 1] != "(":
+            i += 1
+            continue
+        depth = 1
+        j = text_end + 2
+        closed_at = -1
+        while j < n:
+            ch = text[j]
+            if ch == "\n" and j + 1 < n and text[j + 1] == "\n":
+                break  # a destination never spans a blank line; give up
+            if ch == "(":
+                depth += 1
+            elif ch == ")":
+                depth -= 1
+                if depth == 0:
+                    closed_at = j
+                    break
+            j += 1
+        if closed_at == -1:
+            i += 1
+            continue
+        span_start = i - 1 if i > 0 and text[i - 1] == "!" else i
+        span_end = closed_at + 1
+        for k in range(span_start, span_end):
+            if out[k] not in ("\n", "\r"):
+                out[k] = " "
+        i = span_end
+    return "".join(out)
+
+
+def _mask_angle(text: str) -> str:
+    """Blank ``<...>`` runs containing no newline, to spaces -- a CommonMark
+    autolink (``<https://example.com>``) and a raw HTML tag
+    (``<a href="...">``) in one rule, since both share the delimiter and
+    neither may contain a literal newline (FR-010, FR-011). Also the
+    backstop for `_mask_links`: an angle-wrapped link destination whose
+    interior parentheses are unbalanced defeats that function's paren-depth
+    counter, and this rule catches the ``<...>`` regardless, because it does
+    not count parens at all."""
+    return _ANGLE_SPAN_RE.sub(lambda m: " " * len(m.group()), text)
+
+
+def _mask_refdefs(text: str) -> str:
+    """Blank a link reference definition, ``[label]: destination`` (FR-012),
+    to spaces. Wrapping the destination would turn it into
+    ``[label]: [dest](dest)``, which is no longer a valid reference
+    definition, and would silently kill every ``[label]`` reference
+    elsewhere in the file."""
+    return _REFDEF_RE.sub(lambda m: " " * len(m.group()), text)
+
+
+def _mask_for_bare_urls(text: str) -> str:
+    r"""Compose the seven exclusion masks `format_bare_urls` relies on, in the
+    order that lets each one see only real structure (research R2):
+
+    frontmatter -> fences -> code spans -> comments -> links/images ->
+    angle spans -> reference definitions
+
+    Frontmatter is masked first because its own contents must never be
+    read as anything else. Fences and code spans come next, reusing
+    `_mask_fences` and `_mask_code_spans` **verbatim** -- this function adds
+    no new fence-parsing or backtick-parsing logic anywhere (FR-031); a
+    second notion of "what counts as code" in one module is exactly how a
+    byte-preservation guarantee gets quietly broken. Comments are masked for
+    the same opacity reason -- a fenced block or a comment containing
+    ``[a](b)`` must never be read as link syntax by the links/images mask
+    that runs after it. Angle spans run *after* links/images so they can
+    backstop the one case paren-depth counting cannot resolve. Reference
+    definitions run last.
+
+    Every mask blanks its spans to spaces and leaves every ``\n``/``\r`` in
+    place, so the string returned is always the same length as `text`, with
+    the same newline positions -- the property that makes every offset found
+    in the masked text valid in `text` unchanged.
+    """
+    masked = _mask_frontmatter(text)
+    masked = _mask_fences(masked)
+    masked = _mask_code_spans(masked)
+    masked = _mask_comments(masked)
+    masked = _mask_links(masked)
+    masked = _mask_angle(masked)
+    masked = _mask_refdefs(masked)
+    return masked
+
+
+def _trim_bare_url(candidate: str) -> str:
+    """Trim `candidate`'s tail per FR-013, repeatedly, until neither rule
+    fires: drop a final character in `. , : ; ! ? ' " * _ ~`, or drop a
+    final `)` while `candidate` holds more `)` than `(`. The paren rule is
+    what separates "the URL owns this parenthesis" from "the sentence
+    does", and is exact in both directions since it only ever counts.
+    `?`, `&`, `=`, `/`, and `%` are never touched -- they are the URL, not
+    punctuation trailing it. Never raises."""
+    while candidate:
+        if candidate[-1] in _TRAILING_CHARS:
+            candidate = candidate[:-1]
+            continue
+        if candidate[-1] == ")" and candidate.count(")") > candidate.count("("):
+            candidate = candidate[:-1]
+            continue
+        break
+    return candidate
+
+
+def format_bare_urls(text: str) -> tuple[str, tuple[UrlConversion, ...]]:
+    """Wrap every bare ``http://`` or ``https://`` URL in `text` as a
+    markdown link (018-automatic-link-detection, FR-001, contracts/core-
+    api.md C1).
+
+    Each bare URL becomes ``[<url>](<destination>)`` with the URL
+    reproduced byte-for-byte in both slots; the destination is angle-wrapped
+    only when it contains a space, ``(``, ``)``, ``<``, or ``>``, by
+    `_render_destination` -- the same rule every other link choom writes
+    already uses.
+
+    A URL is skipped -- left byte-identical -- when it sits in frontmatter,
+    a fenced code block, an inline code span, an HTML comment, an existing
+    link or image, a CommonMark autolink, a raw HTML tag, or a link
+    reference definition; when it has no host after ``://``; when it does
+    not begin a token (a candidate must start at the beginning of `text` or
+    immediately after whitespace or one of ``([{"'*_~|>``); or when it
+    contains ``[`` or ``]`` -- the candidate pattern's own character class
+    already excludes both, so a bracketed IPv6 host such as
+    ``https://[::1]/status`` never produces a convertible candidate in the
+    first place.
+
+    Returns `text` itself -- the same object -- when nothing was converted,
+    so a caller can test identity and skip the rest of a save unconditionally.
+
+    Idempotent: `format_bare_urls(format_bare_urls(t)[0])[0] ==
+    format_bare_urls(t)[0]`, for any `t`, through any number of passes --
+    masking the *whole* span of an existing link (`_mask_links`, above)
+    means both copies of a converted URL are invisible to the next pass.
+
+    Resolves nothing against the workspace, unlike `heal_text` -- a URL is
+    self-describing, so this function takes no `Workspace` and no `Path`.
+
+    Never raises. Any input is valid input.
+    """
+    masked = _mask_for_bare_urls(text)
+    conversions: list[UrlConversion] = []
+    for match in _BARE_URL_RE.finditer(masked):
+        start = match.start("u")
+        scheme = match.group("scheme")
+        url = _trim_bare_url(match.group("u"))
+        if len(url) <= len(scheme):
+            continue
+        end = start + len(url)
+        replacement = f"[{url}]({_render_destination(url)})"
+        conversions.append(UrlConversion(start=start, end=end, url=url, replacement=replacement))
+
+    if not conversions:
+        return text, ()
+
+    new_text = text
+    for conv in sorted(conversions, key=lambda c: c.start, reverse=True):
+        new_text = new_text[: conv.start] + conv.replacement + new_text[conv.end :]
+
+    return new_text, tuple(conversions)
+
+
+def map_cursor_offset(conversions: tuple[UrlConversion, ...], offset: int) -> int:
+    """Where `offset` -- a character offset into the text handed to
+    `format_bare_urls` -- ends up in the text it returned (contracts/core-
+    api.md C2).
+
+    An offset at or before a conversion's start is unchanged, so far as that
+    conversion is concerned. An offset strictly inside a converted span --
+    after its start and before its end -- lands at the end of that span's
+    replacement, since there is no meaningful position between the two
+    copies of the URL a cursor could occupy. An offset at or after a
+    conversion's end is shifted right by what that conversion added, and the
+    next conversion is then checked the same way.
+
+    Pure integer arithmetic over `conversions`, in ascending order by
+    `start`; reads no text. Never raises.
+    """
+    shift = 0
+    for conv in conversions:
+        if offset <= conv.start:
+            return offset + shift
+        if offset < conv.end:
+            return conv.start + shift + len(conv.replacement)
+        shift += len(conv.replacement) - (conv.end - conv.start)
+    return offset + shift
+
+
 # --- Resolution -------------------------------------------------------------
 
 
@@ -320,19 +633,32 @@ def resolve_id(
                 )
 
     if "task" in pools:
+        # tasks.md first, and the done store only on a miss
+        # (019-completed-tasks-partition, research R4/R9) -- resolving an
+        # open task's id, the common case, costs exactly what it always
+        # did. `LinkTarget.path` is *always* `workspace.tasks_file`,
+        # whichever file actually holds the record right now (FR-024): this
+        # is the canonical-address rule that is the whole reason completing
+        # or reopening a task rewrites no mirror anywhere in the vault. Do
+        # not "fix" this to the record's real path -- that would be the bug.
         tasks, task_warnings = load_tasks(workspace)
         warnings.extend(task_warnings)
-        for task in tasks:
-            if task.id == target_id:
-                candidates.append(
-                    LinkTarget(
-                        id=task.id,
-                        path=workspace.tasks_file,
-                        title=task.text,
-                        kind="task",
-                        line=task.line,
-                    )
+        task_matches = [t for t in tasks if t.id == target_id]
+        if not task_matches:
+            done_tasks, done_warnings = load_done_tasks(workspace)
+            warnings.extend(done_warnings)
+            task_matches = [t for t in done_tasks if t.id == target_id]
+        for task in task_matches:
+            assert task.id is not None  # every match here matched t.id == target_id above
+            candidates.append(
+                LinkTarget(
+                    id=task.id,
+                    path=workspace.tasks_file,
+                    title=task.text,
+                    kind="task",
+                    line=task.line,
                 )
+            )
 
     if not candidates:
         return None, tuple(warnings)
@@ -517,6 +843,10 @@ def _iter_target_paths(workspace: Workspace, paths: tuple[Path, ...]) -> list[Pa
             result.extend(sorted(directory.rglob("*.md")))
     if workspace.tasks_file.is_file():
         result.append(workspace.tasks_file)
+    # 019-completed-tasks-partition (FR-028): ordinary markdown links in a
+    # completed task's text or body are still links and must not stop being
+    # checked/healed because the task moved into the done store.
+    result.extend(iter_done_files(workspace))
     return result
 
 
@@ -530,7 +860,11 @@ def _task_links(task: Task, tasks_path: Path) -> tuple[Link, ...]:
 
 
 def _task_field_reports(workspace: Workspace, tasks_path: Path) -> list[LinkReport]:
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): a completed task's own `links:`
+    # field ids are still links. Every report is attributed to `tasks_path`
+    # (always tasks.md, the canonical address, FR-024) regardless of which
+    # file the record currently sits in.
+    tasks, _warnings = load_task_store(workspace)
     reports: list[LinkReport] = []
     for task in tasks:
         for link in _task_links(task, tasks_path):
@@ -656,7 +990,9 @@ def outbound_links(workspace: Workspace, source: Path) -> tuple[tuple[Link, Link
 
 
 def _all_task_field_links(workspace: Workspace, tasks_path: Path) -> list[Link]:
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): covers the whole store, not
+    # just tasks.md, so a completed task's `links:` field is still found.
+    tasks, _warnings = load_task_store(workspace)
     links: list[Link] = []
     for task in tasks:
         links.extend(_task_links(task, tasks_path))
@@ -706,16 +1042,20 @@ def outbound_for_target(
     if target.kind != "task":
         return outbound_links(workspace, target.path)
 
-    tasks, _warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-028): a completed task is found by
+    # searching the whole store, and its ordinary markdown links are read
+    # from wherever its record actually sits (`task.source`) -- that is
+    # where the bytes are -- while its `links:` field is still attributed
+    # to tasks.md, the canonical address (FR-024).
+    tasks, _warnings = load_task_store(workspace)
     task = next((t for t in tasks if t.id == target.id), None)
     if task is None:
         return ()
 
+    source_path = task.source or workspace.tasks_file
     links = list(_task_links(task, workspace.tasks_file))
     links.extend(
-        link
-        for owner_line, link in _tasks_file_links(workspace.tasks_file)
-        if owner_line == task.line
+        link for owner_line, link in _tasks_file_links(source_path) if owner_line == task.line
     )
     return tuple((link, resolve_link(workspace, link)[1]) for link in links)
 
@@ -759,6 +1099,21 @@ def inbound_links(workspace: Workspace, target_id: str) -> tuple[Link, ...]:
         # ...and markdown links written in tasks.md itself, which are ordinary
         # links that happen to live in a task's text or body (007).
         for _owner_line, link in _tasks_file_links(tasks_path):
+            if link.target_id == target_id:
+                results.append(link)
+
+    # 019-completed-tasks-partition (FR-028): a completed task's own
+    # markdown links move with it into the done store; they are still
+    # links and must still be found. `links:` field ids are already covered
+    # above via `_all_task_field_links`'s store-wide read.
+    for done_path in iter_done_files(workspace):
+        try:
+            data = done_path.read_bytes()
+        except OSError:
+            continue
+        if needle not in data:
+            continue
+        for _owner_line, link in _tasks_file_links(done_path):
             if link.target_id == target_id:
                 results.append(link)
 

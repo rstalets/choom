@@ -3,7 +3,8 @@ from __future__ import annotations
 import random
 
 from choom.core.models import Workspace
-from choom.core.tasks import add_task, load_tasks, set_task_body, set_task_state
+from choom.core.task_store import load_task_store
+from choom.core.tasks import add_task, set_task_body, set_task_state
 
 
 def test_thousand_random_operations_lose_nothing(tmp_workspace: Workspace) -> None:
@@ -24,7 +25,9 @@ def test_thousand_random_operations_lose_nothing(tmp_workspace: Workspace) -> No
             task_id = rng.choice(known_ids)
             set_task_state(tmp_workspace, task_id, done=(op == "complete"))
 
-    tasks, warnings = load_tasks(tmp_workspace)
+    # 019-completed-tasks-partition: a completed record no longer lives in
+    # tasks.md, so "no record lost" is now asserted against the whole store.
+    tasks, warnings = load_task_store(tmp_workspace)
     assert warnings == []
     assert len(tasks) == len(known_ids)
 
@@ -43,6 +46,7 @@ def test_body_bearing_fixtures_survive_random_operations(tmp_workspace: Workspac
     the file."""
     rng = random.Random(20260731)
     known_ids: list[str] = []
+    done_by_id: dict[str, bool] = {}
     expected_body_by_id: dict[str, str] = {}
     non_task_prelude = "# Tasks\n\nA line of prose that must never be touched.\n"
     tmp_workspace.tasks_file.write_text(non_task_prelude, encoding="utf-8", newline="\n")
@@ -60,22 +64,33 @@ def test_body_bearing_fixtures_survive_random_operations(tmp_workspace: Workspac
     ]
 
     for i in range(500):
-        op = rng.choice(["add", "complete", "reopen", "set_body"]) if known_ids else "add"
+        # 019-completed-tasks-partition: set_task_body is scoped to tasks.md
+        # (spec.md, Out of Scope) -- a currently-completed id is excluded
+        # from the "set_body" choice rather than exercising a NotFoundError
+        # this random walk was never meant to test.
+        open_ids = [tid for tid in known_ids if not done_by_id.get(tid, False)]
+        choices = ["add", "complete", "reopen"]
+        if open_ids:
+            choices.append("set_body")
+        op = rng.choice(choices) if known_ids else "add"
         if op == "add":
             text = f"task number {i}"
             task = add_task(tmp_workspace, text)
             known_ids.append(task.id)  # type: ignore[arg-type]
+            done_by_id[task.id] = False  # type: ignore[index]
             expected_body_by_id[task.id] = ""  # type: ignore[index]
         elif op == "set_body":
-            task_id = rng.choice(known_ids)
+            task_id = rng.choice(open_ids)
             body = rng.choice(fixture_bodies)
             set_task_body(tmp_workspace, task_id, body)
             expected_body_by_id[task_id] = body
         else:
             task_id = rng.choice(known_ids)
-            set_task_state(tmp_workspace, task_id, done=(op == "complete"))
+            done = op == "complete"
+            set_task_state(tmp_workspace, task_id, done=done)
+            done_by_id[task_id] = done
 
-    tasks, warnings = load_tasks(tmp_workspace)
+    tasks, warnings = load_task_store(tmp_workspace)
     assert warnings == []
     assert len(tasks) == len(known_ids)
 

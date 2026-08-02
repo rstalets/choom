@@ -98,9 +98,25 @@ updated: 2026-07-28T09:41:00
 - Filenames: `YYYY-MM-DD-<type>-<slug>.md`, ISO date first so lexical sort equals
   chronological sort.
 - Slugs: lowercase, alphanumeric and hyphens only, truncated to 40 characters.
-- Tasks are checkbox lines in `tasks.md`, metadata in a trailing HTML comment, field order
-  `id`, `type`, `tags`, `links`, `created`; empty fields are omitted. An optional body is
-  indented lines beneath the checkbox, after one blank line.
+- Tasks are checkbox lines in `tasks.md` (open) or a done-store day file (completed),
+  metadata in a trailing HTML comment, field order `id`, `type`, `tags`, `links`,
+  `created`, `completed`; empty fields are omitted. `completed` is present only on a
+  record choom has moved into the done store — its absence is legal on an older or
+  hand-completed record. An optional body is indented lines beneath the checkbox, after
+  one blank line.
+- **Completing a task moves its whole record — the checkbox line and its body — out of
+  `tasks.md` into `tasks/done/YYYY/MM/YYYY-MM-DD-done.md`, the day it was completed;
+  reopening moves it back.** A done-store day file has exactly `tasks.md`'s format, no
+  frontmatter — it is a container, not a record. `tasks.md` stays the open list and the
+  canonical address of the whole task collection for link purposes: a link to a task id
+  always derives its path as the path to `tasks.md`, whichever file currently holds the
+  record, so completing or reopening a task changes no link's destination and rewrites no
+  document (§3.3). A record's location is never authoritative — its completion date comes
+  from its own `completed:` field, never from the day file it happens to sit in, and choom
+  never relocates a record to correct its filing. Nothing in an existing workspace moves on
+  its own; a completed task already in `tasks.md` stays there until a real transition
+  (reopen, then complete again) moves it, or the explicit, non-interactive `choom task
+  tidy` sweep is invoked.
 - **Dated files are partitioned by `YYYY/MM/` under their collection root.** The layout is:
 
   ```
@@ -108,6 +124,7 @@ updated: 2026-07-28T09:41:00
   notes/YYYY/MM/YYYY-MM-DD-<type>-<slug>.md
   notes/daily/YYYY/MM/YYYY-MM-DD.md
   tasks.md
+  tasks/done/YYYY/MM/YYYY-MM-DD-done.md
   ```
 
   The partition is derived from the file's own date — the same date already in its filename and its `created` frontmatter — so a file's location is a pure function of data it already carries, and no lookup or index is needed to find or place one.
@@ -117,7 +134,7 @@ updated: 2026-07-28T09:41:00
   Rationale: a flat collection accumulates one file per meeting and one per day forever. At a few years of daily use that is thousands of entries in a single directory — slow to open in Explorer and Finder, unpleasant to scroll, and awkward for OneDrive's per-folder sync behaviour. Partitioning was fixed before v0.0.1 shipped, specifically so it never has to be a migration. Changing this layout after users have vaults means moving their files, and moving a user's files is the one thing this tool must never need to do.
 
 - **`type` is carried in frontmatter and in the filename only. Never as a directory.** Types are free-form and user-invented, so directory-per-type would fragment the vault into a long tail of one-file folders and complicate cross-workspace scanning. Date is the only axis the directory tree encodes, because date is the only attribute every file has exactly one of.
-- **The set of collections is not fixed, but growing it is rare and deliberate** — `meetings/`, `notes/`, `notes/daily/`, `tasks.md` are today's set, and a feature MAY add another only when it has a real, distinct need existing collections don't serve, never as a convenience knob. A new collection MUST fit the same `YYYY/MM` date partitioning as the rest — date stays the only axis the directory tree encodes, never `type` — so adding one carries no reindex or migration risk. Only date partitions inside a collection grow on their own, and only by year and month.
+- **The set of collections is not fixed, but growing it is rare and deliberate** — `meetings/`, `notes/`, `notes/daily/`, `tasks.md`, `tasks/done/` are today's set, and a feature MAY add another only when it has a real, distinct need existing collections don't serve, never as a convenience knob. A new collection MUST fit the same `YYYY/MM` date partitioning as the rest — date stays the only axis the directory tree encodes, never `type` — so adding one carries no reindex or migration risk. Only date partitions inside a collection grow on their own, and only by year and month.
 - **Partitions are created on demand and never pruned.** Writing the first file of a month creates its directory; nothing creates directories in advance, and an empty partition left behind by a deleted file is harmless and is left alone.
 - **Scans are recursive.** Reading a collection means walking its whole subtree, not listing one directory. A file the user has filed under the wrong month still lists — its date comes from frontmatter, never from its path. choom never moves a file to match its partition.
 - Paths must stay well under the Windows 260-character limit — assume the root is already something like `C:\Users\name\OneDrive - Contoso Corporation\Team Notes\`. The partition adds 8 characters (`/YYYY/MM`), taking the worst-case generated path from 107 to 115 characters below the workspace root.
@@ -137,6 +154,7 @@ See [Q3 planning](../../../meetings/2026/07/2026-07-28-q3-planning.md#meeting_20
 - **Inbound links are never stored.** `choom links <id>` and the preview pane's Links section answer "what points at this record" by scanning the workspace at the moment they are asked, the same way `meeting list` scans a collection. No index, no cache, no back-reference written into any target.
 - Text inside a fenced code block or an inline code span is never treated as a link — a note that documents link syntax is not rewritten.
 - A task may carry links too, via the `links:` field on its checkbox line — bare ids, never paths, since a task line is already one line of metadata.
+- **`tasks.md` is the canonical address of the task collection.** A link to a task id always derives its path as the path to `tasks.md`, whichever file — the open list or a done-store day file — currently holds the record. Completing or reopening a task therefore changes no link's correct destination, makes no link stale, and requires no document to be rewritten.
 
 **A checklist item that links to a task is a control surface onto it, not a copy of it.**
 

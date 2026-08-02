@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import asyncio
 import re
+from datetime import date
 from pathlib import Path
 
 import pytest
 
 from choom.cli.main import main
-from choom.core.workspace import init_workspace
+from choom.core.task_store import done_file_for
+from choom.core.workspace import find_workspace, init_workspace
 from choom.tui.app import ChoomApp
 from choom.tui.list_screen import ListScreen, ListView, TaskRow
 from tests.helpers import editor_pane, type_command
@@ -100,5 +102,14 @@ def test_cli_and_tui_toggle_produce_byte_identical_files(
     asyncio.run(_toggle_via_tui(workspace))
     tui_text = workspace.tasks_file.read_text(encoding="utf-8")
 
+    # 019-completed-tasks-partition: the completed record leaves tasks.md
+    # for today's done-store file in both cases -- the CLI's `task done` and
+    # the TUI's space bar both land on `move_record`, and produce byte-
+    # identical results in *both* files, not only the one that empties out.
     assert tui_text == cli_text
-    assert "[x]" in tui_text
+    assert "task_a1b2" not in tui_text
+
+    cli_done_text = done_file_for(find_workspace(cli_dir), date.today()).read_text(encoding="utf-8")
+    tui_done_text = done_file_for(workspace, date.today()).read_text(encoding="utf-8")
+    assert tui_done_text == cli_done_text
+    assert "[x]" in tui_done_text

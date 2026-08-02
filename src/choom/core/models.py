@@ -27,6 +27,13 @@ class Workspace:
     def tasks_file(self) -> Path:
         return self.root / "tasks.md"
 
+    @property
+    def done_dir(self) -> Path:
+        """The done-store collection root, `tasks/done/` (019-completed-tasks-
+        partition). Partitioned `YYYY/MM/` beneath it, same as every other
+        dated collection; see `choom.core.task_store.done_file_for`."""
+        return self.root / "tasks" / "done"
+
 
 @dataclass(frozen=True, slots=True)
 class Document:
@@ -84,6 +91,7 @@ ScanWarningReason = Literal[
     "task_unterminated_comment",
     "task_malformed_comment",
     "task_invalid_value",
+    "task_unreadable_file",
     "link_dead",
     "link_ambiguous",
     "mirror_conflict",
@@ -118,12 +126,26 @@ class EditableFile:
 
 
 @dataclass(frozen=True, slots=True)
+class UrlConversion:
+    """One bare-URL-to-markdown-link edit `format_bare_urls` made, as offsets into
+    the *original* text it was given (018-automatic-link-detection). `start`/`end`
+    bound the matched URL; `replacement` is what was spliced in its place --
+    `[url](destination)`. Never persisted: recomputed from the text on every save."""
+
+    start: int
+    end: int
+    url: str
+    replacement: str
+
+
+@dataclass(frozen=True, slots=True)
 class SaveResult:
     ok: bool
     saved_text: str
     stamped: bool
     message: str
     warnings: tuple[ScanWarning, ...] = ()
+    conversions: tuple[UrlConversion, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -144,6 +166,28 @@ class Task:
     line: int
     links: tuple[str, ...] = ()
     body: str = ""
+    #: The record's own completion date, from its `completed:` field
+    #: (019-completed-tasks-partition). `None` for every open record and for
+    #: a completed record that predates this feature. Never derived from
+    #: `source` -- a record's location is never authoritative (FR-005).
+    completed: date | None = None
+    #: The file this record was read from. Populated by every loader
+    #: (`load_tasks`, `load_done_tasks`, `load_task_store`); `None` only for a
+    #: `Task` built by a caller that never read one. Exists because `line` is
+    #: a line number and stopped being self-describing the moment a record
+    #: could live in either of two files.
+    source: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TidySummary:
+    """What `task_store.tidy_completed` (P3, droppable) did to `tasks.md`
+    (019-completed-tasks-partition). Lives for the length of one command;
+    never persisted."""
+
+    moved: int
+    left: int
+    warnings: tuple[ScanWarning, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -250,13 +294,23 @@ class Mirror:
 
     `state_offset` is the load-bearing field: it is the character offset of
     the single state character in the document text, so applying a state is
-    always `text[:o] + char + text[o+1:]` -- no line is ever re-rendered."""
+    always `text[:o] + char + text[o+1:]` -- no line is ever re-rendered.
+
+    `link_start`/`link_end` are the character offsets of the mirror's own
+    link -- the same `Link` this was selected from (017-editor-task-delete).
+    They exist so a caller deciding whether a line carries text beyond its
+    checkbox and its task link (FR-011) reads the answer `find_mirrors`
+    already computed rather than re-scanning the line for it, which would be
+    a second, divergent definition of which link is the mirror (FR-005,
+    FR-007)."""
 
     task_id: str
     done: bool
     line: int
     state_offset: int
     text: str
+    link_start: int
+    link_end: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -280,6 +334,38 @@ class MirrorReport:
     text: str
     resolutions: tuple[MirrorResolution, ...]
     warnings: tuple[ScanWarning, ...]
+
+
+MirrorDeletionOutcome = Literal[
+    "deletable", "line_only", "unreadable_tasks", "ambiguous_id", "self_referential"
+]
+
+
+@dataclass(frozen=True, slots=True)
+class MirrorDeletion:
+    """What deleting the task line at one cursor position would do
+    (017-editor-task-delete), decided by `mirrors.plan_mirror_deletion` and
+    carried out by `mirrors.commit_mirror_deletion`. Never persisted -- it
+    lives for the length of one keystroke.
+
+    `text` and `span` describe the same single removal:
+    `text == original[:span[0]] + original[span[1]:]`. `text` is what a
+    non-widget caller uses; `span` is what the TUI converts to widget
+    coordinates so the removal is one undoable `TextArea.delete` rather than
+    a re-render (Principle IV, FR-017, FR-018). Both are `""` / `(0, 0)` on a
+    refusing outcome, since nothing is removed.
+
+    `message` names why a refusing outcome was refused and what to do about
+    it (Principle V); it is `""` for `deletable` and `line_only`, which need
+    no explanation."""
+
+    outcome: MirrorDeletionOutcome
+    task_id: str
+    description: str
+    text: str
+    span: tuple[int, int]
+    extra_text: bool
+    message: str = ""
 
 
 @dataclass(frozen=True, slots=True)

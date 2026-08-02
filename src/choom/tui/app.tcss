@@ -13,6 +13,20 @@ CollectionBar {
     layout: horizontal;
 }
 
+/* 020-vertical-tui-mode: added variant, base #body rule above is untouched
+   (FR-020). Selects the vertical arrangement only; every rule below scoped
+   under `.-vertical` likewise leaves its horizontal counterpart alone. */
+#body.-vertical {
+    layout: vertical;
+}
+
+/* 020-vertical-tui-mode: new -- vertical only. Groups the scope pane and the
+   record list side by side so the preview can span beneath both. */
+#upper-band {
+    height: 1fr;
+    layout: horizontal;
+}
+
 #scope-pane {
     width: 14;
     border-right: solid $accent;
@@ -23,9 +37,24 @@ CollectionBar {
     border-right: solid $accent;
 }
 
+/* 020-vertical-tui-mode: vertical only -- #list-pane is rightmost in the
+   upper band there, not bordering the preview pane. */
+#body.-vertical #list-pane {
+    border-right: none;
+}
+
 #preview-pane {
     width: 3fr;
     padding: 0 1;
+}
+
+/* 020-vertical-tui-mode: vertical only -- full width beneath the upper band
+   rather than a fraction of a horizontal row, with a divider on top instead
+   of a side border. */
+#body.-vertical #preview-pane {
+    width: 1fr;
+    height: 1fr;
+    border-top: solid $accent;
 }
 
 #scope-list {
@@ -52,6 +81,14 @@ CollectionBar {
     height: auto;
     max-height: 12;
     border-top: solid $accent;
+}
+
+/* 020-vertical-tui-mode, FR-043: the fixed `max-height: 12` above is a
+   modest slice of a full-height horizontal preview pane, but would consume
+   the *entire* lower band at 80x24 in vertical, leaving no preview visible.
+   Bound as a fraction of the band instead of a fixed row count. */
+#body.-vertical #preview-links-section {
+    max-height: 50%;
 }
 
 #preview-links-list {

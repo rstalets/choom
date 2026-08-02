@@ -18,7 +18,7 @@ does that.
 from __future__ import annotations
 
 import re
-from collections.abc import Container, Mapping
+from collections.abc import Container, Iterable, Mapping
 from datetime import datetime
 from pathlib import Path
 
@@ -31,17 +31,43 @@ from choom.core.models import (
     EditableFile,
     LinkTarget,
     Mirror,
+    MirrorDeletion,
     MirrorReport,
     MirrorResolution,
+    ParsedTasks,
     ReplyCapture,
     SaveResult,
     ScanWarning,
     Task,
     Workspace,
 )
-from choom.core.tasks import add_task, load_tasks, set_task_state
+from choom.core.task_store import iter_done_files, load_done_tasks
+from choom.core.tasks import (
+    _display_path,
+    _format_line_numbers,
+    add_task,
+    delete_task,
+    load_tasks,
+    parse_tasks,
+    set_task_state,
+)
 
 _MIRROR_PREFIX = re.compile(r"^(?P<indent>[ \t]*)[-*+] \[(?P<state>[ xX])\] ")
+
+
+def _split_lines(text: str) -> tuple[list[str], list[int]]:
+    """`text` split on "\n", plus the character offset each line starts at.
+
+    Shared by `find_mirrors` and `plan_mirror_deletion` so the two never
+    compute a line's start offset by a slightly different rule. When `text`
+    ends with "\n", the final element of both lists describes the empty tail
+    after the last real line, which is what lets a removal span run cleanly
+    to `len(text)`."""
+    lines = text.split("\n")
+    line_starts = [0]
+    for line in lines[:-1]:
+        line_starts.append(line_starts[-1] + len(line) + 1)
+    return lines, line_starts
 
 
 # --- Recognition ----------------------------------------------------------------
@@ -65,19 +91,18 @@ def find_mirrors(text: str, *, source: Path) -> tuple[Mirror, ...]:
     Never raises. Any input is valid input; a line this cannot make sense of is a
     line the user typed.
     """
-    task_links_by_line: dict[int, list[tuple[int, str, str]]] = {}
+    task_links_by_line: dict[int, list[tuple[int, int, str, str]]] = {}
     for link in find_links(text, source=source):
         if link.target_id is None or not link.target_id.startswith("task_"):
             continue
-        task_links_by_line.setdefault(link.line, []).append((link.start, link.target_id, link.text))
+        task_links_by_line.setdefault(link.line, []).append(
+            (link.start, link.end, link.target_id, link.text)
+        )
 
     if not task_links_by_line:
         return ()
 
-    lines = text.split("\n")
-    line_starts: list[int] = [0]
-    for line in lines[:-1]:
-        line_starts.append(line_starts[-1] + len(line) + 1)
+    lines, line_starts = _split_lines(text)
 
     mirrors: list[Mirror] = []
     for line_no, candidates in task_links_by_line.items():
@@ -89,7 +114,7 @@ def find_mirrors(text: str, *, source: Path) -> tuple[Mirror, ...]:
         if match is None:
             continue
         candidates.sort(key=lambda c: c[0])
-        _start, task_id, link_text = candidates[0]
+        link_start, link_end, task_id, link_text = candidates[0]
         state_offset = line_starts[index] + match.start("state")
         mirrors.append(
             Mirror(
@@ -98,6 +123,8 @@ def find_mirrors(text: str, *, source: Path) -> tuple[Mirror, ...]:
                 line=line_no,
                 state_offset=state_offset,
                 text=link_text,
+                link_start=link_start,
+                link_end=link_end,
             )
         )
 
@@ -256,6 +283,266 @@ def capture_reply_tasks(
     return ReplyCapture(text="\n".join(tightened), tasks=tuple(tasks), warnings=tuple(warnings))
 
 
+# --- Deletion ---------------------------------------------------------------
+
+#: The two `parse_tasks` warning reasons that mean a line was skipped
+#: *without* producing a `Task` (src/choom/core/tasks.py, both branches
+#: `continue` before `_append_task`). A task id that resolves to nothing in a
+#: tasks.md carrying one of these is a task choom cannot tell "deleted" from
+#: "unreadable" (research R6, FR-021). `task_invalid_value` is deliberately
+#: excluded -- it still falls through to `_append_task`, so the task remains
+#: findable by id and must not block a deletion that can otherwise proceed
+#: (FR-022).
+_UNREADABLE_TASK_REASONS = frozenset({"task_unterminated_comment", "task_malformed_comment"})
+
+#: `parse_tasks` has no path of its own, so every warning message it emits
+#: is worded as if it came from "tasks.md" -- true for the open list, and
+#: not true once the same function is reused for a done-store day file
+#: (019-completed-tasks-partition). This regex only ever extracts the line
+#: number, never the file name, so it stays correct either way; the actual
+#: display name is supplied by whichever file was really being read.
+_WARNING_LINE = re.compile(r"^tasks\.md:(\d+):")
+
+
+def _warning_line_number(warning: ScanWarning) -> int | None:
+    match = _WARNING_LINE.match(warning.message)
+    return int(match.group(1)) if match else None
+
+
+def _removal_span(
+    text: str, lines: list[str], line_starts: list[int], index: int
+) -> tuple[int, int]:
+    """The character span that removes `lines[index]` and exactly its own
+    line terminator (research R4, data-model.md §3).
+
+    A line followed by another -- including the empty tail `_split_lines`
+    leaves after a final "\n" -- spans from its own start to the next line's
+    start, which includes the "\n" between them. The only line that cannot
+    use that rule is the last line of a buffer with no trailing newline: it
+    has no following start to run to, so the span instead absorbs the
+    *preceding* terminator, which is what keeps removal from leaving a stray
+    blank line behind. The only-line case has no preceding terminator either,
+    so it spans the whole buffer.
+    """
+    if len(lines) == 1:
+        return (0, len(text))
+    if index == len(lines) - 1:
+        return (line_starts[index] - 1, len(text))
+    return (line_starts[index], line_starts[index + 1])
+
+
+def _line_carries_extra_text(content: str, mirror: Mirror, line_start: int) -> bool:
+    """FR-011: does `content` -- one line of text, already known to be
+    `mirror`'s line -- hold anything besides the checklist prefix and the
+    mirror's own link. Reads `mirror.link_start`/`link_end` rather than
+    re-scanning for a link, so this can never disagree with `find_mirrors`
+    about which link is the mirror (FR-005, FR-007)."""
+    match = _MIRROR_PREFIX.match(content)
+    assert match is not None  # content is mirror.line's content; the prefix matched by definition
+    relative_start = mirror.link_start - line_start
+    relative_end = mirror.link_end - line_start
+    remainder = content[match.end() : relative_start] + content[relative_end:]
+    return remainder.strip() != ""
+
+
+def plan_mirror_deletion(
+    workspace: Workspace,
+    text: str,
+    line: int,
+    *,
+    source: Path,
+    body_task_id: str | None = None,
+) -> MirrorDeletion | None:
+    """Decide what deleting the task line at `line` (1-based) would do,
+    without doing any of it (research R3, contracts/core-api.md §1).
+
+    Returns `None` when `line` carries no task line -- FR-008's no-op,
+    covering prose, a heading, a blank line, frontmatter, a checklist item
+    with no task link, and anything inside a fenced code block or inline
+    code span, all for free from `find_mirrors`/`find_links`. There is no
+    second definition of what a task line is here (FR-005).
+
+    Otherwise returns a `MirrorDeletion` whose `outcome` is decided in this
+    order: `self_referential` when `body_task_id` names the same task as this
+    line (FR-024); `deletable` when exactly one task record carries the id,
+    in either half of the store (FR-033, bug 1's fix); `ambiguous_id` when
+    more than one does, across files (FR-034); `unreadable_tasks` when none
+    does and a file actually consulted during this resolution holds a line
+    `parse_tasks` could not read (FR-021, FR-035); `line_only` when none does
+    and every file consulted parsed cleanly (FR-012).
+
+    Resolves across the whole store -- `tasks.md` first, then every
+    done-store day file (019-completed-tasks-partition) -- with `parse_tasks`
+    only, never `load_tasks`: the latter backfills missing ids and writes the
+    file, which a step running before the user has confirmed anything must
+    not do (FR-014, research R6). `unreadable_tasks` is scoped to files
+    actually read during *this* resolution, so a broken line in an old day
+    file the user has never opened can never become a standing veto on every
+    `ctrl+t` in the workspace (research R6).
+
+    Never raises. A workspace with no tasks.md and no done store at all is
+    `line_only` -- no record exists, nothing unparseable. tasks.md existing
+    but unreadable at the OS level is `unreadable_tasks` immediately, with
+    the OS error folded into `message` -- unlike a done-store file in the
+    same state, which is skipped rather than treated as a veto, since it is
+    never the file the user is looking at.
+    """
+    mirrors = find_mirrors(text, source=source)
+    mirror = next((m for m in mirrors if m.line == line), None)
+    if mirror is None:
+        return None
+
+    lines, line_starts = _split_lines(text)
+    index = line - 1
+    content = lines[index]
+    span = _removal_span(text, lines, line_starts, index)
+    extra_text = _line_carries_extra_text(content, mirror, line_starts[index])
+    removed_text = text[: span[0]] + text[span[1] :]
+
+    if body_task_id is not None and body_task_id == mirror.task_id:
+        return MirrorDeletion(
+            outcome="self_referential",
+            task_id=mirror.task_id,
+            description=mirror.text,
+            text="",
+            span=(0, 0),
+            extra_text=extra_text,
+            message=(
+                "this line is the task you are editing; close this editor "
+                "and delete it from the tasks list"
+            ),
+        )
+
+    task_id = mirror.task_id
+    match_locations: list[tuple[str, int]] = []
+    unreadable_location: str | None = None
+
+    def _consult(path: Path, parsed: ParsedTasks) -> None:
+        nonlocal unreadable_location
+        display = _display_path(workspace, path)
+        for t in parsed.tasks:
+            if t.id == task_id:
+                match_locations.append((display, t.line))
+        if unreadable_location is None:
+            warning = next(
+                (w for w in parsed.warnings if w.reason in _UNREADABLE_TASK_REASONS), None
+            )
+            if warning is not None:
+                line_no = _warning_line_number(warning)
+                unreadable_location = f"{display}:{line_no}" if line_no is not None else display
+
+    tasks_path = workspace.tasks_file
+    if tasks_path.exists():
+        try:
+            raw = tasks_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            # An OS-level failure to open tasks.md means a duplicate hiding
+            # in it can never be ruled out -- refuse immediately, exactly as
+            # this function always has, rather than trusting a done-store
+            # match that might turn out to be ambiguous.
+            return MirrorDeletion(
+                outcome="unreadable_tasks",
+                task_id=task_id,
+                description=mirror.text,
+                text="",
+                span=(0, 0),
+                extra_text=extra_text,
+                message=f"tasks.md could not be read: {exc}; nothing was deleted",
+            )
+        _consult(tasks_path, parse_tasks(raw))
+
+    # Always scan the whole done store, never only on a miss: FR-034 needs
+    # a duplicate id spanning tasks.md and a day file caught *here*, not
+    # only at commit time, so a match already found in tasks.md must not
+    # skip the rest of the store. This does not reopen the "hundreds of day
+    # files" veto research R6 warns about: `deletable`/`ambiguous_id` are
+    # decided below before `unreadable_location` is ever consulted, so a
+    # broken line anywhere only matters for a mirror whose id resolves to
+    # nothing at all -- never for one that resolves cleanly, anywhere.
+    for done_path in iter_done_files(workspace):
+        try:
+            raw = done_path.read_text(encoding="utf-8")
+        except OSError:
+            # An unrelated day file this process cannot open is excluded
+            # from the resolution, not a veto on it.
+            continue
+        _consult(done_path, parse_tasks(raw))
+
+    if len(match_locations) > 1:
+        return MirrorDeletion(
+            outcome="ambiguous_id",
+            task_id=task_id,
+            description=mirror.text,
+            text="",
+            span=(0, 0),
+            extra_text=extra_text,
+            message=(
+                f"id {task_id!r} appears at {_format_line_numbers(match_locations)}; "
+                "delete one of them"
+            ),
+        )
+
+    if len(match_locations) == 1:
+        return MirrorDeletion(
+            outcome="deletable",
+            task_id=task_id,
+            description=mirror.text,
+            text=removed_text,
+            span=span,
+            extra_text=extra_text,
+        )
+
+    if unreadable_location is not None:
+        return MirrorDeletion(
+            outcome="unreadable_tasks",
+            task_id=task_id,
+            description=mirror.text,
+            text="",
+            span=(0, 0),
+            extra_text=extra_text,
+            message=(
+                f"{unreadable_location} could not be read; fix that line, then try again "
+                "-- nothing was deleted"
+            ),
+        )
+
+    return MirrorDeletion(
+        outcome="line_only",
+        task_id=task_id,
+        description=mirror.text,
+        text=removed_text,
+        span=span,
+        extra_text=extra_text,
+    )
+
+
+def commit_mirror_deletion(workspace: Workspace, plan: MirrorDeletion) -> MirrorDeletion:
+    """Carry out the tasks.md half of a `plan` the user has confirmed
+    (contracts/core-api.md §2). Never touches the document -- the caller
+    owns the buffer and applies `plan.span` itself.
+
+    `deletable` calls the existing `tasks.delete_task`, which re-reads,
+    re-parses, and locates by id before writing, so a plan gone stale between
+    the confirmation and this call cannot splice into a moved line. `line_only`
+    returns `plan` unchanged, having opened nothing -- there is no record to
+    remove. Any refusing outcome raises `UsageError`: reaching here with one
+    is a caller bug, not a user error, since the adapter is required to stop
+    at the plan step (contracts/tui.md C4).
+
+    Raises:
+        NotFoundError: the record disappeared between plan and commit.
+        UsageError: the id became ambiguous between plan and commit, or
+            `plan.outcome` was a refusing outcome.
+        WorkspaceError: tasks.md could not be written.
+    """
+    if plan.outcome == "deletable":
+        delete_task(workspace, plan.task_id)
+        return plan
+    if plan.outcome == "line_only":
+        return plan
+    raise UsageError(f"cannot commit a refused deletion (outcome={plan.outcome!r})")
+
+
 # --- The non-stamping write -------------------------------------------------------
 
 
@@ -294,11 +581,23 @@ def _dead_mirror_warning(source: Path, mirror: Mirror) -> ScanWarning:
 
 
 def _load_tasks_or_warning(
-    workspace: Workspace, source: Path
+    workspace: Workspace, source: Path, mirror_ids: Iterable[str]
 ) -> tuple[dict[str, Task], ScanWarning | None]:
     """`load_tasks`, but never raising: an unreadable tasks.md becomes one
     warning naming `source` rather than propagating WorkspaceError, so every
-    caller in this module stays true to its own "never raises" contract."""
+    caller in this module stays true to its own "never raises" contract.
+
+    Escalates to the done store at most once per call, and only when at
+    least one id in `mirror_ids` is not in `tasks.md` (019-completed-tasks-
+    partition, contracts/core-api.md C8, research R5 -- this is bug 2's
+    fix). Before this escalation, once completed records moved out of
+    `tasks.md`, every mirror of a completed task would resolve to nothing
+    here and `reconcile_on_open` would report it *dead* rather than ticking
+    it -- worse than the behaviour this feature replaces. A document whose
+    mirrors all name open tasks still costs exactly one file read (SC-004,
+    spec 008 SC-008 preserved), since the done store is never touched unless
+    something is actually missing from `tasks.md`.
+    """
     try:
         tasks, _load_warnings = load_tasks(workspace)
     except WorkspaceError as exc:
@@ -307,7 +606,15 @@ def _load_tasks_or_warning(
             reason="link_dead",
             message=f"{source.name}: could not read tasks.md to reconcile: {exc}",
         )
-    return {t.id: t for t in tasks if t.id is not None}, None
+    by_id = {t.id: t for t in tasks if t.id is not None}
+
+    if any(mirror_id not in by_id for mirror_id in mirror_ids):
+        done_tasks, _done_warnings = load_done_tasks(workspace)
+        for task in done_tasks:
+            if task.id is not None and task.id not in by_id:
+                by_id[task.id] = task
+
+    return by_id, None
 
 
 def reconcile_on_open(workspace: Workspace, text: str, *, source: Path) -> MirrorReport:
@@ -331,7 +638,9 @@ def reconcile_on_open(workspace: Workspace, text: str, *, source: Path) -> Mirro
     if not mirrors:
         return MirrorReport(text=text, resolutions=(), warnings=())
 
-    tasks_by_id, load_warning = _load_tasks_or_warning(workspace, source)
+    tasks_by_id, load_warning = _load_tasks_or_warning(
+        workspace, source, (m.task_id for m in mirrors)
+    )
     if load_warning is not None:
         return MirrorReport(text=text, resolutions=(), warnings=(load_warning,))
 
@@ -386,7 +695,9 @@ def reconcile_on_save(
     if not mirrors:
         return MirrorReport(text=text, resolutions=(), warnings=())
 
-    tasks_by_id, load_warning = _load_tasks_or_warning(workspace, source)
+    tasks_by_id, load_warning = _load_tasks_or_warning(
+        workspace, source, (m.task_id for m in mirrors)
+    )
     if load_warning is not None:
         return MirrorReport(text=text, resolutions=(), warnings=(load_warning,))
 

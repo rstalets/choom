@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+from datetime import date
+
 from choom.core.models import Workspace
+from choom.core.task_store import done_file_for
 from choom.core.tasks import add_task, set_task_state
 from choom.tui.app import ChoomApp
 from choom.tui.list_screen import ListView, TaskRow
@@ -35,11 +38,14 @@ async def test_toggling_moves_a_task_between_categories(tmp_workspace: Workspace
         await pilot.pause()
 
         # The TUI's toggle bridges to the same core write the CLI uses, and
-        # must preserve the fields already on the line.
-        text = tmp_workspace.tasks_file.read_text(encoding="utf-8")
-        assert "[x]" in text
-        assert "type:errand" in text
-        assert "tags:home" in text
+        # must preserve the fields already on the line. 019-completed-tasks-
+        # partition: the record moves into today's done-store file, so
+        # tasks.md no longer carries it.
+        assert task.id not in tmp_workspace.tasks_file.read_text(encoding="utf-8")
+        done_text = done_file_for(tmp_workspace, date.today()).read_text(encoding="utf-8")
+        assert "[x]" in done_text
+        assert "type:errand" in done_text
+        assert "tags:home" in done_text
 
         # FR-020: it moved out of To-Do (the default category)...
         assert not any(r.record.id == task.id for r in task_rows(app))

@@ -17,9 +17,9 @@ driving. The core decides who goes where, inspects every arrival, and is the onl
 gets to call a job finished -- and the only one that notices when a copy has started
 drifting off its route.
 
-This sits between `/product-owner` (which refines an issue into a real problem statement)
-and `/release` (which ships what landed). It does not refine issues and it does not cut
-releases.
+This sits between `/regina` (which refines an issue into a real problem statement and the
+decisions a spec needs) and `/release` (which ships what landed). It does not refine issues
+and it does not cut releases.
 
 **You are the orchestrator, not the implementer.** You run on Opus. You do not write
 feature code yourself. Your job is routing, review, verification, and merge decisions.
@@ -52,6 +52,9 @@ construct mid-run.
   Every other kind of problem (a flaky test, a merge conflict, an ambiguous requirement, a
   missing edge case, a lint failure, a CI misconfiguration) you are empowered to resolve
   or direct a subagent to resolve.
+- **Every PR you merge on your own authority carries the `delamain` label**, applied before the
+  merge. It is how the repo owner tells autonomously-merged work from human-reviewed work months
+  later, when the transcript is gone. See Step 9.
 - **Never commit to `main`, never force-push `main`, never merge a PR whose checks are not
   green.** When running `--into` an integration branch, you never touch `main` at all --
   merging `<TARGET>` into `main` is the user's decision, not yours, and you stop at handing
@@ -64,6 +67,86 @@ construct mid-run.
 - **No `Claude-Session:` line or `claude.ai/code` link in any PR title or body.** Public repo.
 - **Park, don't halt.** One blocked job does not stop the run. Park it, keep the rest moving,
   and report everything parked at the end.
+- **Never end a turn with nothing in flight.** You only wake up when a background agent
+  completes. A turn that ends with no agent running is a run that has silently died -- see
+  "Keeping the run alive" below. This is the single failure mode that costs a whole night.
+
+## Keeping the run alive
+
+You advance turn by turn, and the only thing that re-invokes you is a background agent
+finishing. Nothing polls on your behalf. That makes one specific mistake fatal in a way it
+would not be in an interactive session: **if you end a turn without a live agent, nothing
+will ever wake you, and the run stops until a human notices.** From the user's side a dead
+run and a slow one look identical, so it can burn hours before anyone asks.
+
+This has happened. An orchestrator wrote "now running #39", updated the ledger to match, and
+ended the turn -- having never made the `Agent` call. Two hours of real work, then six and a
+half hours of nothing. The wrong status line was not the damage; ending the turn with an
+empty queue was.
+
+Three rules, in order of how much they save you:
+
+1. **Act, then record.** Never write a ledger row, a status sentence, or a chat report that
+   describes an action you have not yet taken. Make the `Agent` call, confirm it returned an
+   agent id, and only then write it down. Prose that runs ahead of the tool call is how a
+   phantom job enters the ledger, and the ledger is what a resumed session trusts.
+2. **Check the queue before you stop.** Before ending any turn, ask: is at least one agent
+   actually in flight, or is the run genuinely complete? If neither, you are not finished --
+   keep working in this same turn. Spawn the next job, run the next review, do the next
+   verification. Do not hand off to a notification that is never going to arrive.
+3. **If a spawn fails, retry in the same turn.** A failed or refused `Agent` call leaves the
+   queue empty. Fix it and re-issue immediately rather than reporting the intent and stopping.
+
+**On resume, trust the filesystem over the ledger.** A ledger row saying "in progress" is a
+claim, not evidence -- it may describe an agent that was never spawned, or one that died. Before
+continuing a run you did not personally start this turn, verify each claimed in-flight job is
+real: does its branch exist (`git branch -a`), does its worktree exist (`git worktree list`),
+is there an open PR, and is its agent's output file still being written? A job that fails these
+checks was never running; restart it rather than waiting on it. `git worktree list` showing a
+worktree whose branch has no commits is the signature of a job that died before it produced
+anything.
+
+## Step 0 -- Resuming, and running under `/loop`
+
+**Before Step 1, check whether this run is already in progress.** Read
+`$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`. If a ledger exists for this work set, you are
+*resuming*, not starting, and two things change:
+
+- **Do not re-ask for the Step 4 go-ahead.** It was given once and it still holds. Re-asking
+  on every resume is how an unattended run turns into a queue of unanswered questions. Skip
+  straight to the first unfinished job in the ledger. The gate is per *run*, not per turn.
+- **Verify before you trust.** Every row claiming to be in flight is a claim, not evidence --
+  see "Keeping the run alive". Check each against the filesystem, and treat a job that fails
+  those checks as never having started: restart it rather than waiting on it.
+
+Re-present the run plan only if the work set itself has changed -- an issue added to or removed
+from the milestone, or a job you are about to park.
+
+### Running under `/loop`
+
+This skill is built to be driven by `/loop`, which fires on a wall-clock interval rather than
+waiting on a turn to complete. That matters because the orchestrator only wakes when a subagent
+finishes, so a turn that ends with an empty queue stalls the run until a human notices. A
+periodic tick is the external heartbeat that recovers from exactly that:
+
+```
+/loop 20m /delamain <milestone-or-issues>
+```
+
+Twenty to thirty minutes is the right order. The stall it guards against is rare and a tick that
+finds everything healthy costs almost nothing -- verify the queue, report nothing new, end the
+turn. Do not set a short interval to "watch" a job: subagent completions already re-invoke you,
+so a fast tick buys nothing and burns tokens.
+
+On each firing, do this and nothing more when the run is healthy:
+
+1. Read the ledger.
+2. Verify every in-flight claim against the filesystem.
+3. Restart anything dead; advance anything finished; spawn the next job if the queue is empty.
+4. If every job is merged or parked, the run is complete -- say so and stop the loop.
+
+A tick that finds a live agent and outstanding work should end quietly. Do not re-review a gate
+you have already passed, do not re-run a smoke test that already passed, and do not re-merge.
 
 ## Step 1 -- Resolve the work set
 
@@ -144,7 +227,7 @@ What changes when `<TARGET>` is not `main`:
 | Labels | Lane | Path |
 |---|---|---|
 | `enhancement` + `ready` | **Feature** | speckit: specify → plan → tasks → implement |
-| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/product-owner <n>` and skip. |
+| `enhancement`, no `ready` | **Parked** | Not refined. Recommend `/regina <n>` and skip. |
 | `bug` | **Direct** | Single subagent: reproduce → fix → test → PR |
 | `maintenance`, `documentation`, `dependencies`, `github_actions` | **Direct** | Single subagent: change → test → PR |
 | No label, or ambiguous | **Parked** | Ask rather than guess a lane. |
@@ -180,6 +263,10 @@ serialization. List anything parked at Step 2 and why.
 Ask for a single go-ahead. **This is the only approval gate.** After it, run to completion
 without checking back except to report a parked job or a constitution escalation.
 
+**Once per run, not once per turn.** If Step 0 found an existing ledger, the go-ahead has
+already been given -- do not ask again. Under `/loop` this is the difference between a heartbeat
+and an interrogation.
+
 ## Step 5 -- Model and agent routing
 
 | Work | Agent | Model | Isolation |
@@ -188,6 +275,10 @@ without checking back except to report a parked job or a constitution escalation
 | `/speckit-implement` | fresh `general-purpose` agent | **sonnet** | enters the feature's existing worktree |
 | Bugfix / maintenance / docs / CI | one `general-purpose` agent per issue | **sonnet** | `worktree` |
 | Follow-up fixes on an open PR | reuse that job's agent via `SendMessage` | same as the job | same worktree |
+
+Every `Agent` call returns an agent id. Treat that id as the receipt: until you have seen it,
+the job does not exist, is not in the ledger, and is not something you may describe as running.
+Ending a turn on an unconfirmed spawn stalls the run indefinitely (see "Keeping the run alive").
 
 Run every agent with `run_in_background: true` and react to completion notifications. That is
 what lets the serial feature lane and the parallel direct lane advance at the same time.
@@ -336,6 +427,29 @@ Merge when **all** of these hold. No exceptions, no "it's only a docs change".
   -- and carries no session URL.
 - The PR contains implementation, not just spec/plan/tasks artifacts.
 
+**Label every PR you merge autonomously `delamain`, before you merge it.** The repo owner needs
+to be able to tell at a glance which PRs a human reviewed and which one of your copies did, and
+that distinction has to survive in the record long after the run -- when auditing what shipped in
+a release, or when tracing a regression back to how it was approved. A merged PR's label is the
+only durable trace of that; this chat transcript is not.
+
+```
+gh pr edit <n> --add-label delamain
+gh pr merge <n> --merge --delete-branch
+```
+
+Apply it in that order, so a PR that is somehow merged out from under you is never left
+unlabelled. The label goes on **anything you merge on your own authority** -- feature PRs,
+bugfix PRs, maintenance PRs, and the housekeeping PRs you open against the skill or the repo's
+own tooling mid-run. It does **not** go on a PR a human merges, and it is not a substitute for
+any gate above: labelling a red PR does not make it mergeable.
+
+If the label does not exist in the repo, create it once rather than skipping it:
+
+```
+gh label create delamain --color ec6547 --description "This PR was merged by Delamain autonomously."
+```
+
 Then merge with a merge commit, matching this repo's history:
 
 ```
@@ -425,6 +539,11 @@ Keep a running ledger at `$CLAUDE_JOB_DIR/tmp/delamain-ledger.md`: one row per i
 agent, worktree, branch, PR, stage, and outcome. Update it as each stage lands so a resumed
 session can pick the run back up.
 
+Write a row **after** the action it records, never before, and put the real agent id in it. A
+row written in advance is a claim about the future, and a resumed session cannot tell it apart
+from a fact -- it will wait on a job that was never started. If you catch a row that turned out
+to be wrong, correct it in place and say so in the row rather than deleting the evidence.
+
 Report progress in chat as waves complete -- what merged, what is in flight, what is parked.
 At the end, give the user:
 
@@ -434,7 +553,7 @@ At the end, give the user:
   `specs/<feature>/` survived so a re-run starts from the reviewed design rather than from
   scratch. Lead with this section if it is non-empty -- it is the first thing the user needs
   to know and the reason they will want the ledger.
-- **Parked**: issue, the reason, and the specific next action (usually `/product-owner <n>`
+- **Parked**: issue, the reason, and the specific next action (usually `/regina <n>`
   or a constitution decision only they can make).
 
 When the run targeted an integration branch, close by handing it back explicitly -- the user

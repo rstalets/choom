@@ -24,11 +24,19 @@ from choom.core.documents import _read_document
 from choom.core.editing import load_for_edit, save_buffer
 from choom.core.editor_commands import parse_line, parse_reply_lines
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
-from choom.core.links import format_link, link_candidates, resolve_id
+from choom.core.links import (
+    format_bare_urls,
+    format_link,
+    link_candidates,
+    map_cursor_offset,
+    resolve_id,
+)
 from choom.core.mirrors import (
     capture_reply_tasks,
     capture_task,
+    commit_mirror_deletion,
     find_mirrors,
+    plan_mirror_deletion,
     reconcile_on_open,
     reconcile_on_save,
     write_document,
@@ -37,6 +45,7 @@ from choom.core.models import (
     AssistantReply,
     LinkCandidate,
     LinkTarget,
+    MirrorDeletion,
     ParsedCommand,
     ReplyCapture,
     ResolvedAssistant,
@@ -70,10 +79,12 @@ class EditTarget:
     """What `EditorPane` edits: the buffer's starting text, how to save it, the
     path shown to the user and handed to `/ai`, the line offset that positions
     an `/ai` prompt within that file, whether the target has frontmatter to
-    stamp (research R5), and whether it has a document identity a `/task`
-    capture -- typed or from a reply -- can link from (research R3). A file
-    and a task's body are its two implementations -- `EditorPane` itself
-    knows neither one, only this shape."""
+    stamp (research R5), whether it has a document identity a `/task`
+    capture -- typed or from a reply -- can link from (research R3), and the
+    id of the task whose body this is, when it is one (research R9,
+    017-editor-task-delete). A file and a task's body are its two
+    implementations -- `EditorPane` itself knows neither one, only this
+    shape."""
 
     text: str
     display_path: Path
@@ -81,6 +92,11 @@ class EditTarget:
     ai_line_offset: int
     stamps_frontmatter: bool
     captures_tasks: bool
+    #: The id of the task whose body `text` is, or `None` when this target is
+    #: a document. Lets `ctrl+t` refuse deleting the very task record whose
+    #: body the buffer holds (FR-024) -- `captures_tasks=False` alone says
+    #: "this is a task body" but not *which* task.
+    body_task_id: str | None = None
 
 
 def open_editor(app: App[None], path: Path) -> bool:
@@ -174,11 +190,18 @@ def open_task_editor(app: App[None], task: Task) -> None:
             body = report.text
 
     def _save(text: str) -> SaveResult:
+        # format_bare_urls runs here, before set_task_body, rather than inside
+        # it (018-automatic-link-detection, research R9): set_task_body has a
+        # second caller above -- reconcile-on-open -- and converting there
+        # would rewrite a body the user has not touched, violating FR-016.
+        converted, conversions = format_bare_urls(text)
         try:
-            set_task_body(workspace, task_id, text)
+            set_task_body(workspace, task_id, converted)
         except (NotFoundError, UsageError, WorkspaceError) as exc:
             return SaveResult(ok=False, saved_text="", stamped=False, message=str(exc))
-        return SaveResult(ok=True, saved_text=text, stamped=False, message="")
+        return SaveResult(
+            ok=True, saved_text=converted, stamped=False, message="", conversions=conversions
+        )
 
     target = EditTarget(
         text=body,
@@ -187,6 +210,7 @@ def open_task_editor(app: App[None], task: Task) -> None:
         ai_line_offset=_task_ai_line_offset(app, task_id),
         stamps_frontmatter=False,
         captures_tasks=False,
+        body_task_id=task_id,
     )
     _open(app, target)
 
@@ -245,6 +269,30 @@ def _resolution_message(resolved: ResolvedAssistant) -> str:
             "choose one with /config assistant"
         )
     return "no AI assistant found; install one or set it with /config assistant"
+
+
+def _delete_task_question(plan: MirrorDeletion) -> str:
+    """The `ctrl+t` confirmation's question (contracts/tui.md C5): what the
+    outcome means, plus the "and the document is saved" clause every case
+    needs -- `ctrl+t` commits unrelated unsaved edits in the buffer
+    (FR-028/FR-030), and the user most at risk is the one with a half-written
+    paragraph elsewhere, so the save is named rather than left implicit
+    (research R10). `plan.outcome` here is always `deletable` or `line_only`
+    -- `action_delete_task` returns before this is called for any refusing
+    outcome."""
+    if plan.outcome == "deletable":
+        question = (
+            f'Delete "{plan.description}"? It goes from this document and from '
+            "your task list, and the document is saved. This cannot be undone."
+        )
+    else:
+        question = (
+            f'Delete "{plan.description}"? It is no longer in your task list, so '
+            "only this line goes. The document is saved. This cannot be undone."
+        )
+    if plan.extra_text:
+        question += " This line has other text on it, which goes too."
+    return question
 
 
 class EditorTextArea(TextArea):
@@ -323,6 +371,13 @@ class EditorPane(Vertical):
         Binding("ctrl+o", "save", "Save", show=True, priority=True),
         Binding("ctrl+s", "save", "Save", show=False, priority=True),
         Binding("ctrl+x", "save_and_close", "Save & close", show=True, priority=True),
+        # No priority=True, unlike its neighbours above: TextArea binds none of
+        # ctrl+o/ctrl+s/ctrl+x itself, but it also doesn't bind ctrl+t, and
+        # ctrl+t is not printable input either, so it bubbles to the pane on
+        # its own (research R1). Staying non-priority also means it cannot
+        # fire while the link picker holds focus -- check_action closes the
+        # remaining gap for when the picker is open but unfocused.
+        Binding("ctrl+t", "delete_task", "Delete task", show=True),
         Binding("escape", "close", "Discard", show=True),
         # The one justified deviation from Principle V's ctrl+c/ctrl+q reservation
         # (plan Complexity Tracking): active only while a request is in flight, and
@@ -387,16 +442,25 @@ class EditorPane(Vertical):
             "save_and_close",
             "close",
             "cancel_request",
+            "delete_task",
         ):
             # research R2: these bindings are `priority=True`, checked from the
             # app down regardless of focus, so they would otherwise fire
             # underneath the picker while a choice is pending. `escape` is not
             # priority and so would never reach here anyway (LinkPicker's own
             # binding claims it first), but the gate covers it too rather than
-            # leaning on that as an implicit guarantee.
+            # leaning on that as an implicit guarantee. `delete_task` is not
+            # priority either, but the picker takes focus rather than the
+            # editor, so this is what keeps it inert while a choice is pending
+            # (FR-004, research R12).
             return False
         if action == "cancel_request":
             return self._request is not None
+        if action == "delete_task":
+            # Inert while an /ai reply is in flight (research R12): the
+            # buffer's target line has been replaced by the placeholder, so a
+            # deletion planned now would read text about to be overwritten.
+            return self._request is None
         return True
 
     def action_noop(self) -> None:
@@ -418,7 +482,17 @@ class EditorPane(Vertical):
         status = self.screen.query_one(StatusBar)
         status.update(in_flight_status(self._breadcrumb, status.size.width))
 
-    def _save(self) -> bool:
+    def _save(self, note: str | None = None) -> bool:
+        """Save the buffer, exactly as before, with one addition: `note`, when
+        given, is folded into whatever status text this save renders rather
+        than being rendered separately afterwards (017-editor-task-delete,
+        contracts/tui.md C6). That is what stops a deletion's own success
+        message from racing this method's status render, and what lets a
+        save warning -- most importantly the dead-mirror warning for a second
+        copy of the same task elsewhere in the document (FR-025) -- appear
+        *with* the deletion note rather than instead of it. `note` plays no
+        part on a failed save: the save's own message is what a failure
+        reports (C8)."""
         editor = self.query_one("#editor", TextArea)
         text = editor.text
 
@@ -447,9 +521,27 @@ class EditorPane(Vertical):
             # what actually landed on disk, or the widget would read as dirty
             # the instant it saved (whenever the new timestamp differs from
             # what's still displayed). `load_text` resets cursor/selection, so
-            # capture and restore it around the reload (FR-014).
+            # capture and restore it around the reload (FR-014). The stamp is
+            # length-neutral, so restoring `(row, col)` verbatim is correct for
+            # it; a URL conversion is not (018-automatic-link-detection,
+            # research R12), so the column is mapped through the conversions
+            # instead. The row is never affected -- no conversion inserts a
+            # newline -- so only the column needs mapping.
             cursor = editor.cursor_location
-            editor.text = result.saved_text
+            if result.conversions:
+                # `TextArea.document` is typed as the abstract `DocumentBase`,
+                # but the editor is never given a `document` override
+                # (research R4, same idiom as `_commit_delete_task` above) --
+                # it is always the concrete `Document`, which carries
+                # `get_index_from_location`/`get_location_from_index`.
+                offset = editor.document.get_index_from_location(cursor)  # type: ignore[attr-defined]
+                new_offset = map_cursor_offset(result.conversions, offset)
+                editor.text = result.saved_text
+                cursor = editor.document.get_location_from_index(  # type: ignore[attr-defined]
+                    new_offset
+                )
+            else:
+                editor.text = result.saved_text
             editor.cursor_location = cursor
 
         self.original_text = result.saved_text
@@ -460,10 +552,21 @@ class EditorPane(Vertical):
 
         messages = [w.message for w in result.warnings]
         messages.extend(w.message for w in mirror_report.warnings)
+        if result.conversions:
+            # FR-025: named when non-zero, silent otherwise -- a message on
+            # every save is a message nobody reads, composed into the same
+            # chain as a save/mirror warning so it never replaces one.
+            count = len(result.conversions)
+            noun = "link" if count == 1 else "links"
+            messages.append(f"formatted {count} {noun}")
         if self.target.stamps_frontmatter and not result.stamped:
-            self._render_status("frontmatter's updated: field could not be found; saved as typed")
+            missing_stamp = "frontmatter's updated: field could not be found; saved as typed"
+            self._render_status(f"{note}; {missing_stamp}" if note else missing_stamp)
         elif messages:
-            self._render_status("; ".join(messages))
+            combined = "; ".join(messages)
+            self._render_status(f"{note}; {combined}" if note else combined)
+        elif note:
+            self._render_status(note, warn=False)
         else:
             self._render_status(None)
         return True
@@ -492,6 +595,72 @@ class EditorPane(Vertical):
             confirm_label="Exit Without Saving",
         )
         self.app.push_screen(dialog, _handle_dismiss)
+
+    # --- ctrl+t delete task (017-editor-task-delete) ----------------------------
+
+    def action_delete_task(self) -> None:
+        """`ctrl+t` (contracts/tui.md C4): plan the deletion from the cursor's
+        row, stop with a status note on a no-op or a refusal, otherwise raise
+        the one confirmation and act on the plan captured *now* -- nothing
+        that happens while the dialog is up can redirect the deletion onto a
+        different line (FR-013)."""
+        editor = self.query_one("#editor", EditorTextArea)
+        row, _column = editor.cursor_location
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        plan = plan_mirror_deletion(
+            workspace,
+            editor.text,
+            row + 1,
+            source=self.target.display_path,
+            body_task_id=self.target.body_task_id,
+        )
+
+        if plan is None:
+            self._render_status("no task on this line", warn=False)
+            return
+        if plan.outcome in ("unreadable_tasks", "ambiguous_id", "self_referential"):
+            self._render_status(plan.message)
+            return
+
+        def _handle_dismiss(confirmed: bool | None) -> None:
+            if confirmed:
+                self._commit_delete_task(plan)
+
+        dialog = ConfirmDialog(
+            _delete_task_question(plan), cancel_label="Keep It", confirm_label="Delete"
+        )
+        self.app.push_screen(dialog, _handle_dismiss)
+
+    def _commit_delete_task(self, plan: MirrorDeletion) -> None:
+        """The confirmed half of `action_delete_task` (contracts/tui.md C6):
+        write tasks.md first, then splice the buffer with `TextArea.delete`
+        -- never `editor.text = ...`, which is an alias of `load_text` and
+        would clear the whole session's undo history (research R2) -- then
+        run the ordinary save so both halves land durably (FR-028/FR-029)."""
+        workspace = self.app.workspace  # type: ignore[attr-defined]
+        try:
+            commit_mirror_deletion(workspace, plan)
+        except (NotFoundError, UsageError, WorkspaceError) as exc:
+            self._render_status(str(exc))
+            return
+
+        editor = self.query_one("#editor", EditorTextArea)
+        # `TextArea.document` is typed as the abstract `DocumentBase`, but the
+        # editor is never given a `document` override (research R4) -- it is
+        # always the concrete `Document`, which is what carries
+        # `get_location_from_index`.
+        doc = editor.document
+        editor.delete(
+            doc.get_location_from_index(plan.span[0]),  # type: ignore[attr-defined]
+            doc.get_location_from_index(plan.span[1]),  # type: ignore[attr-defined]
+            maintain_selection_offset=False,
+        )
+        # The bridge assertion that keeps this adapter honest (research R4):
+        # if it ever starts computing its own removal instead of applying
+        # core's span, this breaks rather than silently diverging.
+        assert editor.text == plan.text
+
+        self._save(f'deleted "{plan.description}"')
 
     # --- /ai in-editor command --------------------------------------------------
 

@@ -233,7 +233,7 @@ def test_duplicated_id_raises_usage_error_naming_both_lines(
     )
     before = tasks_file(tmp_workspace).read_bytes()
 
-    with pytest.raises(UsageError, match="lines 1 and 2"):
+    with pytest.raises(UsageError, match="tasks.md:1 and tasks.md:2"):
         set_task_body(tmp_workspace, "t_dupe", "anything")
 
     assert tasks_file(tmp_workspace).read_bytes() == before

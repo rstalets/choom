@@ -32,7 +32,8 @@ the path is computed and repaired on save, so `[Q3 planning](#meeting_20260728_a
 
 ## Tasks
 
-One checkbox line per task in `tasks.md`, metadata in a trailing HTML comment; `[ ]` open, `[x]` done. An optional body is indented lines beneath it, one blank line first:
+`tasks.md` is the open list -- nothing but open tasks. Completing a task moves its record
+into `tasks/done/YYYY/MM/YYYY-MM-DD-done.md` for the day it was completed; `task list --done`/`--all` still find it there. One checkbox line per task, metadata in a trailing HTML comment; `[ ]` open, `[x]` done. An optional body is indented lines beneath it, one blank line first:
 
 ```
 - [ ] send the vendor comparison <!-- id:task_a1b2 tags:procurement links:meeting_20260728_a1b2c3d4 -->

@@ -43,6 +43,7 @@ from choom.core.meetings import create_meeting, scan_meetings
 from choom.core.mirrors import propagate_to_documents
 from choom.core.models import DocumentFilter, TaskFilter, Workspace
 from choom.core.notes import create_note, open_daily_note, scan_notes
+from choom.core.task_store import load_task_store, tidy_completed
 from choom.core.tasks import add_task, filter_tasks, get_task, load_tasks, set_task_state
 from choom.core.workspace import find_workspace, init_workspace
 
@@ -192,6 +193,16 @@ def _build_parser() -> argparse.ArgumentParser:
         "--force", action="store_true", help="required; deletes without asking"
     )
 
+    task_tidy_parser = task_subparsers.add_parser(
+        "tidy",
+        help=(
+            "explicitly move every parseable completed record out of tasks.md "
+            "into the done store (019-completed-tasks-partition, P3); never runs "
+            "on its own"
+        ),
+    )
+    task_tidy_parser.add_argument("--json", action="store_true")
+
     config_parser = subparsers.add_parser("config", help="get or set workspace settings")
     config_subparsers = config_parser.add_subparsers(dest="config_command", required=True)
 
@@ -241,9 +252,12 @@ def _run_tui() -> int:
         print_error(str(exc))
         return exc.exit_code
 
+    from choom.core import workspace_title
     from choom.tui.app import ChoomApp
+    from choom.tui.terminal_title import terminal_title
 
-    ChoomApp(workspace).run()
+    with terminal_title(workspace_title(workspace)):
+        ChoomApp(workspace).run()
     return 0
 
 
@@ -395,7 +409,7 @@ def _cmd_task_add(namespace: argparse.Namespace) -> int:
         links=links,
     )
     if namespace.json:
-        print_task_show_json(task)
+        print_task_show_json(workspace, task)
     else:
         print(task.id)
     return 0
@@ -403,7 +417,14 @@ def _cmd_task_add(namespace: argparse.Namespace) -> int:
 
 def _cmd_task_list(namespace: argparse.Namespace) -> int:
     workspace = find_workspace(Path.cwd())
-    tasks, warnings = load_tasks(workspace)
+    # 019-completed-tasks-partition (FR-018, SC-003): the bare form MUST NOT
+    # escalate to the done store -- that is the entire point of the
+    # feature, and it looks like an oversight rather than a decision if this
+    # comment is not here. `--done`/`--all` want the union.
+    if namespace.done or namespace.all:
+        tasks, warnings = load_task_store(workspace)
+    else:
+        tasks, warnings = load_tasks(workspace)
     for warning in warnings:
         print_error(warning.message)
 
@@ -416,7 +437,7 @@ def _cmd_task_list(namespace: argparse.Namespace) -> int:
     filtered = filter_tasks(tasks, task_filter)
 
     if namespace.json:
-        print_tasks_json(filtered)
+        print_tasks_json(workspace, filtered)
     else:
         print_tasks_table(filtered)
     return 0
@@ -426,19 +447,20 @@ def _cmd_task_show(namespace: argparse.Namespace) -> int:
     workspace = find_workspace(Path.cwd())
     task = get_task(workspace, namespace.id)
     if namespace.json:
-        print_task_show_json(task)
+        print_task_show_json(workspace, task)
     else:
         print_task_show(task)
     return 0
 
 
 def _set_task_state_and_propagate(namespace: argparse.Namespace, *, done: bool) -> int:
-    """Shared body of `task done`/`task undone` (contracts/cli.md): tasks.md is
-    written first, exactly as before this feature; then every document the
-    task links to has its mirrors spliced to the new state. A document failure
-    is a warning, never a non-zero exit -- the operation asked for (completing
-    or reopening the task) already succeeded, and exiting non-zero would make
-    an assistant retry a completion that already happened (research R11)."""
+    """Shared body of `task done`/`task undone` (contracts/cli.md): the
+    record's destination file is written first, exactly as `move_record`
+    requires, then every document the task links to has its mirrors spliced
+    to the new state. A document failure is a warning, never a non-zero
+    exit -- the operation asked for (completing or reopening the task)
+    already succeeded, and exiting non-zero would make an assistant retry a
+    completion that already happened (research R11)."""
     workspace = find_workspace(Path.cwd())
     task = set_task_state(workspace, namespace.id, done=done)
     documents_updated, warnings = propagate_to_documents(workspace, task)
@@ -446,6 +468,7 @@ def _set_task_state_and_propagate(namespace: argparse.Namespace, *, done: bool) 
         print_error(warning.message)
 
     if namespace.json:
+        source = task.source or workspace.tasks_file
         print(
             json.dumps(
                 {
@@ -456,6 +479,8 @@ def _set_task_state_and_propagate(namespace: argparse.Namespace, *, done: bool) 
                         path.relative_to(workspace.root).as_posix() for path in documents_updated
                     ],
                     "warnings": [w.message for w in warnings],
+                    # 019-completed-tasks-partition: where the record now lives.
+                    "file": source.relative_to(workspace.root).as_posix(),
                 },
                 ensure_ascii=False,
             )
@@ -469,6 +494,28 @@ def _cmd_task_done(namespace: argparse.Namespace) -> int:
 
 def _cmd_task_undone(namespace: argparse.Namespace) -> int:
     return _set_task_state_and_propagate(namespace, done=False)
+
+
+def _cmd_task_tidy(namespace: argparse.Namespace) -> int:
+    """`choom task tidy` (019-completed-tasks-partition, P3, research R11):
+    non-interactive, no confirmation, on the precedent `links check`/`links
+    heal` already set for a one-shot maintenance command with no per-record
+    decision to make (Principle II). Never runs unless invoked."""
+    workspace = find_workspace(Path.cwd())
+    summary = tidy_completed(workspace)
+    for warning in summary.warnings:
+        print_error(warning.message)
+    if namespace.json:
+        print(
+            json.dumps(
+                {"moved": summary.moved, "left": summary.left},
+                ensure_ascii=False,
+            )
+        )
+    else:
+        print(f"moved\t{summary.moved}")
+        print(f"left\t{summary.left}")
+    return 0
 
 
 def _cmd_config_assistant(namespace: argparse.Namespace) -> int:
@@ -641,6 +688,8 @@ def _dispatch(namespace: argparse.Namespace) -> int:
             return _cmd_task_undone(namespace)
         if namespace.task_command == "delete":
             return _cmd_task_delete(namespace)
+        if namespace.task_command == "tidy":
+            return _cmd_task_tidy(namespace)
         return _cmd_task_list(namespace)
     if namespace.command == "config":
         return _cmd_config_assistant(namespace)

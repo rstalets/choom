@@ -20,7 +20,7 @@ PREVIEW_HELP = "e edit   b backlinks   esc back   ↑↓/pgup/pgdn scroll   ctrl
 #: EDIT_HELP is a whole separate string rather than an append -- the footer must
 #: never grow past what fits, so the two never concatenate (research R10).
 LINKS_SECTION_HELP = "↑↓ move   enter/o open   esc close   ctrl+q quit"
-EDIT_HELP = "ctrl+o save   ctrl+x save & back   esc discard   ctrl+q quit"
+EDIT_HELP = "ctrl+o save   ctrl+x save & back   ctrl+t delete task   esc discard   ctrl+q quit"
 #: Swapped in for EDIT_HELP while the link picker is open, on the same terms as
 #: LINKS_SECTION_HELP above -- never concatenated with EDIT_HELP.
 LINK_PICKER_HELP = "↑↓ move   enter insert   esc cancel   ctrl+q quit"

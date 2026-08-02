@@ -3,8 +3,10 @@ from __future__ import annotations
 import json
 import os
 import stat
+from datetime import date
 
 from choom.core.models import Workspace
+from choom.core.task_store import done_file_for, load_task_store
 from choom.core.tasks import add_task, load_tasks, set_task_state
 from tests.conftest import tasks_file, write_raw, write_tasks
 
@@ -75,10 +77,18 @@ def test_crlf_no_final_newline_preserved_across_toggle_and_backfill(
     assert bare_task.id is not None
     set_task_state(tmp_workspace, bare_task.id, done=True)
 
+    # 019-completed-tasks-partition: the completed record leaves tasks.md
+    # for today's done-store file; tasks.md keeps its own CRLF/no-final-
+    # newline state on what remains.
     with open(tmp_workspace.tasks_file, encoding="utf-8", newline="") as fh:
         text_after = fh.read()
     assert not text_after.endswith("\n")
-    assert "- [x] bare" in text_after
+    assert "bare" not in text_after
+
+    done_path = done_file_for(tmp_workspace, date.today())
+    with open(done_path, encoding="utf-8", newline="") as fh:
+        done_text = fh.read()
+    assert "- [x] bare" in done_text
 
 
 def test_add_task_on_no_final_newline_file_adds_terminator_and_nothing_else(
@@ -161,7 +171,10 @@ def test_body_bearing_fixtures_survive_a_full_read_and_toggle_cycle(
 
     set_task_state(tmp_workspace, "t_0001", done=True)
 
-    tasks_after, warnings_after = load_tasks(tmp_workspace)
+    # 019-completed-tasks-partition: t_0001's whole record -- checkbox and
+    # body -- moves out of tasks.md into today's done-store file; every
+    # other task and body stays exactly where it was.
+    tasks_after, warnings_after = load_task_store(tmp_workspace)
     assert warnings_after == []
     assert len(tasks_after) == 5
     by_id_after = {t.id: t for t in tasks_after}
@@ -170,12 +183,15 @@ def test_body_bearing_fixtures_survive_a_full_read_and_toggle_cycle(
     assert by_id_after["t_0002"].body == "```python\ndef f():\n    return 1\n```"
     assert by_id_after["t_0004"].body == "Café review — 日本語のメモ 🎉"
 
-    # Every line is still in the file, untouched, aside from the one checkbox.
     text_after = tmp_workspace.tasks_file.read_text(encoding="utf-8")
-    assert "   three-space indent, not two" in text_after
+    assert "three-space indent, not two" not in text_after
     assert "```python\n  def f():\n      return 1\n  ```" in text_after
     assert "  - [ ] a nested checklist item" in text_after
     assert "Café review — 日本語のメモ 🎉" in text_after
+
+    done_path = done_file_for(tmp_workspace, date.today())
+    done_text = done_path.read_text(encoding="utf-8")
+    assert "   three-space indent, not two" in done_text
 
 
 def test_read_only_file_degrades_gracefully(cli) -> None:
@@ -228,14 +244,19 @@ def test_hand_written_links_field_survives_a_task_done_round_trip(
 
     set_task_state(tmp_workspace, "task_a1b2", done=True)
 
+    # 019-completed-tasks-partition: task_a1b2's record moves into today's
+    # done-store file; every other line in tasks.md is byte-identical.
     text_after = tmp_workspace.tasks_file.read_text(encoding="utf-8")
-    assert "links:meeting_20260728_a1b2c3d4" in text_after
-    assert "- [x] call Terry" in text_after
-    # every other line is byte-identical -- only the one checkbox character moved
+    assert "task_a1b2" not in text_after
     assert "- [ ] untouched line one <!-- id:task_yyyy -->\n" in text_after
     assert "- [x] untouched line two <!-- id:task_zzzz -->\n" in text_after
 
-    tasks_after, warnings_after = load_tasks(tmp_workspace)
+    done_path = done_file_for(tmp_workspace, date.today())
+    done_text = done_path.read_text(encoding="utf-8")
+    assert "links:meeting_20260728_a1b2c3d4" in done_text
+    assert "- [x] call Terry" in done_text
+
+    tasks_after, warnings_after = load_task_store(tmp_workspace)
     assert warnings_after == []
     target_after = next(t for t in tasks_after if t.id == "task_a1b2")
     assert target_after.links == ("meeting_20260728_a1b2c3d4",)

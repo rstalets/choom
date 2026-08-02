@@ -3,12 +3,20 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
+import pytest
+
 from choom.core.assistants import compose_prompt, resolve_assistant, start_request
 from choom.core.config import get_assistant, set_assistant
 from choom.core.editing import load_for_edit, save_buffer
 from choom.core.links import relative_destination
 from choom.core.meetings import create_meeting, scan_meetings
-from choom.core.mirrors import capture_task, propagate_to_documents, reconcile_on_open
+from choom.core.mirrors import (
+    capture_task,
+    commit_mirror_deletion,
+    plan_mirror_deletion,
+    propagate_to_documents,
+    reconcile_on_open,
+)
 from choom.core.notes import create_note, open_daily_note, scan_notes
 from choom.core.tasks import set_task_state
 from choom.core.workspace import init_workspace
@@ -158,6 +166,47 @@ def test_capture_and_mirror_round_trip_in_a_workspace_with_spaces_and_non_ascii(
     assert "- [x] [appeler Terry" in meeting.path.read_text(encoding="utf-8")
 
 
+# --- T024 (017-editor-task-delete): ctrl+t's core half in a non-ASCII workspace
+
+
+def test_task_deletion_survives_a_workspace_path_with_spaces_and_non_ascii(
+    tmp_path: Path,
+) -> None:
+    """The gesture's own path budget is zero -- `plan_mirror_deletion` and
+    `commit_mirror_deletion` neither construct nor open a path beyond
+    `workspace.tasks_file`, which every other core function already opens.
+    What this exercises is the character-offset splice itself: a non-ASCII
+    task description sliced out of the buffer by `str` offsets, which cannot
+    split a multi-byte character the way a byte offset could."""
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    meeting = create_meeting(workspace, "café résumé — naïve", type="standup")
+    task, line = capture_task(
+        workspace,
+        "appeler Terry à propos du renouvellement 笔记",
+        source=meeting.path,
+        source_id=meeting.id,
+    )
+    assert task.id is not None
+
+    text = f"above\n\n{line}\n  a nested note\n\nbelow\n"
+    plan = plan_mirror_deletion(workspace, text, 3, source=meeting.path)
+    assert plan is not None
+    assert plan.outcome == "deletable"
+    # The central invariant (data-model.md §3), asserted here specifically
+    # because the sliced text is non-ASCII: `str` offsets index characters,
+    # never bytes, so this holds even though "appeler...笔记" is not the same
+    # number of bytes as it is characters.
+    assert plan.text == text[: plan.span[0]] + text[plan.span[1] :]
+    assert plan.text == "above\n\n  a nested note\n\nbelow\n"
+
+    commit_mirror_deletion(workspace, plan)
+    tasks_text = workspace.tasks_file.read_text(encoding="utf-8")
+    assert task.text not in tasks_text
+
+
 def test_reconcile_on_open_works_in_a_workspace_with_spaces_and_non_ascii(
     tmp_path: Path,
 ) -> None:
@@ -178,3 +227,121 @@ def test_reconcile_on_open_works_in_a_workspace_with_spaces_and_non_ascii(
     )
     assert "[x]" in report.text
     assert report.warnings == ()
+
+
+# --- T037 (018-automatic-link-detection): bare-URL conversion in a workspace
+# with spaces and non-ASCII, and across a CRLF document -----------------------
+
+
+def test_a_bare_url_with_non_ascii_characters_survives_a_save(tmp_path: Path) -> None:
+    """Offsets in `format_bare_urls` are character offsets into a Python
+    `str`, never byte offsets, so a multi-byte character next to a URL
+    cannot be split mid-character. This is the case that would catch it if
+    the implementation ever moved to byte offsets: a non-ASCII character
+    immediately follows the converted URL on the same line."""
+    workspace_root = tmp_path / "Équipe Notes 笔记"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    note = create_note(workspace, "vendor landscape")
+    original = note.path.read_text(encoding="utf-8")
+    note.path.write_text(
+        original + "\nVoir https://example.com/résumé puis 笔记.\n",
+        encoding="utf-8",
+    )
+
+    file = load_for_edit(note.path)
+    result = save_buffer(note.path, file.text, file, workspace=workspace)
+    assert result.ok
+    assert len(result.conversions) == 1
+    conv = result.conversions[0]
+    assert conv.url == "https://example.com/résumé"
+    assert "[https://example.com/résumé](https://example.com/résumé)" in result.saved_text
+    assert "puis 笔记." in result.saved_text  # the trailing non-ASCII text is intact
+
+
+def test_a_bare_url_in_a_crlf_document_round_trips_the_line_ending_convention(
+    tmp_path: Path,
+) -> None:
+    """`load_for_edit` normalises CRLF to LF on read and
+    `_apply_line_ending_policy` restores the convention on write -- this
+    feature adds no line-ending handling of its own, so a CRLF file must
+    round-trip exactly as it already does. If this test ever needs new
+    production code to pass, the conversion is doing something it should
+    not (research R2: no mask or edit in this feature inserts or removes a
+    newline)."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    workspace = init_workspace(workspace_root).workspace
+
+    note = create_note(workspace, "vendor landscape")
+    original = note.path.read_bytes().decode("utf-8")
+    crlf_text = (original + "\nSee https://example.com/a for details.\n").replace("\n", "\r\n")
+    note.path.write_bytes(crlf_text.encode("utf-8"))
+
+    file = load_for_edit(note.path)
+    assert file.newline == "\r\n"
+    result = save_buffer(note.path, file.text, file, workspace=workspace)
+    assert result.ok
+    assert len(result.conversions) == 1
+
+    on_disk = note.path.read_bytes().decode("utf-8")
+    assert "\r\n" in on_disk
+    assert "\n" not in on_disk.replace("\r\n", "")  # every newline is `\r\n` -- none bare
+    assert "[https://example.com/a](https://example.com/a)" in on_disk
+
+
+# --- T031 (020-vertical-tui-mode, Polish): preferences path with spaces and
+# non-ASCII characters --------------------------------------------------------
+
+
+def test_preferences_file_round_trips_in_a_profile_path_with_spaces_and_non_ascii(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from choom.core import preferences
+
+    profile_root = tmp_path / "Équipe Config 笔记"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+
+    preferences.set_view_orientation("vertical")
+    prefs_path = profile_root / "preferences.toml"
+    assert prefs_path.is_file()
+    assert preferences.get_view_orientation() == "vertical"
+
+    preferences.set_view_orientation("horizontal")
+    assert preferences.get_view_orientation() == "horizontal"
+    assert 'orientation = "horizontal"' in prefs_path.read_text(encoding="utf-8")
+
+
+def test_preferences_path_stays_well_under_the_windows_260_character_limit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from choom.core import preferences
+
+    # A representative Windows-shaped path (this assertion holds regardless
+    # of host OS -- it is about the *length* of the resolved path, not about
+    # actually resolving one on Windows).
+    windows_shaped = r"C:\Users\someone\AppData\Local\choom\preferences.toml"
+    assert len(windows_shaped) < 260
+
+    profile_root = tmp_path / "profile"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+    preferences.set_view_orientation("vertical")
+    prefs_path = profile_root / "preferences.toml"
+    assert len(str(prefs_path)) < 260
+
+
+def test_preferences_write_involves_no_admin_rights_or_network(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Not directly testable in the negative, but the write path never
+    imports or calls anything network- or privilege-related -- confirmed by
+    construction (`write_text_atomic` is a same-directory temp file plus
+    `os.replace`, both plain filesystem calls) and exercised here as an
+    ordinary user-writable directory."""
+    from choom.core import preferences
+
+    profile_root = tmp_path / "plain profile"
+    monkeypatch.setattr(preferences, "preferences_root", lambda: profile_root)
+    preferences.set_view_orientation("vertical")
+    assert (profile_root / "preferences.toml").is_file()

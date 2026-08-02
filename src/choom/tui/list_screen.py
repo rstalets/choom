@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import cast
 
 from textual import events, on, work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
 from textual.css.query import NoMatches
 from textual.screen import Screen
 from textual.timer import Timer
@@ -18,6 +20,7 @@ from choom.core.documents import _read_document, scan_documents
 from choom.core.errors import NotFoundError, UsageError, WorkspaceError
 from choom.core.links import resolve_href
 from choom.core.models import Document, LinkTarget, ScanWarning, Task, Workspace, YearMonth
+from choom.core.task_store import store_fingerprint
 from choom.tui.collection_bar import COLLECTIONS, CollectionBar
 from choom.tui.columns import (
     TASK_LEAD,
@@ -30,6 +33,7 @@ from choom.tui.command_bar import CommandBar
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditorPane, EditTarget
 from choom.tui.help_screen import HelpScreen
+from choom.tui.layout import effective_orientation as _resolve_effective_orientation
 from choom.tui.link_picker import LinkPicker
 from choom.tui.links_pane import LinkRow, build_link_rows, fetch_inbound
 from choom.tui.rendering import render_preview_markdown, render_task_markdown
@@ -56,6 +60,17 @@ _CREATE_VERB = {"meetings": "meeting", "notes": "note"}
 #: the full frame-budget argument and the trigger to move this read to a
 #: worker thread instead of shortening the interval.
 REFRESH_SECONDS = 2.0
+
+#: 019-completed-tasks-partition (T037, plan.md Complexity Tracking): the
+#: Done view's stat-fingerprint precheck forces a full re-parse after this
+#: many seconds of *displayed* Done view, even when the fingerprint still
+#: matches -- because a miss here is permanent (every later tick recomputes
+#: the same tuple), not transient like the tick's ordinary staleness. Wall-
+#: clock, not tick-count, since the tick pauses while filtering, editing, or
+#: suspended. If a measured full parse ever exceeds ~100 ms, month-scope the
+#: Done view -- do not raise this number; a longer interval only makes the
+#: stall rarer, not smaller, and widens the window this bound exists to close.
+_DONE_FINGERPRINT_MAX_STALE_SECONDS = 30.0
 
 
 def _document_key(documents: list[Document]) -> tuple[tuple[object, ...], ...]:
@@ -151,6 +166,54 @@ class TaskRow(ListItem):
         self.query_one(Label).update(self._row_text(self.record, layout))
 
 
+class _Body(Container):
+    """The recomposable container holding the scope pane, record list, and
+    preview -- the one structure that differs between orientations (research
+    R1, data-model.md §4). `ListScreen.compose()` yields exactly one of
+    these, with `id="body"`; the switch (`ListScreen._on_config_requested`)
+    and the resize guard (`ListScreen.on_resize`) both call
+    `self.query_one("#body").recompose()` to rebuild it in place.
+
+    `Widget.recompose()` tears down and rebuilds only the recomposed
+    widget's *own* children, by re-running *its own* `compose()` -- never
+    its parent's. That is why this branch cannot live in `ListScreen.compose()`
+    the way a first read of the contract might suggest: `ListScreen` is never
+    the widget being recomposed, `#body` is, so `#body` needs its own
+    `compose()` to have anything to rebuild.
+
+    Reads `self.has_class("-vertical")` rather than re-deriving the
+    orientation itself, so there is exactly one place (the caller, before
+    it toggles the class and calls `recompose()`) that decides which tree
+    this produces -- the class is the single source of truth `app.tcss`'s
+    `#body.-vertical` selector already keys off. Horizontal composes
+    **exactly today's tree, unchanged** (FR-020 holds by construction); every
+    id is identical in both trees, which is what lets the inline editor's
+    mount target (`ListScreen.open_inline_editor`) and every existing
+    `query_one` call keep working untouched.
+    """
+
+    def compose(self) -> ComposeResult:
+        if self.has_class("-vertical"):
+            with Horizontal(id="upper-band"):
+                yield ScopePane(id="scope-pane")
+                with Vertical(id="list-pane"):
+                    yield Static(id="list-header")
+                    yield ListView(id="meeting-list")
+            with Vertical(id="preview-pane"):
+                yield Markdown(id="preview", open_links=False)
+                with Vertical(id="preview-links-section"):
+                    yield ListView(id="preview-links-list")
+        else:
+            yield ScopePane(id="scope-pane")
+            with Vertical(id="list-pane"):
+                yield Static(id="list-header")
+                yield ListView(id="meeting-list")
+            with Vertical(id="preview-pane"):
+                yield Markdown(id="preview", open_links=False)
+                with Vertical(id="preview-links-section"):
+                    yield ListView(id="preview-links-list")
+
+
 class ListScreen(Screen[None]):
     BINDINGS = [
         Binding("tab", "next_collection", "Collection", show=True),
@@ -196,6 +259,19 @@ class ListScreen(Screen[None]):
         #: lifetime is exactly one bar session (contract C5, plan Complexity
         #: Tracking) -- never consulted once the bar is closed.
         self._filter_hydration: Worker[tuple[list[Document], list[ScanWarning]]] | None = None
+        #: 019-completed-tasks-partition (T036/T037, plan.md Complexity
+        #: Tracking): the Done view's stat-fingerprint precheck. Holds no
+        #: task data -- only the last sampled `store_fingerprint` tuple, the
+        #: items/key it produced, and the wall-clock time of the last *real*
+        #: parse, so a tick that finds an unchanged fingerprint can skip
+        #: re-parsing the whole store and still hand back the same items.
+        self._done_fingerprint: tuple[tuple[str, int, int], ...] | None = None
+        self._done_fingerprint_items: list[Task] = []
+        self._done_fingerprint_key: tuple[tuple[object, ...], ...] = ()
+        self._done_fingerprint_at: float | None = None
+        #: Wall-clock seconds, injected so no test reads the real clock
+        #: (Principle VI). `time.monotonic` by default.
+        self._clock: Callable[[], float] = time.monotonic
 
     def compose(self) -> ComposeResult:
         yield CollectionBar(
@@ -203,19 +279,50 @@ class ListScreen(Screen[None]):
             str(self.app.workspace.root),  # type: ignore[attr-defined]
             id="collection-bar",
         )
-        with Horizontal(id="body"):
-            yield ScopePane(id="scope-pane")
-            with Vertical(id="list-pane"):
-                yield Static(id="list-header")
-                yield ListView(id="meeting-list")
-            with Vertical(id="preview-pane"):
-                yield Markdown(id="preview", open_links=False)
-                with Vertical(id="preview-links-section"):
-                    yield ListView(id="preview-links-list")
+        # 020-vertical-tui-mode: `#body`'s own compose() (below, `_Body`) is
+        # what decides the tree, not this one -- `Widget.recompose()` only
+        # re-invokes the *recomposed widget's own* compose(), never its
+        # parent's, so the orientation branch has to live there for the
+        # switch (`_on_config_requested`) and the resize guard (`on_resize`)
+        # to be able to rebuild it in place.
+        vertical = self.effective_orientation() == "vertical"
+        yield _Body(id="body", classes="-vertical" if vertical else "")
         with Vertical(id="bottom-bar"):
             yield LinkPicker(id="link-picker")
             yield CommandBar(id="command-bar")
             yield StatusBar(LIST_HELP, id="status-bar")
+
+    def effective_orientation(self) -> str:
+        """The orientation actually rendered right now: `app.view_orientation`
+        (the stored preference) resolved against this screen's current
+        height (research R12, contracts/layout.md). The one place the two
+        combine -- every other caller asks this rather than reading
+        `app.view_orientation` directly, so the fallback cannot drift out of
+        step between callers."""
+        return _resolve_effective_orientation(
+            self.app.view_orientation,  # type: ignore[attr-defined]
+            self.size.height,
+        )
+
+    async def _recompose_body(self, orientation: str) -> None:
+        """Toggle `#body`'s `-vertical` class to match `orientation` and
+        rebuild it in place. `_Body.compose()` (module level, above) reads
+        the class rather than re-deriving the orientation itself, so this is
+        the one place that decides which tree the next `recompose()`
+        produces -- shared by the switch (`_on_config_requested`) and the
+        resize guard (`on_resize`) so the two recompose paths cannot drift
+        apart."""
+        body = self.query_one("#body")
+        if orientation == "vertical":
+            body.add_class("-vertical")
+        else:
+            body.remove_class("-vertical")
+        await body.recompose()
+        # A freshly composed #preview-links-section defaults to visible
+        # (Vertical's own default), unlike the one on_mount hides once at
+        # startup -- restore that same default here so the caller's own
+        # FR-021 re-show logic is the only reason it would end up visible.
+        self.query_one("#preview-links-section").display = False
 
     async def on_mount(self) -> None:
         self.query_one("#preview-links-section").display = False
@@ -285,11 +392,40 @@ class ListScreen(Screen[None]):
         if self._editor_pane is not None:
             self._editor_pane.handle_link_cancelled(message.message)
 
-    def on_resize(self, event: events.Resize) -> None:
-        # Column widths are a pure function of the pane's width (research
-        # R8) -- re-render the header and every already-rendered row's text
-        # in place, with no disk read, rather than re-running the whole
-        # refresh (US5).
+    async def on_resize(self, event: events.Resize) -> None:
+        # 020-vertical-tui-mode, contracts/tui.md C4, FR-025 -- see "The one
+        # way this feature loses the user's words" in tasks.md. Branch one,
+        # unconditionally, first: an inline editor is mounted *inside*
+        # #preview-pane, so recomposing #body while it is open would remove
+        # the editor and the user's unsaved buffer along with it, with no
+        # confirmation and no way back. This is the single line of defence
+        # against that -- there is no second guard behind it -- so it is
+        # checked before the effective orientation is even read.
+        if self._editor_pane is not None:
+            self._rerender_columns()
+            return
+
+        # Branch two: the effective orientation, resolved against the *new*
+        # size, may not have crossed the threshold at all -- the common
+        # case, and today's whole behaviour before this feature existed.
+        # `#body`'s own `-vertical` class (not a separately tracked field)
+        # is the ground truth for what is currently rendered, matching
+        # `_recompose_body`'s single source of truth.
+        effective = self.effective_orientation()
+        body = self.query_one("#body")
+        if body.has_class("-vertical") == (effective == "vertical"):
+            self._rerender_columns()
+            return
+
+        # Branch three: the threshold was crossed -- rebuild #body for the
+        # new orientation and repopulate exactly as the command path does
+        # (data-model.md §5.2), then re-render columns for the new widths.
+        await self._recompose_body(effective)
+        await self._refresh_scope_pane()
+        await self.refresh_rows()
+        if self._preview_links_expanded:
+            self.query_one("#preview-links-section").display = True
+            await self._populate_preview_links()
         self._rerender_columns()
 
     def _column_layout(self) -> ColumnLayout:
@@ -482,9 +618,18 @@ class ListScreen(Screen[None]):
         read. Touches no widget -- returns the rows, whether they are tasks,
         and the comparison key built from them, which is what a worker thread
         would eventually hand back via `call_from_thread` instead of this
-        being called directly on the main thread."""
+        being called directly on the main thread.
+
+        The Done category's read goes through `_done_view_read`'s stat-
+        fingerprint precheck instead of calling `visible_tasks()` directly
+        (019-completed-tasks-partition, T036) -- the Todo category never
+        does, since `visible_tasks()` already costs exactly one file read
+        there (FR-018) and needs no gating."""
         app = self.app
         is_tasks = app.active == "tasks"  # type: ignore[attr-defined]
+        if is_tasks and app.task_category == "done":  # type: ignore[attr-defined]
+            items_t, key = self._done_view_read()
+            return cast("list[Document | Task]", items_t), True, key
         items = cast(
             "list[Document | Task]",
             app.visible_tasks() if is_tasks else app.visible_documents(),  # type: ignore[attr-defined]
@@ -495,6 +640,44 @@ class ListScreen(Screen[None]):
             else _document_key(cast("list[Document]", items))
         )
         return items, is_tasks, key
+
+    def _done_view_read(self) -> tuple[list[Task], tuple[tuple[object, ...], ...]]:
+        """The Done view's tick read, gated by a stat fingerprint (T036,
+        plan.md Complexity Tracking): `_refresh_tick` runs every
+        `REFRESH_SECONDS` on Textual's main thread, so a whole-store parse at
+        the SC-005 ceiling would drop frames for as long as the Done view is
+        displayed. `store_fingerprint` costs a directory walk, not a parse;
+        when it matches the last sample, the parse is skipped and the
+        previous items/key are returned unchanged.
+
+        Bounded by a forced full re-parse once more than 30 s of *displayed*
+        Done view has elapsed since the last real one (T037): a missed
+        change is not like the tick's ordinary staleness, which the next
+        tick always corrects -- `store_fingerprint`'s own docstring explains
+        why a miss here is permanent, not transient, so the bound exists to
+        put a ceiling on it rather than leave it open-ended. If a measured
+        full parse ever exceeds ~100 ms, the fix is to month-scope the Done
+        view, never to lengthen this bound -- a longer interval only makes
+        the stall rarer, not smaller, and widens the very window this bound
+        exists to close.
+        """
+        app = self.app
+        now = self._clock()
+        fingerprint = store_fingerprint(app.workspace)  # type: ignore[attr-defined]
+        stale = (
+            self._done_fingerprint_at is None
+            or now - self._done_fingerprint_at >= _DONE_FINGERPRINT_MAX_STALE_SECONDS
+        )
+        if not stale and fingerprint == self._done_fingerprint:
+            return self._done_fingerprint_items, self._done_fingerprint_key
+
+        items = cast("list[Task]", app.visible_tasks())  # type: ignore[attr-defined]
+        key = _task_key(items)
+        self._done_fingerprint = fingerprint
+        self._done_fingerprint_items = items
+        self._done_fingerprint_key = key
+        self._done_fingerprint_at = now
+        return items, key
 
     async def _refresh_tick_apply(self, key: tuple[tuple[object, ...], ...]) -> None:
         """The apply step: re-renders via `refresh_rows` -- the same path
@@ -951,8 +1134,42 @@ class ListScreen(Screen[None]):
         await self._activate_collection(message.name)
 
     @on(CommandBar.ConfigRequested)
-    def _on_config_requested(self, message: CommandBar.ConfigRequested) -> None:
+    async def _on_config_requested(self, message: CommandBar.ConfigRequested) -> None:
+        """`/config <setting> [<value>]` (research R11; 020-vertical-tui-mode
+        data-model.md §5.1). `handle_config_command` validates, persists, and
+        updates `app.view_orientation` on its own -- this handler's only job
+        is to notice whether the *effective* orientation actually changed
+        (an assistant-setting command, an error, a get, or setting the value
+        already in effect never does, contracts/tui.md C3's idempotence
+        clause) and, only then, rebuild `#body` in place.
+
+        Recomposes `#body`, never the screen (FR-026): a screen-level
+        recompose would destroy the command bar mid-dispatch of the very
+        message this handler is responding to.
+        """
+        before = self.effective_orientation()
         self._pending_error = self.app.handle_config_command(message.argument)  # type: ignore[attr-defined]
+        after = self.effective_orientation()
+        if after == before:
+            return
+
+        list_view = self.query_one("#meeting-list", ListView)
+        highlighted = list_view.highlighted_child
+        select_id: str | None = None
+        if isinstance(highlighted, DocumentRow):
+            select_id = highlighted.document.id
+        elif isinstance(highlighted, TaskRow):
+            select_id = highlighted.record.id
+
+        await self._recompose_body(after)
+        await self._refresh_scope_pane()
+        await self.refresh_rows(select_id=select_id)
+        if self._preview_links_expanded:
+            # FR-021: the recompose built a fresh #preview-links-section that
+            # defaults to hidden -- without this, backlinks silently
+            # collapses on every orientation switch.
+            self.query_one("#preview-links-section").display = True
+            await self._populate_preview_links()
 
     @on(CommandBar.HelpRequested)
     def _on_help_requested(self, message: CommandBar.HelpRequested) -> None:

@@ -182,13 +182,24 @@ def test_list_checkbox_free_file_lists_nothing(cli) -> None:
     assert result.out == ""
 
 
+def _done_file(cli, on: date) -> Path:
+    return cli.root / "tasks" / "done" / f"{on:%Y}" / f"{on:%m}" / f"{on:%Y-%m-%d}-done.md"
+
+
 def test_task_done_and_undone_change_the_file(cli) -> None:
     _seed_tasks(cli)
 
     assert cli("task", "done", "task_0001").exit_code == 0
-    text = cli.read("tasks.md")
-    assert "- [x] one <!-- id:task_0001 created:2026-07-20 -->\n" in text
+    # 019-completed-tasks-partition: the completed record leaves tasks.md
+    # for today's done-store file, byte-identical apart from the checkbox
+    # and the new completed: field.
+    assert "task_0001" not in cli.read("tasks.md")
+    done_text = _done_file(cli, date.today()).read_text(encoding="utf-8")
+    assert "- [x] one <!-- id:task_0001 created:2026-07-20 completed:" in done_text
 
+    # task_0003 was already [x] in tasks.md before this feature -- reopening
+    # it is an in-place splice, since tasks.md is already where an open
+    # record belongs (FR-037/FR-039); it never visits the done store.
     assert cli("task", "undone", "task_0003").exit_code == 0
     text = cli.read("tasks.md")
     assert "- [ ] three <!-- id:task_0003 created:2026-07-22 -->\n" in text
@@ -251,9 +262,10 @@ def test_task_done_leaves_the_body_intact(cli) -> None:
 
     assert cli("task", "done", task_id).exit_code == 0
 
-    text = cli.read("tasks.md")
-    assert "[x] call the vendor" in text
-    assert "Need the Q3 comparison." in text
+    assert "call the vendor" not in cli.read("tasks.md")
+    done_text = _done_file(cli, date.today()).read_text(encoding="utf-8")
+    assert "[x] call the vendor" in done_text
+    assert "Need the Q3 comparison." in done_text
 
 
 def test_duplicated_id_exits_2_naming_both_lines(cli) -> None:
@@ -264,4 +276,57 @@ def test_duplicated_id_exits_2_naming_both_lines(cli) -> None:
 
     result = cli("task", "done", "task_dupe")
     assert result.exit_code == 2
-    assert "lines 1 and 2" in result.err
+    assert "tasks.md:1 and tasks.md:2" in result.err
+
+
+# --- 019-completed-tasks-partition: task delete/tidy reach the done store --
+
+
+def test_task_delete_removes_a_completed_record_from_the_done_store(cli) -> None:
+    done_path = _done_file(cli, date.today())
+    done_path.parent.mkdir(parents=True, exist_ok=True)
+    done_path.write_text(
+        "- [x] paid the invoice <!-- id:task_a1b2 completed:" + date.today().isoformat() + " -->\n",
+        encoding="utf-8",
+    )
+
+    result = cli("task", "delete", "task_a1b2", "--force")
+    assert result.exit_code == 0
+    assert "task_a1b2" not in done_path.read_text(encoding="utf-8")
+
+
+def test_task_tidy_moves_completed_lines_and_reports_counts(cli) -> None:
+    (cli.root / "tasks.md").write_text(
+        "- [ ] open one <!-- id:task_open -->\n"
+        "- [x] done one <!-- id:task_done1 created:2026-01-05 -->\n"
+        "- [x] done two <!-- id:task_done2 created:2026-01-06 -->\n",
+        encoding="utf-8",
+    )
+
+    result = cli("task", "tidy")
+    assert result.exit_code == 0
+    assert "moved\t2" in result.out
+    assert "left\t0" in result.out
+
+    text_after = cli.read("tasks.md")
+    assert "task_open" in text_after
+    assert "task_done1" not in text_after
+    assert "task_done2" not in text_after
+
+    result_json = cli("task", "tidy", "--json")
+    assert result_json.exit_code == 0
+    payload = json.loads(result_json.out)
+    assert payload == {"moved": 0, "left": 0}  # nothing left to move the second time
+
+
+def test_task_tidy_never_runs_implicitly(cli) -> None:
+    (cli.root / "tasks.md").write_text(
+        "- [x] done one <!-- id:task_done1 created:2026-01-05 -->\n", encoding="utf-8"
+    )
+    before = (cli.root / "tasks.md").read_bytes()
+
+    cli("task", "list")
+    cli("task", "list", "--all")
+    cli("task", "list", "--done")
+
+    assert (cli.root / "tasks.md").read_bytes() == before
