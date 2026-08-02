@@ -98,8 +98,11 @@ same message for the same mistake (FR-015).
 
 **Guarantees**:
 
-- **No line is lost.** The output has the same line count and ordering as the input, under every outcome
-  including total failure (FR-017).
+- **No line carrying a character is lost.** Ordering is preserved under every outcome, including total
+  failure (FR-017). The line count is preserved too, with one exception: a blank line lying between two
+  *captured* lines is dropped, so task lines written as a loose list land as a tight checklist (FR-010a).
+  A blank line before the block, after it, or beside a line whose capture failed is kept — that line is
+  still the assistant's text, not a checklist item.
 - **Order is the reply's order.** Tasks reach `tasks.md` in the order the assistant listed them.
 - **Partial failure is normal.** One failing line stops nothing; the lines after it are still captured
   (FR-016).

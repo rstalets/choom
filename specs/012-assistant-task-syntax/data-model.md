@@ -40,7 +40,9 @@ The outcome of walking one reply.
 
 **Invariants**:
 
-- `text` has the same number of lines as the input, and the same line ordering.
+- `text` has the same line ordering as the input, and the same number of lines except where a blank
+  line lay between two captured lines, which is dropped so a loose list of task lines lands as a tight
+  checklist (FR-010a). No line carrying a character is ever dropped.
 - A reply with no eligible lines returns `text` unchanged — identical to its input, not merely equal in
   content (FR-011). This is what makes "behaves exactly as `/ai` does today" checkable.
 - `len(tasks) + len(warnings)` equals the number of eligible lines.

@@ -2,9 +2,10 @@
 
 **Feature**: 012-assistant-task-syntax | **Date**: 2026-08-01
 
-Thirteen decisions. No `NEEDS CLARIFICATION` markers remain, and none were carried in from the spec.
-R13 was added after implementation, from a bug report, and supersedes R4's account of what the
-instruction says — R4's placement reasoning still stands.
+Fourteen decisions. No `NEEDS CLARIFICATION` markers remain, and none were carried in from the spec.
+R13 and R14 were added after implementation, each from a bug report. R13 supersedes R4's account of what
+the instruction says — R4's placement reasoning still stands — and R14 bends FR-017's no-line-dropped
+invariant, which it states plainly.
 
 ---
 
@@ -317,3 +318,42 @@ Before: 0 captured on the first, which is the bug. After: 2, 2, 0, 0 -- all four
 - *Post-process a markdown list into task lines.* Rejected outright: choom would be inventing tasks from
   text the assistant did not mark as tasks, which is the opposite of the explicit grammar this feature
   exists to establish.
+
+---
+
+## R14: A loose list of task lines is tightened here, not in the prompt
+
+**Added after implementation**, from a bug report: a captured list arrived in the note with a blank line
+between every checklist item.
+
+**Decision**: `capture_reply_tasks` drops a run of blank lines lying between two *captured* lines
+(`_tighten_captured_runs`). Blank lines before the block, after it, between a capture and ordinary prose,
+or beside a line whose capture failed are all kept.
+
+**Rationale**: both shapes are ordinary markdown. An assistant may write its task lines tight or as a
+loose list, and nothing about the request determines which. Substituting each line for its mirror
+faithfully preserves whichever arrived, so the user's note gets a gappy checklist roughly whenever the
+model felt like it — the same list, formatted two different ways on two different days.
+
+The alternative is a prompt instruction, and R13 is the reason not to reach for one again: three rounds of
+wording produced an assistant that complies *usually*. Sampling the real Claude Code CLI for this
+behaviour gave tight lists in every one of five attempts across two fixture notes, including two at six
+tasks — the reported gappy output never reproduced on demand. A property that cannot be reproduced cannot
+be pinned by a test, and a prompt cannot make it deterministic. Moving the rule into the walk makes the
+outcome the same on every run regardless of which shape the model chose, and it is testable.
+
+**On the invariant this bends**: FR-017 said no part of a reply may be dropped. It now says no line
+*carrying a character* may be dropped, with this one bounded exception (FR-010a). That is a real
+weakening and worth stating plainly rather than burying: the guarantee exists so an assistant's words
+always reach the document, and a blank line between two checklist items is not words. The exception is
+narrow by construction — it requires a captured line on both sides, so no rule about prose, failures, or
+block separation changes.
+
+**Alternatives considered**:
+
+- *Instruct the assistant to keep task lines consecutive.* Rejected per above: probabilistic where this is
+  deterministic. It remains available as a belt-and-braces addition if the loose shape proves common.
+- *Normalise blank lines across the whole reply.* Rejected: it would reformat the assistant's prose, which
+  is exactly what FR-010 exists to prevent.
+- *Tighten in the TUI before inserting.* Rejected under Principle I — it is a rule about reply content, and
+  the unit tests for it should not need an event loop.

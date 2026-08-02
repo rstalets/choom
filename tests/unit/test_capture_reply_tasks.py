@@ -199,3 +199,78 @@ def test_an_unwritable_tasks_md_fails_the_line_without_losing_the_reply(
     assert capture.tasks == ()
     assert len(capture.warnings) == 1
     assert capture.warnings[0].reason == "reply_capture_failed"
+
+
+def test_blank_lines_between_captured_lines_are_dropped(tmp_workspace: Workspace) -> None:
+    """An assistant may write its task lines as a loose list -- one blank line between
+    each. Substituting each for its mirror would leave a gappy checklist in the note.
+    Which shape arrives is not reliably settled by the prompt, so it is settled here."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    reply = "/task first thing\n\n/task second thing\n\n/task third thing"
+
+    capture = capture_reply_tasks(tmp_workspace, reply, source=meeting.path, source_id=meeting.id)
+
+    assert len(capture.tasks) == 3
+    lines = capture.text.splitlines()
+    assert len(lines) == 3
+    assert all(line.startswith("- [ ] [") for line in lines)
+
+
+def test_several_blank_lines_between_captures_are_all_dropped(tmp_workspace: Workspace) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    reply = "/task first thing\n\n\n/task second thing"
+
+    capture = capture_reply_tasks(tmp_workspace, reply, source=meeting.path, source_id=meeting.id)
+
+    assert len(capture.text.splitlines()) == 2
+
+
+def test_blank_lines_around_the_captured_block_are_kept(tmp_workspace: Workspace) -> None:
+    """Block separation is correct markdown and is not this rule's business -- only a
+    gap *between* two checklist items is."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    reply = "Here is what you owe:\n\n/task first thing\n/task second thing\n\nThat is all."
+
+    capture = capture_reply_tasks(tmp_workspace, reply, source=meeting.path, source_id=meeting.id)
+
+    lines = capture.text.splitlines()
+    assert lines[0] == "Here is what you owe:"
+    assert lines[1] == ""
+    assert lines[2].startswith("- [ ] [first thing]")
+    assert lines[3].startswith("- [ ] [second thing]")
+    assert lines[4] == ""
+    assert lines[5] == "That is all."
+
+
+def test_prose_between_two_captures_is_never_dropped(tmp_workspace: Workspace) -> None:
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    reply = "/task first thing\n\nand a thought in between\n\n/task second thing"
+
+    capture = capture_reply_tasks(tmp_workspace, reply, source=meeting.path, source_id=meeting.id)
+
+    assert capture.text.splitlines() == [
+        capture.text.splitlines()[0],
+        "",
+        "and a thought in between",
+        "",
+        capture.text.splitlines()[4],
+    ]
+
+
+def test_a_blank_beside_a_failed_capture_is_kept(tmp_workspace: Workspace) -> None:
+    """A line whose capture failed is still the assistant's text, not a checklist item,
+    so the gap beside it is ordinary block separation."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    reply = "/task first thing\n\n/task\n\n/task third thing"
+
+    capture = capture_reply_tasks(tmp_workspace, reply, source=meeting.path, source_id=meeting.id)
+
+    assert len(capture.tasks) == 2
+    assert len(capture.warnings) == 1
+    assert capture.text.splitlines() == [
+        capture.text.splitlines()[0],
+        "",
+        "/task",
+        "",
+        capture.text.splitlines()[4],
+    ]

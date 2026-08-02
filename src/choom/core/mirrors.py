@@ -166,6 +166,31 @@ def capture_task(
     return task, line
 
 
+def _tighten_captured_runs(out_lines: list[str], captured: set[int]) -> list[str]:
+    """Drop blank lines that sit between two captured task lines.
+
+    An assistant may write its task lines as a loose list -- one blank line between
+    each -- and both shapes are ordinary markdown, so which one arrives is not
+    something the reply can be relied on to settle. Substituting each line for its
+    mirror then leaves a gappy checklist in the user's note, which is not what a
+    captured list of commitments should look like.
+
+    Only a run of blank lines with a captured line on *both* sides is dropped. A blank
+    line between prose and the first task is block separation and stays; so does one
+    after the last task, and so does one beside a task line whose capture failed --
+    that line is still the assistant's text, not a checklist item.
+    """
+    if len(captured) < 2:
+        return out_lines
+    drop: set[int] = set()
+    ordered = sorted(captured)
+    for start, end in zip(ordered, ordered[1:], strict=False):
+        between = range(start + 1, end)
+        if between and all(out_lines[i].strip() == "" for i in between):
+            drop.update(between)
+    return [line for index, line in enumerate(out_lines) if index not in drop]
+
+
 def capture_reply_tasks(
     workspace: Workspace, text: str, *, source: Path, source_id: str
 ) -> ReplyCapture:
@@ -176,6 +201,11 @@ def capture_reply_tasks(
     that line's argument and type suffix and substitutes the returned mirror line for the
     text of that line. Every other line is carried through byte-identical. Writes
     tasks.md through `capture_task`, once per eligible line, and nothing else.
+
+    The one line this does not carry through is a blank one sitting between two
+    captured lines, which is dropped so a loose list of task lines becomes a tight
+    checklist (`_tighten_captured_runs`, FR-010a). No line carrying any character is
+    ever dropped.
 
     Returns `ReplyCapture(text, tasks, warnings)`. When `text` has no eligible line, the
     returned `text` is `text` itself -- the same object -- and no read or write happens
@@ -195,6 +225,7 @@ def capture_reply_tasks(
     tasks: list[Task] = []
     warnings: list[ScanWarning] = []
     out_lines: list[str] = []
+    captured: set[int] = set()
     for line in lines:
         if line.task is None:
             out_lines.append(line.text)
@@ -218,9 +249,11 @@ def capture_reply_tasks(
             out_lines.append(line.text)
             continue
         tasks.append(task)
+        captured.add(len(out_lines))
         out_lines.append(mirror)
 
-    return ReplyCapture(text="\n".join(out_lines), tasks=tuple(tasks), warnings=tuple(warnings))
+    tightened = _tighten_captured_runs(out_lines, captured)
+    return ReplyCapture(text="\n".join(tightened), tasks=tuple(tasks), warnings=tuple(warnings))
 
 
 # --- The non-stamping write -------------------------------------------------------

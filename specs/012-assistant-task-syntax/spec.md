@@ -267,6 +267,12 @@ the failure.
   checklist item linking to the task it created.
 - **FR-010**: Every line of the reply that is not a captured task line MUST be inserted exactly as
   written, with the reply's original line order preserved.
+- **FR-010a**: A blank line lying between two captured task lines MUST be dropped, so that task lines
+  written as a loose list become a tight checklist. This is the only exception to FR-010 and FR-017, and
+  it is bounded to a line carrying no characters, with a captured line on both sides. A blank line between
+  prose and the captured block, after the last captured line, or beside a line whose capture failed MUST
+  be kept — those are ordinary block separation, and a failed line is still the assistant's text rather
+  than a checklist item.
 - **FR-011**: A reply containing no task lines MUST behave exactly as it does today — no capture attempt,
   no additional message, no change to how the reply is inserted.
 - **FR-012**: A line inside a fenced code block MUST NOT be captured.
@@ -279,7 +285,9 @@ the failure.
   written and the user told a description was required.
 - **FR-016**: A capture that fails MUST NOT prevent the rest of the reply from being inserted or the
   remaining task lines from being captured. The failing line MUST be inserted as written.
-- **FR-017**: No part of a reply may be dropped or truncated by this feature, under any failure.
+- **FR-017**: No part of a reply may be dropped or truncated by this feature, under any failure. No line
+  carrying any character may be dropped under any circumstances; the single exception is the blank line
+  between two captured lines described in FR-010a.
 - **FR-018**: When a reply captures one or more tasks, the user MUST be told how many were captured;
   when any capture failed, the user MUST be told that, naming the reason.
 - **FR-019**: A cancelled or failed request MUST behave exactly as today — the `/ai` line is restored and
