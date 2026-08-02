@@ -6,12 +6,14 @@ from choom.core.meetings import create_meeting
 from choom.core.models import Workspace
 from choom.core.tasks import add_task
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditorPane, EditScreen
 from choom.tui.list_screen import DocumentRow, ListScreen
-from tests.helpers import list_view, to_collection
+from tests.helpers import editor_pane, list_view, to_collection
 
 
 async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> None:
+    # `e` from the list opens inline (contract C1): the list screen is never
+    # left (014-inline-editor-pane).
     meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
     app = ChoomApp(tmp_workspace)
@@ -21,8 +23,9 @@ async def test_e_from_list_opens_the_raw_markdown(tmp_workspace: Workspace) -> N
         await pilot.press("e")
         await pilot.pause()
 
-        assert isinstance(app.screen, EditScreen)
-        assert app.screen.target.display_path == meeting.path
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        assert pane.target.display_path == meeting.path
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text.startswith("---\n")
         assert "Q3 planning" in editor.text
@@ -64,7 +67,8 @@ async def test_e_opens_the_task_editor_on_a_highlighted_task(tmp_workspace: Work
         await pilot.press("e")
         await pilot.pause()
 
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
+        editor_pane(app)  # asserts one is mounted
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text == ""
 
@@ -92,9 +96,14 @@ async def test_e_is_a_noop_on_the_empty_state(tmp_workspace: Workspace) -> None:
         assert isinstance(app.screen, ListScreen)
 
 
-async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
+async def test_e_from_list_and_e_from_preview_produce_identical_buffers(
     tmp_workspace: Workspace,
 ) -> None:
+    # `e` from the list opens inline; `e` from the full-screen reading view
+    # stays full-screen (US3, contract C1's last row) -- different hosts, but
+    # the same `EditorPane` widget underneath (research R1), so FR-019's
+    # "identical capability inline and full-screen" is checkable as "same
+    # buffer contents" rather than "same screen class".
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
     from_list = ChoomApp(tmp_workspace)
@@ -102,9 +111,8 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
         await to_collection(from_list, pilot, "meetings")
         await pilot.press("e")
         await pilot.pause()
-        list_screen = from_list.screen
-        assert type(list_screen) is EditScreen
-        list_text = list_screen.query_one("#editor", TextArea).text
+        assert isinstance(from_list.screen, ListScreen)
+        list_text = editor_pane(from_list).query_one("#editor", TextArea).text
 
     from_preview = ChoomApp(tmp_workspace)
     async with from_preview.run_test(size=(80, 24)) as pilot:
@@ -113,13 +121,9 @@ async def test_e_from_list_and_e_from_preview_produce_identical_edit_screens(
         await pilot.pause()
         await pilot.press("e")
         await pilot.pause()
-        preview_screen = from_preview.screen
-        assert type(preview_screen) is EditScreen
-        preview_text = preview_screen.query_one("#editor", TextArea).text
+        assert isinstance(from_preview.screen, EditScreen)
+        preview_text = editor_pane(from_preview).query_one("#editor", TextArea).text
 
-    # Both routes go through the same `open_editor()` (research R10), so they
-    # necessarily construct the same screen class with the same bindings --
-    # what remains to verify is that the buffer contents agree too.
     assert list_text == preview_text
 
 
@@ -187,13 +191,14 @@ async def test_entering_and_leaving_a_document_without_typing_raises_no_confirma
         await to_collection(app, pilot, "meetings")
         await pilot.press("e")
         await pilot.pause()
-        assert isinstance(app.screen, EditScreen)
-        assert app.screen.is_dirty is False
+        assert isinstance(app.screen, ListScreen)
+        assert editor_pane(app).is_dirty is False
 
         await pilot.press("escape")
         await pilot.pause()
 
         assert isinstance(app.screen, ListScreen)
+        assert not app.screen.query(EditorPane)  # pane unmounted, no confirmation raised
 
     assert meeting.path.read_bytes() == before
 
@@ -209,12 +214,13 @@ async def test_entering_and_leaving_a_task_body_without_typing_raises_no_confirm
         await pilot.pause()
         await pilot.press("e")
         await pilot.pause()
-        assert isinstance(app.screen, EditScreen)
-        assert app.screen.is_dirty is False
+        assert isinstance(app.screen, ListScreen)
+        assert editor_pane(app).is_dirty is False
 
         await pilot.press("escape")
         await pilot.pause()
 
         assert isinstance(app.screen, ListScreen)
+        assert not app.screen.query(EditorPane)  # pane unmounted, no confirmation raised
 
     assert tmp_workspace.tasks_file.read_bytes() == before

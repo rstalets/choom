@@ -9,9 +9,8 @@ import pytest
 from choom.cli.main import main
 from choom.core.workspace import init_workspace
 from choom.tui.app import ChoomApp
-from choom.tui.edit_screen import EditScreen
-from choom.tui.list_screen import ListView, TaskRow
-from tests.helpers import type_command
+from choom.tui.list_screen import ListScreen, ListView, TaskRow
+from tests.helpers import editor_pane, type_command
 
 _MASKED_FIELDS = re.compile(r"^(id|created|updated):.*$", re.MULTILINE)
 
@@ -21,12 +20,13 @@ def _normalize(text: str) -> str:
 
 
 async def _create_via_tui(workspace, command_text: str) -> Path:  # type: ignore[no-untyped-def]
+    # Creating from the list opens inline (contract C1, US4).
     app = ChoomApp(workspace)
     async with app.run_test(size=(80, 24)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, command_text)
-        assert isinstance(app.screen, EditScreen)
-        return app.screen.target.display_path
+        assert isinstance(app.screen, ListScreen)
+        return editor_pane(app).target.display_path
 
 
 @pytest.mark.parametrize(

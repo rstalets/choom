@@ -21,7 +21,7 @@ from choom.core.meetings import create_meeting
 from choom.core.models import Document, Task, Workspace
 from choom.core.notes import create_note
 from choom.core.tasks import set_task_state
-from choom.tui.edit_screen import EditScreen
+from choom.tui.edit_screen import EditorPane
 from choom.tui.list_screen import DocumentRow, ListView, TaskRow
 
 #: Collection verbs, in the order the collection bar cycles with `tab` from launch.
@@ -73,15 +73,25 @@ async def to_collection(app: Any, pilot: Any, name: str) -> None:
     await type_command(app, pilot, name)
 
 
-async def open_edit(app: Any, pilot: Any, *, collection: str = "meetings") -> EditScreen:
-    """From the list, open the first row's preview and then its editor."""
+async def open_edit(app: Any, pilot: Any, *, collection: str = "meetings") -> EditorPane:
+    """From the list, open the first row's preview and then its editor -- the
+    full-screen route (US3): `enter` opens the reading view, `e` inside it
+    opens a full-screen editor. Returns the mounted pane."""
     await to_collection(app, pilot, collection)
     await pilot.press("enter")
     await pilot.pause()
     await pilot.press("e")
     await pilot.pause()
-    assert isinstance(app.screen, EditScreen)
-    return app.screen
+    return editor_pane(app)
+
+
+def editor_pane(app: Any) -> EditorPane:
+    """The one open `EditorPane`, inline or full-screen (research R1, R10):
+    `app.screen` is either `EditScreen` (the pane is its child) or `ListScreen`
+    with the pane mounted inline in `#preview-pane` -- either way this is the
+    single query that finds it. Raises if none is mounted, which is the
+    "an editor is open" assertion T013 asks for."""
+    return app.screen.query_one(EditorPane)
 
 
 def list_view(app: Any) -> ListView:

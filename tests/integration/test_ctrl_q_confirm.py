@@ -7,7 +7,8 @@ from choom.core.models import Workspace
 from choom.tui.app import ChoomApp
 from choom.tui.confirm_dialog import ConfirmDialog
 from choom.tui.edit_screen import EditScreen
-from tests.helpers import open_edit
+from choom.tui.list_screen import ListScreen
+from tests.helpers import editor_pane, open_edit, to_collection
 
 
 async def test_ctrl_q_with_changes_raises_dialog_with_nothing_written(
@@ -76,6 +77,40 @@ async def test_ctrl_q_escape_cancels_and_returns_to_editor_with_buffer_intact(
         assert isinstance(app.screen, EditScreen)
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text == expected_text
+
+
+async def test_ctrl_q_with_changes_over_inline_editor_raises_dialog(
+    tmp_workspace: Workspace,
+) -> None:
+    """`ctrl+q` finds a dirty inline editor the same way it finds a dirty
+    full-screen one (research R9, `open_editors`, T010/T032): the confirmation
+    is raised, nothing is written, and the pane is still there to return to."""
+    meeting = create_meeting(tmp_workspace, "Q3 planning", type="standup")
+    before_bytes = meeting.path.read_bytes()
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("e")
+        await pilot.pause()
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        editor = pane.query_one("#editor", TextArea)
+        editor.text = editor.text + "unsaved change"
+
+        await pilot.press("ctrl+q")
+        await pilot.pause()
+
+        assert isinstance(app.screen, ConfirmDialog)
+        assert app.is_running
+        assert meeting.path.read_bytes() == before_bytes
+
+        await pilot.press("escape")
+        await pilot.pause()
+
+        assert app.is_running
+        assert isinstance(app.screen, ListScreen)
+        assert editor_pane(app) is pane
 
 
 async def test_ctrl_q_with_no_changes_exits_immediately_with_no_dialog(

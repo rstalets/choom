@@ -11,6 +11,7 @@ from choom.core.models import Workspace
 from choom.core.tasks import add_task
 from choom.tui.app import ChoomApp
 from choom.tui.edit_screen import EditScreen
+from choom.tui.list_screen import ListScreen
 from tests.conftest import tasks_file
 from tests.helpers import to_collection
 
@@ -141,7 +142,7 @@ async def test_task_body_save_whose_task_vanished_reports_it_and_keeps_the_buffe
         await pilot.pause()
         await pilot.press("e")
         await pilot.pause()
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)  # e from the list opens inline (contract C1)
 
         editor = app.screen.query_one("#editor", TextArea)
         editor.text = "some detail typed while the file moved underneath us"
@@ -157,7 +158,7 @@ async def test_task_body_save_whose_task_vanished_reports_it_and_keeps_the_buffe
         await pilot.press("ctrl+o")
         await pilot.pause()
 
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
         assert editor.text == buffer_before_save
 
         from choom.tui.status_bar import StatusBar

@@ -5,7 +5,6 @@ from choom.core.models import Workspace
 from choom.core.notes import create_note
 from choom.tui.app import ChoomApp
 from choom.tui.collection_bar import CollectionBar
-from choom.tui.edit_screen import EditScreen
 from choom.tui.list_screen import ListScreen
 from tests.helpers import row_titles, to_collection, type_command
 
@@ -21,7 +20,7 @@ async def test_creating_a_note_while_viewing_meetings_lands_on_notes_after_close
         assert app.active == "meetings"
 
         await type_command(app, pilot, "note.research vendor landscape")
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
 
         await pilot.press("escape")  # nothing edited yet, so this pops immediately
         await pilot.pause()
@@ -45,7 +44,7 @@ async def test_creating_a_meeting_while_viewing_notes_lands_on_meetings_after_cl
         assert app.active == "notes"
 
         await type_command(app, pilot, "meeting.standup Q3 planning")
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
 
         await pilot.press("escape")
         await pilot.pause()
@@ -59,7 +58,7 @@ async def test_bare_daily_note_lands_on_notes_view_after_close(tmp_workspace: Wo
     async with app.run_test(size=(100, 30)) as pilot:
         await pilot.pause()
         await type_command(app, pilot, "note")
-        assert isinstance(app.screen, EditScreen)
+        assert isinstance(app.screen, ListScreen)
 
         await pilot.press("escape")
         await pilot.pause()

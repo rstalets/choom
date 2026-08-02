@@ -66,7 +66,7 @@ async def test_reply_replaces_the_command_line(
         saved = screen.target.display_path.read_text(encoding="utf-8")
         assert "/ai summarise the bullets above" in saved
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert EDIT_HELP in str(status.content)
 
 
@@ -110,14 +110,14 @@ async def test_reply_with_task_lines_captures_real_linked_tasks(
             assert task.id is not None
             assert f"#{task.id}" in editor.get_line(line_index + (1 if task is first else 3)).plain
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         status_text = str(status.content)
         assert "2 tasks captured" in status_text
         assert "⚠" not in status_text
 
         # Still the same screen, editor focused -- no navigation happened.
         assert isinstance(app.screen, EditScreen)
-        assert app.screen is screen
+        assert app.screen.pane is screen
         assert editor.has_focus
 
 
@@ -155,7 +155,7 @@ async def test_unwritable_tasks_md_still_lands_the_whole_reply(
             ]
             assert actual_lines == expected_lines  # no line lost, none captured
 
-            status = screen.query_one(StatusBar)
+            status = app.screen.query_one(StatusBar)
             status_text = str(status.content)
             assert "⚠" in status_text
             assert "could not write" in status_text
@@ -338,7 +338,7 @@ async def test_reply_explaining_the_syntax_captures_nothing(
         # still empty, not merely present.
         assert tmp_workspace.tasks_file.read_text(encoding="utf-8") == ""
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         status_text = str(status.content)
         assert "captured" not in status_text
         assert EDIT_HELP in status_text
@@ -371,7 +371,7 @@ async def test_cancel_restores_the_line_and_kills_the_process(
         assert editor.get_line(line_index).plain == "/ai anything"
         assert process.poll() is not None  # the child is gone, no orphan
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "⚠" not in str(status.content)  # a requested cancel is not a failure
 
 
@@ -393,7 +393,7 @@ async def test_non_zero_exit_shows_a_message_and_restores_the_line(
 
         assert editor.get_line(line_index).plain == "/ai broken"
         assert editor.read_only is False
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "Claude Code CLI" in str(status.content)
         assert "stub failure" in str(status.content)
         # the saved document (from FR-008's pre-invocation save) is untouched
@@ -421,7 +421,7 @@ async def test_empty_reply_shows_a_message_and_restores_the_line(
         await pilot.pause()
 
         assert editor.get_line(line_index).plain == "/ai say nothing"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "empty reply" in str(status.content)
 
 
@@ -449,7 +449,7 @@ async def test_no_assistant_available_reports_and_restores_the_line(
         assert screen._request is None
         assert editor.read_only is False
         assert editor.get_line(line_index).plain == "/ai anything"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "/config assistant" in str(status.content)
 
 
@@ -475,7 +475,7 @@ async def test_configured_but_missing_binary_names_the_assistant(
         await pilot.pause()
 
         assert editor.get_line(line_index).plain == "/ai anything"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "Claude Code CLI" in str(status.content)
         assert "not installed" in str(status.content) or "not on your PATH" in str(status.content)
 
@@ -492,7 +492,7 @@ async def test_bare_ai_reports_a_prompt_is_needed(tmp_workspace: Workspace) -> N
         await pilot.pause()
 
         assert screen._request is None
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "needs a prompt" in str(status.content)
         # nothing was saved on account of the bare command
         assert screen.is_dirty is True  # the appended blank command line is still unsaved
@@ -523,7 +523,7 @@ async def test_both_assistants_installed_nothing_configured_reports_ambiguous(
 
         assert screen._request is None
         assert editor.get_line(line_index).plain == "/ai anything"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         text = str(status.content)
         assert "claude" in text and "copilot" in text
         assert "/config assistant" in text
@@ -542,7 +542,7 @@ async def test_resize_mid_request_updates_the_breadcrumb_display(
 
         await submit_editor_line(pilot, editor, "/ai anything")
         assert screen._request is not None
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         wide_text = str(status.content)
         assert "— ctrl+c to cancel" in wide_text
 
@@ -588,7 +588,7 @@ async def test_save_failure_never_invokes_the_assistant(
             assert editor.read_only is False
             # the buffer holds exactly what was typed -- nothing else was inserted
             assert editor.text == expected
-            status = screen.query_one(StatusBar)
+            status = app.screen.query_one(StatusBar)
             assert "⚠" in str(status.content)
     finally:
         directory.chmod(original_mode)
@@ -641,6 +641,6 @@ async def test_a_document_deleted_mid_request_lands_the_reply_and_says_why(
         tasks, _ = load_tasks(tmp_workspace)
         assert tasks == []
 
-        status = str(screen.query_one(StatusBar).content)
+        status = str(app.screen.query_one(StatusBar).content)
         assert "could not identify this document" in status
         assert "⚠" in status

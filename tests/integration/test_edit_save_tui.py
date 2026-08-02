@@ -55,7 +55,7 @@ async def test_ctrl_o_writes_and_preserves_cursor_position(tmp_workspace: Worksp
 
         assert isinstance(app.screen, EditScreen)
         assert editor.cursor_location == (2, 3)
-        path = app.screen.target.display_path
+        path = app.screen.pane.target.display_path
         assert "An appended line." in path.read_text(encoding="utf-8")
 
 
@@ -72,7 +72,7 @@ async def test_ctrl_s_behaves_identically_to_ctrl_o(tmp_workspace: Workspace) ->
         await pilot.pause()
 
         assert isinstance(app.screen, EditScreen)
-        path = app.screen.target.display_path
+        path = app.screen.pane.target.display_path
         assert "Saved via ctrl+s." in path.read_text(encoding="utf-8")
 
 
@@ -191,7 +191,7 @@ async def test_resize_while_editing_preserves_buffer_cursor_and_dirty_state(
         editor = app.screen.query_one("#editor", TextArea)
         assert editor.text == expected_text
         assert editor.cursor_location == (1, 3)
-        assert app.screen.is_dirty is True
+        assert app.screen.pane.is_dirty is True
 
 
 async def test_edit_that_drops_out_of_active_filter_moves_selection_to_remaining_row(

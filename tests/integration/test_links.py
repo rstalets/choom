@@ -132,7 +132,7 @@ async def test_link_one_match_inserts_a_correct_markdown_link(tmp_workspace: Wor
         expected = f"[Q3 planning]({expected_dest}#{meeting.id})"
         assert editor.get_line(line_index).plain == expected
 
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "⚠" not in str(status.content)
 
 
@@ -147,7 +147,7 @@ async def test_link_zero_matches_leaves_the_line_and_reports(tmp_workspace: Work
         line_index = await submit_editor_line(pilot, editor, "/link nothing matches this at all")
 
         assert editor.get_line(line_index).plain == "/link nothing matches this at all"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         assert "no record matches" in str(status.content)
 
 
@@ -166,7 +166,7 @@ async def test_link_several_matches_leaves_the_line_and_names_candidates(
         line_index = await submit_editor_line(pilot, editor, "/link q3 planning")
 
         assert editor.get_line(line_index).plain == "/link q3 planning"
-        status = screen.query_one(StatusBar)
+        status = app.screen.query_one(StatusBar)
         text = str(status.content)
         assert "Q3 planning alpha" in text
         assert "Q3 planning beta" in text
