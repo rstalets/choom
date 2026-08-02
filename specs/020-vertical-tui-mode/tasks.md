@@ -69,7 +69,7 @@ that branch.
 
 **Purpose**: establish a green baseline before anything moves.
 
-- [ ] T001 Confirm the baseline is green before changing anything: run `scripts/dev-tests.sh` from the
+- [x] T001 Confirm the baseline is green before changing anything: run `scripts/dev-tests.sh` from the
       repository root and record the pass count. Also run
       `uv run ruff format --check . && uv run ruff check . && uv run mypy`. Do not start T002 on a red
       tree — a pre-existing failure attributed to this feature wastes the whole gate
@@ -85,7 +85,7 @@ then does T004 write the first preference in a test. Getting that order wrong me
 writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — the exact bug
 `tests/conftest.py`'s autouse fixture exists to prevent.
 
-- [ ] T002 Create `src/choom/core/preferences.py` with `LEGAL_VIEW_ORIENTATIONS`,
+- [x] T002 Create `src/choom/core/preferences.py` with `LEGAL_VIEW_ORIENTATIONS`,
       `DEFAULT_VIEW_ORIENTATION = "horizontal"`, and **`preferences_root() -> Path`** per
       [contracts/core-api.md](./contracts/core-api.md). This is the single overridable resolver — the
       only function in the module that reads an environment variable or calls `Path.home()`; every
@@ -98,7 +98,7 @@ writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — t
       explicitly. Never creates the directory, never raises. Same task: unit tests in
       `tests/unit/test_preferences.py` covering each platform branch, the precedence order, and the
       empty/relative rejection. Verify: `scripts/dev-tests.sh tests/unit/test_preferences.py`
-- [ ] T003 Extend the autouse `_isolated_profile_root` fixture in `tests/conftest.py` (currently at
+- [x] T003 Extend the autouse `_isolated_profile_root` fixture in `tests/conftest.py` (currently at
       line 20) to also isolate preferences, **at both levels**, and rename it to reflect that it now
       guards two stores. Level one: `monkeypatch.setattr(preferences, "preferences_root", lambda: root)`
       for in-process tests. Level two: `monkeypatch.setenv` for `LOCALAPPDATA`, `APPDATA`, and
@@ -109,7 +109,7 @@ writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — t
       whole one. Extend the docstring to cover the second store. Verify:
       `scripts/dev-tests.sh` (whole suite — this fixture is autouse and touches everything), plus
       confirm by inspection that no real `~/.config/choom` or `%LOCALAPPDATA%\choom` appears after a run
-- [ ] T004 Add `get_view_orientation() -> str` to `src/choom/core/preferences.py`. **Never raises**;
+- [x] T004 Add `get_view_orientation() -> str` to `src/choom/core/preferences.py`. **Never raises**;
       always returns a member of `LEGAL_VIEW_ORIENTATIONS`. Same task: unit tests in
       `tests/unit/test_preferences.py` covering **all eight failure modes**, each of which must return
       `"horizontal"` and must not raise — (1) file absent, (2) unreadable / `OSError`, (3) not valid
@@ -119,7 +119,7 @@ writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — t
       and case-sensitive) — plus the two happy paths. choom must always start; a hand-edited
       preferences file is a normal case, not an error (Principle IV, and the precedent
       `get_assistant` sets). Verify: `scripts/dev-tests.sh tests/unit/test_preferences.py`
-- [ ] T005 Add `set_view_orientation(value: str) -> None` to `src/choom/core/preferences.py`. Raises
+- [x] T005 Add `set_view_orientation(value: str) -> None` to `src/choom/core/preferences.py`. Raises
       `UsageError` for an illegal value with **nothing written**; raises `WorkspaceError` on an I/O
       failure. Writes through the existing `write_text_atomic` (`core/atomic_write.py:19`), which also
       creates the parent directory — do not hand-roll a fourth temp-file dance, that module exists
@@ -128,11 +128,11 @@ writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — t
       tests covering create-from-absent, replace-in-place, **comments / key order / unknown keys and
       unknown tables all survive**, CRLF preserved, illegal value writes nothing, and idempotence.
       Verify: `scripts/dev-tests.sh tests/unit/test_preferences.py`
-- [ ] T006 [P] Export `preferences_root`, `get_view_orientation`, `set_view_orientation`,
+- [x] T006 [P] Export `preferences_root`, `get_view_orientation`, `set_view_orientation`,
       `LEGAL_VIEW_ORIENTATIONS`, and `DEFAULT_VIEW_ORIENTATION` from `src/choom/core/__init__.py`'s
       `__all__`, keeping it alphabetically sorted as it is today. Verify:
       `uv run ruff check . && uv run mypy`
-- [ ] T007 [P] Create `src/choom/tui/layout.py` per [contracts/layout.md](./contracts/layout.md): the
+- [x] T007 [P] Create `src/choom/tui/layout.py` per [contracts/layout.md](./contracts/layout.md): the
       five component constants and **`MIN_VERTICAL_SCREEN_HEIGHT` written as their sum**, never as the
       literal `11` —
 
@@ -154,7 +154,7 @@ writes into a developer's real `~/.config/choom` or `%LOCALAPPDATA%\choom` — t
       `MIN_VERTICAL_SCREEN_HEIGHT == 11` **and** that it equals the sum of its five components (so the
       derivation cannot silently drift from the value), and `effective_orientation` at heights 10 and
       11 for both stored values. Verify: `scripts/dev-tests.sh tests/unit/test_layout.py`
-- [ ] T008 Read the preference once in `ChoomApp.__init__` (`src/choom/tui/app.py:84`) into
+- [x] T008 Read the preference once in `ChoomApp.__init__` (`src/choom/tui/app.py:84`) into
       `self.view_orientation`, alongside the existing session state. `cli/main.py` is **not** modified.
       This holds the *stored* value, not the effective one — the fallback is resolved per-render
       against the current height, because the terminal can be resized after startup. Same task: a unit
@@ -173,7 +173,7 @@ previewed.
 **Independent test**: open choom in a half-width window, highlight a record, run
 `/config view vertical`, confirm the arrangement and that the highlight and preview survived.
 
-- [ ] T009 [US1] Add the five `-vertical` CSS variants to `src/choom/tui/app.tcss` per
+- [x] T009 [US1] Add the five `-vertical` CSS variants to `src/choom/tui/app.tcss` per
       [contracts/layout.md](./contracts/layout.md): `#body.-vertical { layout: vertical; }` beside the
       existing `#body` rule; a new `#upper-band { height: 1fr; layout: horizontal; }`; and vertical-only
       variants for `#list-pane` (drop `border-right` — it is rightmost in the upper band),
@@ -182,23 +182,23 @@ previewed.
       FR-020's "no residual difference" structural rather than something to test for. Verify: launch
       the app in both orientations and compare horizontal against the pre-change screenshot; T029
       makes it a test
-- [ ] T010 [US1] Add an `effective_orientation()` accessor to `ListScreen` that combines
+- [x] T010 [US1] Add an `effective_orientation()` accessor to `ListScreen` that combines
       `app.view_orientation` with `self.size.height` through `layout.effective_orientation`, so the
       fallback is applied in exactly **one** place and no caller reads the stored value directly.
       Verify: `uv run mypy`
-- [ ] T011 [US1] Branch `ListScreen.compose` (`src/choom/tui/list_screen.py:200`) on the effective
+- [x] T011 [US1] Branch `ListScreen.compose` (`src/choom/tui/list_screen.py:200`) on the effective
       orientation per [data-model.md](./data-model.md) §4. Horizontal composes **exactly today's tree,
       unchanged**. Vertical composes `Vertical#body.-vertical` containing `Horizontal#upper-band`
       (scope pane + list pane) and `#preview-pane`. **Every id is identical in both trees** — that is
       what lets the inline editor's mount target and every existing `query_one` keep working untouched.
       Keep the branch to a small contiguous block: this is the one hunk that will conflict with #43.
       Verify: `scripts/dev-tests.sh tests/integration/test_list_tui.py`
-- [ ] T012 [US1] Add `view` to `ChoomApp.handle_config_command` (`src/choom/tui/app.py:382`) — the set
+- [x] T012 [US1] Add `view` to `ChoomApp.handle_config_command` (`src/choom/tui/app.py:382`) — the set
       and get forms per [contracts/tui.md](./contracts/tui.md) C1. Error wording is T025's; this task
       is the happy path: a legal value persists via `set_view_orientation`, updates
       `app.view_orientation`, and returns the confirmation string. Same task: tests that a legal value
       is persisted and reported. Verify: `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py`
-- [ ] T013 [US1] Make `_on_config_requested` (`src/choom/tui/list_screen.py:953`) `async` and perform
+- [x] T013 [US1] Make `_on_config_requested` (`src/choom/tui/list_screen.py:953`) `async` and perform
       the switch per [data-model.md](./data-model.md) §5.1: capture the highlighted record's id, then
       `await self.query_one("#body").recompose()`, then `await self._refresh_scope_pane()`, then
       `await self.refresh_rows(select_id=...)`. **Recompose `#body`, never the screen** — a
@@ -206,12 +206,12 @@ previewed.
       handled. Do not add a focus call: `_on_command_bar_closed` already focuses `#meeting-list`
       afterwards and that existing rule is what FR-023 requires. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py`
-- [ ] T014 [US1] Restore the backlinks-expanded state after a recompose (FR-021): if
+- [x] T014 [US1] Restore the backlinks-expanded state after a recompose (FR-021): if
       `self._preview_links_expanded` was set, re-show `#preview-links-section` and repopulate it. The
       recompose builds a fresh section that defaults to hidden, so without this the section silently
       collapses on every switch. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k backlinks`
-- [ ] T015 [US1] Integration tests in a new `tests/integration/test_vertical_layout_tui.py` at
+- [x] T015 [US1] Integration tests in a new `tests/integration/test_vertical_layout_tui.py` at
       `size=(120, 40)`: the vertical tree has `#upper-band` with the scope pane and list pane as its
       children and `#preview-pane` as a sibling below; the horizontal tree has all three as siblings of
       `#body`; the same record is highlighted and previewed across a switch (FR-022); collection,
@@ -232,12 +232,12 @@ inside any workspace.
 **Independent test**: set vertical, relaunch, confirm; open a second workspace, confirm; inspect the
 workspace tree and find nothing changed.
 
-- [ ] T016 [US2] Integration tests in `tests/integration/test_vertical_layout_tui.py`: a fresh app with
+- [x] T016 [US2] Integration tests in `tests/integration/test_vertical_layout_tui.py`: a fresh app with
       a stored `"vertical"` opens vertical with no command typed; an app with **no** preferences file
       opens horizontal (FR-002 — the default needs no configuration); the same stored preference
       applies in a **second, unrelated workspace** (FR-008, one value per user, not keyed by
       workspace). Verify: `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k persist`
-- [ ] T017 [US2] Test that a switch writes **nothing** inside the workspace (FR-024, SC-005): snapshot
+- [x] T017 [US2] Test that a switch writes **nothing** inside the workspace (FR-024, SC-005): snapshot
       every file under the workspace root before the switch and assert byte-identical afterwards, and
       assert specifically that `.choom/config.toml` gains no `[view]` table. This is the constitutional
       requirement from spec.md §"Decision" made executable — the whole storage argument is worthless if
@@ -255,12 +255,12 @@ workspace tree and find nothing changed.
 **Independent test**: run the same scripted interaction in both orientations; every outcome except
 pane geometry is identical.
 
-- [ ] T018 [US3] Test that the inline editor opens in the lower band in vertical with the list and
+- [x] T018 [US3] Test that the inline editor opens in the lower band in vertical with the list and
       scope pane still visible above, saves and discards identically, and returns the preview with the
       same record highlighted (FR-040). **`list_screen.py:246`'s mount line must not change** — the id
       exists in both trees, so if this task needs to edit that line, T011 got the ids wrong. Verify:
       `scripts/dev-tests.sh tests/integration/test_inline_editor_tui.py tests/integration/test_vertical_layout_tui.py -k editor`
-- [ ] T019 [US3] Bound `#preview-links-section` in vertical (FR-043) as a fraction of its container
+- [x] T019 [US3] Bound `#preview-links-section` in vertical (FR-043) as a fraction of its container
       rather than the fixed `max-height: 12` it carries today (`app.tcss:50-60`). **This is a real
       regression, not a precaution**: in horizontal the preview pane is full body height so 12 rows is
       a slice, but in vertical at 80x24 the lower band is ~10 rows and the existing constant would
@@ -268,7 +268,7 @@ pane geometry is identical.
       only by reading the stylesheet against the new band height. Same task: a test at `(80, 24)` in
       vertical that with the backlinks section expanded, **preview content is still visible above it**.
       Verify: `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k backlinks`
-- [ ] T020 [US3] Test binding and footer parity (FR-027, FR-028, SC-007): capture the active binding
+- [x] T020 [US3] Test binding and footer parity (FR-027, FR-028, SC-007): capture the active binding
       set and the footer string in each state — list, task list, preview, backlinks-focused, editor,
       link-picker — in **both** orientations and assert they are identical. Orientation must never
       appear in the footer. `status_bar.py:10-26`'s help strings must not be edited by this feature;
@@ -289,7 +289,7 @@ and never rewrites the stored preference.
 **Independent test**: run at 80x24 and confirm both bands are usable; shrink past the threshold and
 confirm the fallback; grow back and confirm the reversal; confirm the stored value is unchanged.
 
-- [ ] T021 [US4] Wire the resize path in `ListScreen.on_resize` (`src/choom/tui/list_screen.py:288`)
+- [x] T021 [US4] Wire the resize path in `ListScreen.on_resize` (`src/choom/tui/list_screen.py:288`)
       per [contracts/tui.md](./contracts/tui.md) C4, with the branches in **this order**:
 
       1. `if self._editor_pane is not None:` → columns only, **never recompose** (FR-025)
@@ -301,7 +301,7 @@ confirm the fallback; grow back and confirm the reversal; confirm the stored val
       the threshold with **no** editor open does flip the layout, and that a resize not crossing it
       does not. The dirty-editor case is T022's, deliberately separate. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k resize`
-- [ ] T022 [US4] **The data-loss regression test, and proof that the guard is load-bearing.** Its own
+- [x] T022 [US4] **The data-loss regression test, and proof that the guard is load-bearing.** Its own
       task because this is the only path in the feature that can destroy the user's words, and a guard
       whose test would pass without it is not a guard. In
       `tests/integration/test_vertical_layout_tui.py`: open the inline editor in vertical, type text
@@ -311,7 +311,7 @@ confirm the fallback; grow back and confirm the reversal; confirm the stored val
       confirm it **fails**, restore the guard, confirm it passes. Record the observed failure mode in
       the test's docstring so the next reader knows what it is protecting. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k dirty_editor`
-- [ ] T023 [US4] The threshold boundary, in **both** directions — the part a single "it degrades" test
+- [x] T023 [US4] The threshold boundary, in **both** directions — the part a single "it degrades" test
       would miss and the part most likely to rot if the constant is ever edited. In
       `tests/integration/test_vertical_layout_tui.py`: `(80, 11)` renders vertical with both bands at
       their minimum (column header + 3 rows above, 4 content lines below); `(80, 10)` renders
@@ -319,7 +319,7 @@ confirm the fallback; grow back and confirm the reversal; confirm the stored val
       `24 → 10 → 24` round trip leaves the **stored** preference reading `"vertical"` throughout
       (FR-034) — degrading must never rewrite it. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k boundary`
-- [ ] T024 [US4] The required 80x24 case (FR-031, SC-008). **This is genuinely new coverage, not a
+- [x] T024 [US4] The required 80x24 case (FR-031, SC-008). **This is genuinely new coverage, not a
       re-run**: every existing narrow-terminal test varies *width* at a fixed 24 rows
       (`tests/integration/test_narrow_terminal_tui.py` uses `(20,24)`, `(10,24)`, `(40,24)`), so no
       test in the repo currently exercises height at all. Assert that at `(80, 24)` in vertical the
@@ -327,7 +327,7 @@ confirm the fallback; grow back and confirm the reversal; confirm the stored val
       least four lines, and that neither band is reduced to a single row. Add `(120, 40)` as the
       comfortable companion — the two sizes the TUI is smoke-tested at. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k terminal_size`
-- [ ] T025 [US4] Extend `tests/integration/test_narrow_terminal_tui.py` with a vertical case at
+- [x] T025 [US4] Extend `tests/integration/test_narrow_terminal_tui.py` with a vertical case at
       `(20, 24)` proving width degradation is **identical** in both orientations (FR-039): the
       lower-priority labelled columns drop, the collection bar compacts, and the workspace path elides
       exactly as they do in horizontal. Also assert width **never** triggers the fallback — a terminal
@@ -346,7 +346,7 @@ discoverable without guessing.
 **Independent test**: enter each malformed form and confirm the message, that the layout is unchanged,
 and that the help pane lists the command.
 
-- [ ] T026 [US5] Error messages per [contracts/tui.md](./contracts/tui.md) C1. `/config view sideways`
+- [x] T026 [US5] Error messages per [contracts/tui.md](./contracts/tui.md) C1. `/config view sideways`
       → `view must be one of horizontal, vertical; got 'sideways'`, matching `set_assistant`'s existing
       shape exactly; the layout does not change and **nothing is written** (FR-044). Also change the
       existing bare `unknown setting: {name!r}` at `src/choom/tui/app.py:389` to name the settings that
@@ -355,19 +355,19 @@ and that the help pane lists the command.
       instead, and a second setting is what makes the list worth printing. Same task: tests for both
       messages and for the no-write guarantee. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k error`
-- [ ] T027 [US5] The get form and the fallback report. `/config view` with no value reports the current
+- [x] T027 [US5] The get form and the fallback report. `/config view` with no value reports the current
       setting and the accepted values; when the fallback is in effect it reports **both** facts — that
       the setting is vertical and that horizontal is in effect because the terminal is too short
       (FR-037). Setting `vertical` on a too-short terminal still saves and says so (FR-038). Same task:
       tests for the unset, set, and fallback-in-effect wordings. Verify:
       `scripts/dev-tests.sh tests/integration/test_vertical_layout_tui.py -k report`
-- [ ] T028 [US5] Update the `/config` verb entry in `src/choom/tui/commands.py:24` so its argument and
+- [x] T028 [US5] Update the `/config` verb entry in `src/choom/tui/commands.py:24` so its argument and
       description cover **both** settings and both of `view`'s accepted values (FR-046) —
       `VERB_TABLE` is what `HelpScreen._render_body` prints, so this is the whole of discoverability.
       No new verb is registered; `/config` already exists. Same task: extend
       `tests/integration/test_help_pane_tui.py` to assert the help pane names `view` and both values.
       Verify: `scripts/dev-tests.sh tests/integration/test_help_pane_tui.py`
-- [ ] T029 [US5] Degrade gracefully when the store cannot be written (FR-013): catch `WorkspaceError`
+- [x] T029 [US5] Degrade gracefully when the store cannot be written (FR-013): catch `WorkspaceError`
       from `set_view_orientation`, **still apply the layout for this session**, and report
       `view set to vertical for this session; could not save the preference: <reason>`. A failed write
       must not abort the interface. Same task: a test with an unwritable preferences directory
@@ -380,7 +380,7 @@ and that the help pane lists the command.
 
 ## Phase 8: Polish & cross-cutting
 
-- [ ] T030 Lock horizontal's geometry with a test, turning
+- [x] T030 Lock horizontal's geometry with a test, turning
       [contracts/layout.md](./contracts/layout.md)'s must-not-change list from advice into
       enforcement. In a new `tests/unit/test_app_tcss_scope.py`: parse `src/choom/tui/app.tcss` into
       selector → declarations and assert that the base rules for `#body`, `#scope-pane`, `#list-pane`,
@@ -393,23 +393,23 @@ and that the help pane lists the command.
       feature. Docstring must say that a failure means either scope creep or a deliberate change that
       has to be re-recorded here on purpose. Verify:
       `scripts/dev-tests.sh tests/unit/test_app_tcss_scope.py`
-- [ ] T031 [P] Cross-platform paths: extend `tests/integration/test_unicode_paths.py` with a profile
+- [x] T031 [P] Cross-platform paths: extend `tests/integration/test_unicode_paths.py` with a profile
       directory containing spaces and non-ASCII characters, confirming the preferences file is written
       and read back verbatim. Also assert the resolved path stays well under the Windows 260-character
       limit and that no admin rights or network access are involved. Verify:
       `scripts/dev-tests.sh tests/integration/test_unicode_paths.py`
-- [ ] T032 [P] Verify the scope fence held (see "Scope fence" above): `git diff` must show **no**
+- [x] T032 [P] Verify the scope fence held (see "Scope fence" above): `git diff` must show **no**
       change to `ScopePane`, `show_categories`, `task_category`, or the task branch of `refresh_rows` —
       those belong to #43, which implements first. Also confirm `src/choom/cli/` has **no diff at all**
       (gate II, FR-030): no subparser, no `--json` key, no exit code, and `_run_tui` untouched. Verify:
       `git diff origin/release/v0.0.4 -- src/choom/cli/` is empty, and inspect the `list_screen.py`
       diff against the four named symbols
-- [ ] T033 [P] Confirm no other documentation needs amending: `docs/REQUIREMENTS.md` is unchanged
+- [x] T033 [P] Confirm no other documentation needs amending: `docs/REQUIREMENTS.md` is unchanged
       because this feature adds no exit code, no frontmatter key, no id-scheme change, and no directory
       layout change; `AGENTS.md.tmpl` is unchanged because a pane arrangement is not something an
       assistant reads, writes, or needs told about, and the file's content rule bites well before its
       ~100-line backstop does
-- [ ] T034 **Leave README.md alone — this is a deliberate skip, not an oversight.** Per CLAUDE.md the
+- [x] T034 **Leave README.md alone — this is a deliberate skip, not an oversight.** Per CLAUDE.md the
       README feature list describes the *released* version and closes with "Everything above has landed
       on `main` as of vX.Y.Z"; `/release` folds a version's user-visible changes in when it cuts that
       version. Adding or extending a bullet for this unreleased work — including appending a sentence
@@ -418,14 +418,25 @@ and that the help pane lists the command.
       this feature's own `specs/020-vertical-tui-mode/` artifacts instead, which is what a
       "document it" task is actually for at implementation time. Verify: no `README.md` edit appears in
       `git diff`
-- [ ] T035 Run the gates: `scripts/dev-tests.sh` (whole suite green, count no lower than T001's
+- [x] T035 Run the gates: `scripts/dev-tests.sh` (whole suite green, count no lower than T001's
       baseline plus the new tests) and
       `uv run ruff format --check . && uv run ruff check . && uv run mypy`
-- [ ] T036 Run [quickstart.md](./quickstart.md) end to end by hand against a scratch workspace under
+- [ ] **DEFERRED** T036 Run [quickstart.md](./quickstart.md) end to end by hand against a scratch workspace under
       `/tmp`, particularly §3 (the backlinks bound in the lower band), §4 (the size table, including
       80x11 and 80x10), and **§5 (the data-loss guard — the one that matters most)**. TUI changes are
       verified before release on the terminals in `docs/REQUIREMENTS.md` §4.3; do this at 120x40 and
-      80x24 at minimum
+      80x24 at minimum.
+
+      **Deferral note**: this agent has no real terminal/tmux session, so the by-hand walkthrough
+      itself was not performed and is not claimed as done. As a partial substitute, `ChoomApp.export_screenshot()`
+      was used under `run_test()` at both 80x24 and 120x40 against a scratch workspace with several
+      meetings, and the resulting SVGs were inspected: the upper band (scope pane + list, with header
+      and record rows) renders above a full-width divider, with the preview content below it, at both
+      sizes -- consistent with §3/§4. This is not a substitute for an interactive walkthrough (no key
+      presses were driven interactively against a real terminal emulator, and §5's data-loss guard was
+      not exercised by hand here -- it has its own automated regression test, T022, which *was* run
+      and confirmed to fail without the guard). The orchestrator's tmux smoke test at 120x40 and 80x24
+      is the point at which this task should actually be completed.
 
 ---
 
