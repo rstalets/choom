@@ -175,6 +175,36 @@ async def test_out_of_process_create_freezes_the_list_while_the_pane_is_open(
         assert len(list_view(app).children) == rows_before + 1
 
 
+async def test_resize_with_an_open_inline_editor_preserves_buffer_and_cursor(
+    tmp_workspace: Workspace,
+) -> None:
+    """FR-005: resizing the terminal with an open inline editor re-wraps in
+    place -- the buffer and the cursor's character are exactly what they were
+    (the full-screen equivalent is
+    test_edit_save_tui.py::test_resize_while_editing_preserves_buffer_cursor_and_dirty_state)."""
+    create_meeting(tmp_workspace, "Q3 planning", type="standup")
+
+    app = ChoomApp(tmp_workspace)
+    async with app.run_test(size=(80, 24)) as pilot:
+        await to_collection(app, pilot, "meetings")
+        await pilot.press("e")
+        await pilot.pause()
+        editor = app.screen.query_one("#editor", TextArea)
+        editor.text = editor.text + "\nresize me not away.\n"
+        editor.cursor_location = (1, 3)
+        expected_text = editor.text
+
+        await pilot.resize_terminal(50, 40)
+        await pilot.pause()
+
+        assert isinstance(app.screen, ListScreen)
+        pane = editor_pane(app)
+        editor = pane.query_one("#editor", TextArea)
+        assert editor.text == expected_text
+        assert editor.cursor_location == (1, 3)
+        assert pane.is_dirty is True
+
+
 # --- User Story 2: task editing shares the same inline route -----------------
 
 

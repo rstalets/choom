@@ -231,19 +231,19 @@ visible, and the new record is the highlighted row while the editor is open.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T044 [P] Integration test in `tests/integration/test_narrow_terminal_tui.py`: at 40 columns the
+- [X] T044 [P] Integration test in `tests/integration/test_narrow_terminal_tui.py`: at 40 columns the
       inline editor mounts, `soft_wrap` is on, and no line requires horizontal scrolling (FR-004,
       research R11)
-- [ ] T045 [P] Integration test in `tests/integration/test_inline_editor_tui.py`: resizing the terminal
+- [X] T045 [P] Integration test in `tests/integration/test_inline_editor_tui.py`: resizing the terminal
       with an open inline editor preserves the buffer exactly and leaves the cursor on the same
       character (FR-005)
-- [ ] T046 [P] Update `README.md` only if it describes where the editor appears; per `CLAUDE.md` the
+- [X] T046 [P] Update `README.md` only if it describes where the editor appears; per `CLAUDE.md` the
       README documents shipped releases, so an unreleased change does not belong there — check and skip
       deliberately rather than by omission
-- [ ] T047 Run `uv run ruff check .`, `uv run ruff format --check .`, and `uv run mypy src` and fix
+- [X] T047 Run `uv run ruff check .`, `uv run ruff format --check .`, and `uv run mypy src` and fix
       anything the move introduced
-- [ ] T048 Run the full suite `uv run pytest` and compare against T001's baseline
-- [ ] T049 Walk `specs/014-inline-editor-pane/quickstart.md` steps 1–10 by hand in a real terminal,
+- [X] T048 Run the full suite `uv run pytest` and compare against T001's baseline
+- [X] T049 Walk `specs/014-inline-editor-pane/quickstart.md` steps 1–10 by hand in a real terminal,
       including the resize and the out-of-process create
 - [ ] T050 Verify the TUI on the target terminals listed in `docs/REQUIREMENTS.md` before release
 
