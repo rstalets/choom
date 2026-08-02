@@ -17,6 +17,24 @@ from tests.conftest import STUB_REPLY_TEXT
 from tests.helpers import open_edit, submit_editor_line
 
 
+@pytest.fixture(autouse=True)
+def _offer_already_made(tmp_workspace: Workspace) -> None:
+    """Record the discovery offer as already made, for every test in this module.
+
+    These tests are about `/ai`, and they reach it by putting exactly one assistant
+    on PATH (`stub_assistant`, or an emptied PATH plus an explicit setting). That is
+    precisely the condition 013-assistant-discovery-file's launch offer fires on, so
+    without this the app opens onto a `ConfirmDialog` and every query for a widget on
+    the list underneath fails with `NoMatches`. First-run discovery has its own
+    coverage in `test_launch_offer.py`; here it is noise.
+
+    Module-scoped rather than in `tmp_workspace` itself: the unit tests for the config
+    writer and for `should_offer_discovery` need a workspace that has *not* been
+    through this, and pre-recording it globally would quietly gut them.
+    """
+    set_launch_offer_made(tmp_workspace, True)
+
+
 async def test_reply_replaces_the_command_line(
     tmp_workspace: Workspace, stub_assistant: Callable[[str], None]
 ) -> None:
@@ -191,11 +209,6 @@ async def test_configured_but_missing_binary_names_the_assistant(
     empty_bin.mkdir()
     monkeypatch.setenv("PATH", str(empty_bin))
     set_assistant(tmp_workspace, "claude")
-    # An explicitly configured assistant with no discovery file installed is exactly
-    # what 013-assistant-discovery-file's launch offer would raise a ConfirmDialog
-    # for (FR-022) -- irrelevant to what this test exercises, so pre-record the offer
-    # as already made to keep the app landing straight on ListScreen.
-    set_launch_offer_made(tmp_workspace, True)
 
     create_meeting(tmp_workspace, "Q3 planning", type="standup")
 
