@@ -27,7 +27,7 @@ dev = [
     # runners). A bare `pytest` invocation stays serial, which is useful for
     # readable failure output when debugging a single test.
     "pytest-xdist==3.8.0",
-    "ruff==0.16.0",
+    "ruff==0.16.1",
     "mypy==2.3.0",
     "types-PyYAML==6.0.12.20260724",
 ]
