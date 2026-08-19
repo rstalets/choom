@@ -28,7 +28,7 @@ dev = [
     # readable failure output when debugging a single test.
     "pytest-xdist==3.8.0",
     "ruff==0.16.0",
-    "mypy==2.3.0",
+    "mypy==2.3.1",
     "types-PyYAML==6.0.12.20260724",
 ]
 
